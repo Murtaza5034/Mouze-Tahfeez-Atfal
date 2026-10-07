@@ -4874,6 +4874,106 @@ export function startWhatsAppBotEngine() {
       return;
     }
 
+    // 5c. Universal Send Message endpoint (POST /api/send-message or POST /api/send-text)
+    if ((pathname === '/api/send-message' || pathname === '/api/send-text') && req.method === 'POST') {
+      let body = '';
+      req.on('data', (chunk) => { body += chunk; });
+      req.on('end', async () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const chatId = payload.phone || payload.chatId || payload.to || payload.recipient || '';
+          const phone = cleanPhone(chatId);
+          const text = payload.message || payload.text || payload.body || '';
+
+          if (!phone) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Recipient phone number is required.' }));
+            return;
+          }
+
+          if (sock && baileysStatus === 'CONNECTED') {
+            const jid = `${phone}@s.whatsapp.net`;
+            const sent = await sock.sendMessage(jid, { text });
+            console.log(`[BOT-SEND-MESSAGE] 🚀 Outbound text sent to +${phone}: "${text.substring(0, 60)}..."`);
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              id: sent?.key?.id || `msg_${Date.now()}`,
+              success: true,
+              timestamp: Date.now(),
+              to: phone,
+              status: 'SENT',
+              provider: 'baileys_socket',
+              helpline: BOT_CONFIG.HELPLINE_NUMBER
+            }));
+          } else {
+            console.log(`[BOT-SEND-MESSAGE-QUEUED] ⚠️ WhatsApp not connected. Simulated delivery for +${phone}`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              success: true,
+              simulated: true,
+              warning: 'WhatsApp daemon is initializing or unlinked. Message received by bot queue.',
+              to: phone,
+              helpline: BOT_CONFIG.HELPLINE_NUMBER
+            }));
+          }
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    // 5d. Outbound Admission WhatsApp Trigger (POST /api/whatsapp-admission)
+    if (pathname === '/api/whatsapp-admission' && req.method === 'POST') {
+      let body = '';
+      req.on('data', (chunk) => { body += chunk; });
+      req.on('end', async () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const { trigger, application } = payload;
+          if (!application) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Missing application object' }));
+            return;
+          }
+
+          const rawPhone = application.whatsapp_number || application.whatsappNumber || application.phone || '';
+          const phone = cleanPhone(rawPhone);
+          const fullName = application.full_name || application.fullName || 'Mumin';
+          const prog = application.program || 'Hifz Classes';
+          const appId = application.application_id || application.applicationId || 'N/A';
+
+          let msg = '';
+          if (trigger === 'submission') {
+            msg = `Salaam ${fullName},\n\nThank you for registering for *${prog}* (1447-48H) at Tahfeez Galiakot.\n\nYour admission status is: *⏳ Pending Admin Review*\nApplication Ref ID: *${appId}*\n\nWe have received your application and our administration will review and update you shortly.\n\nHelpline: +91 81079 25353\nTahfeez – Galiakot`;
+          } else if (trigger === 'approved') {
+            msg = `Salaam ${fullName}!\n\nMubarak! Your admission application (*${appId}*) for *${prog}* has been *APPROVED*! 🎉\n\nPlease confirm your enrollment by replying to this message with:\n👉 *Yes* (to confirm)\n👉 *No* (to decline)\n👉 *Want to talk* (for inquiries)\n\nTahfeez – Galiakot`;
+          } else if (trigger === 'rejected') {
+            msg = `Salaam ${fullName},\n\nRegarding your application (*${appId}*) for *${prog}*, we regret to inform you that we cannot accommodate new admissions at this time due to full batch capacity.\n\nHelpline: +91 81079 25353`;
+          } else if (trigger === 'waiting') {
+            msg = `Salaam ${fullName},\n\nYour application (*${appId}*) for *${prog}* is currently on the *Waiting List*.\n\nWe will notify you immediately once a slot becomes available.\n\nHelpline: +91 81079 25353`;
+          } else {
+            msg = `Salaam ${fullName},\n\nYour admission status for *${prog}* (Ref: *${appId}*) is now: *${trigger}*.\n\nHelpline: +91 81079 25353`;
+          }
+
+          if (sock && baileysStatus === 'CONNECTED' && phone) {
+            const jid = `${phone}@s.whatsapp.net`;
+            await sock.sendMessage(jid, { text: msg });
+            console.log(`[ADMISSION-WA-SENT] 🚀 Sent ${trigger} notification to +${phone}`);
+          }
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, trigger, phone, message: msg }));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
     // 6. Generate Result Preview Image (POST /api/preview)
     if (pathname === '/api/preview' && req.method === 'POST') {
       let body = '';

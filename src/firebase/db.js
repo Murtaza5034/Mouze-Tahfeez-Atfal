@@ -165,9 +165,10 @@ const DOC_ID_BY = {
   marhala_settings: (d) => String(d.id ?? 1),
   email_settings: (d) => String(d.id ?? 1),
   whatsapp_config: (d) => String(d.id ?? 1),
-  jadawal: (d) => d.student_id || d.id,
   app_lock_settings: (d) => d.user_id || d.id,
   users: (d) => d.id || d.user_id,
+  admission_applications: (d) => d.application_id || d.id,
+  admission_cms_settings: (d) => String(d.id ?? 1),
 };
 
 function deriveDocId(collectionName, data) {

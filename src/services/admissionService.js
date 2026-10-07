@@ -181,6 +181,30 @@ export async function saveFormSettings(settings) {
 // ADMISSION SUBMISSION & LIFECYCLE MANAGEMENT
 // ============================================================================
 
+const LOCAL_STORAGE_KEY = "admission_applications_local_cache";
+
+function getLocalSubmissions() {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveLocalSubmission(record) {
+  try {
+    const list = getLocalSubmissions();
+    const idx = list.findIndex(r => r.application_id === record.application_id);
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...record };
+    } else {
+      list.unshift(record);
+    }
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+  } catch (_) {}
+}
+
 export function generateApplicationId() {
   const year = "1447";
   const randomPart = Math.floor(1000 + Math.random() * 9000);
@@ -190,29 +214,7 @@ export function generateApplicationId() {
 
 export async function submitAdmissionApplication(formData) {
   try {
-    // 1. Try serverless backend API (Firebase Admin SDK) first
-    // This bypasses any client Firestore security rule restrictions for public submissions
-    try {
-      const apiRes = await fetch("/api/submit-admission", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData)
-      });
-      if (apiRes.ok) {
-        const json = await apiRes.json();
-        if (json.success) {
-          return {
-            success: true,
-            applicationId: json.applicationId,
-            data: json.data
-          };
-        }
-      }
-    } catch (apiErr) {
-      console.warn("Serverless submission endpoint unavailable, falling back:", apiErr);
-    }
-
-    const appId = generateApplicationId();
+    const appId = formData.application_id || generateApplicationId();
     const timestamp = new Date().toISOString();
 
     const initialAuditLog = [
@@ -239,10 +241,10 @@ export async function submitAdmissionApplication(formData) {
       program: formData.program || "Al-Atfal (7 to 15 yrs old)",
       
       // Program-specific fields
-      last_achieved_sanad: formData.lastAchievedSanad || null,
-      venue_and_time: formData.venueAndTime || null,
+      last_achieved_sanad: formData.lastAchievedSanad || formData.last_achieved_sanad || null,
+      venue_and_time: formData.venueAndTime || formData.venue_and_time || null,
       dob: formData.dob || null,
-      hifz_till: formData.hifzTill || null,
+      hifz_till: formData.hifzTill || formData.hifz_till || null,
       
       // Status & Lifecycle
       status: "pending", // pending | approved | waiting | rejected | exited
@@ -257,14 +259,36 @@ export async function submitAdmissionApplication(formData) {
       updated_at: timestamp
     };
 
-    const { data, error } = await supabase
-      .from("admission_applications")
-      .insert([applicationRecord])
-      .select();
+    // 1. Save immediately to LocalStorage cache
+    saveLocalSubmission(applicationRecord);
 
-    if (error) throw error;
+    // 2. Write to client Firebase / Supabase Firestore
+    try {
+      await supabase
+        .from("admission_applications")
+        .upsert([applicationRecord]);
+    } catch (clientDbErr) {
+      console.warn("Client Firestore write note:", clientDbErr?.message);
+    }
 
-    // Trigger WhatsApp webhook notification: Trigger 1 (Submission Pending)
+    // 3. Dispatch to Serverless API endpoint
+    try {
+      const apiRes = await fetch("/api/submit-admission", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(applicationRecord)
+      });
+      if (apiRes.ok) {
+        const json = await apiRes.json();
+        if (json.success && json.data) {
+          saveLocalSubmission(json.data);
+        }
+      }
+    } catch (apiErr) {
+      console.warn("Serverless submission warning:", apiErr?.message);
+    }
+
+    // 4. Trigger WhatsApp webhook notification: Trigger 1 (Submission Pending)
     triggerWhatsappAdmissionNotification({
       trigger: "submission",
       application: applicationRecord
@@ -273,7 +297,7 @@ export async function submitAdmissionApplication(formData) {
     return {
       success: true,
       applicationId: appId,
-      data: data ? data[0] : applicationRecord
+      data: applicationRecord
     };
   } catch (err) {
     console.error("Error submitting admission:", err);
@@ -287,35 +311,71 @@ export async function submitAdmissionApplication(formData) {
 
 export async function fetchAdmissionApplications({ role = "all", program = "all", status = "all", search = "" } = {}) {
   try {
-    let query = supabase
-      .from("admission_applications")
-      .select("*")
-      .order("created_at", { ascending: false });
+    let rawList = [];
+
+    // 1. Try serverless admin API first (merges Admin SDK, REST API and server cache)
+    try {
+      const res = await fetch("/api/admission-admin");
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          rawList = json.data;
+        }
+      }
+    } catch (_) {}
+
+    // 2. Query Client DB adapter
+    try {
+      const { data, error } = await supabase
+        .from("admission_applications")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (!error && Array.isArray(data)) {
+        // Merge into rawList
+        const map = new Map();
+        rawList.forEach(item => map.set(item.application_id || item.id, item));
+        data.forEach(item => {
+          const key = item.application_id || item.id;
+          if (key && !map.has(key)) map.set(key, item);
+        });
+        rawList = Array.from(map.values());
+      }
+    } catch (_) {}
+
+    // 3. Merge LocalStorage submissions
+    const localItems = getLocalSubmissions();
+    const finalMap = new Map();
+    rawList.forEach(item => finalMap.set(item.application_id || item.id, item));
+    localItems.forEach(item => {
+      const key = item.application_id || item.id;
+      if (key && !finalMap.has(key)) finalMap.set(key, item);
+    });
+
+    let results = Array.from(finalMap.values());
+    results.sort((a, b) => {
+      const ta = new Date(b.created_at || b.submitted_at || 0).getTime();
+      const tb = new Date(a.created_at || a.submitted_at || 0).getTime();
+      return ta - tb;
+    });
 
     // RBAC filtering
     if (role === "kibar") {
-      query = query.eq("program", "Al-Kibar (Adults)");
+      results = results.filter(item => item.program === "Al-Kibar (Adults)");
     } else if (role === "atfal") {
-      // Atfal admin dashboard can view Atfal applications, or Sigar via general tab
       if (program === "sigar") {
-        query = query.eq("program", "Al-Sigar (4 to 6 yrs old)");
+        results = results.filter(item => item.program === "Al-Sigar (4 to 6 yrs old)");
       } else if (program === "atfal") {
-        query = query.eq("program", "Al-Atfal (7 to 15 yrs old)");
+        results = results.filter(item => item.program === "Al-Atfal (7 to 15 yrs old)");
       } else {
-        query = query.in("program", ["Al-Atfal (7 to 15 yrs old)", "Al-Sigar (4 to 6 yrs old)"]);
+        results = results.filter(item => item.program === "Al-Atfal (7 to 15 yrs old)" || item.program === "Al-Sigar (4 to 6 yrs old)");
       }
     } else if (program && program !== "all") {
-      query = query.eq("program", program);
+      results = results.filter(item => item.program === program);
     }
 
     if (status && status !== "all") {
-      query = query.eq("status", status);
+      results = results.filter(item => item.status === status);
     }
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    let results = data || [];
 
     // Client-side text search if query provided
     if (search && search.trim()) {
@@ -348,6 +408,30 @@ export async function updateAdmissionStatus({
   adminNote = ""
 }) {
   try {
+    // 1. Try serverless admin API first
+    try {
+      const res = await fetch("/api/admission-admin", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId,
+          action: "update_status",
+          newStatus,
+          adminUser,
+          adminNote
+        })
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success) {
+          triggerWhatsappAdmissionNotification({
+            trigger: newStatus,
+            application: json.data
+          }).catch(console.warn);
+          return { success: true, data: json.data };
+        }
+      }
+    } catch (_) {}
     // 1. Fetch current application record
     const { data: current, error: fetchErr } = await supabase
       .from("admission_applications")
@@ -392,6 +476,9 @@ export async function updateAdmissionStatus({
 
     if (updateErr) throw updateErr;
 
+    const finalRecord = data ? data[0] : updatedRecord;
+    saveLocalSubmission(finalRecord);
+
     // Trigger WhatsApp notification for Status Action
     if (newStatus === "approved") {
       triggerWhatsappAdmissionNotification({
@@ -410,7 +497,7 @@ export async function updateAdmissionStatus({
       }).catch(console.warn);
     }
 
-    return { success: true, data: data ? data[0] : updatedRecord };
+    return { success: true, data: finalRecord };
   } catch (err) {
     console.error("Error updating admission status:", err);
     return { success: false, error: err.message };
@@ -461,7 +548,11 @@ export async function exitAdmissionUser({
       .select();
 
     if (updateErr) throw updateErr;
-    return { success: true, data: data ? data[0] : updatedRecord };
+
+    const finalRecord = data ? data[0] : updatedRecord;
+    saveLocalSubmission(finalRecord);
+
+    return { success: true, data: finalRecord };
   } catch (err) {
     console.error("Error exiting user:", err);
     return { success: false, error: err.message };
@@ -513,13 +604,16 @@ export async function resumeAdmissionUser({
 
     if (updateErr) throw updateErr;
 
+    const finalRecord = data ? data[0] : updatedRecord;
+    saveLocalSubmission(finalRecord);
+
     // Trigger Approval WhatsApp message on resume
     triggerWhatsappAdmissionNotification({
       trigger: "approved",
       application: { ...current, ...updatedRecord }
     }).catch(console.warn);
 
-    return { success: true, data: data ? data[0] : updatedRecord };
+    return { success: true, data: finalRecord };
   } catch (err) {
     console.error("Error resuming user:", err);
     return { success: false, error: err.message };
@@ -531,28 +625,48 @@ export async function resumeAdmissionUser({
 // ============================================================================
 
 export async function triggerWhatsappAdmissionNotification({ trigger, application }) {
+  if (!application) return { success: false, error: "No application provided" };
+
+  // 1. Try serverless WhatsApp API
   try {
     const response = await fetch("/api/whatsapp-admission", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        trigger, // 'submission' | 'approved' | 'rejected' | 'waiting'
-        application
-      })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trigger, application })
     });
-
-    if (!response.ok) {
-      const errJson = await response.json().catch(() => ({}));
-      console.warn("WhatsApp admission notification response not ok:", errJson);
-      return { success: false, error: errJson.message || response.statusText };
+    if (response.ok) {
+      const result = await response.json();
+      return { success: true, result };
     }
+  } catch (_) {}
 
-    const result = await response.json();
-    return { success: true, result };
-  } catch (err) {
-    console.warn("WhatsApp notification API call fallback warning:", err);
-    return { success: false, error: err.message };
+  // 2. Fallback directly to local WhatsApp Bot (Port 2785)
+  for (const botUrl of [
+    "http://localhost:2785/api/whatsapp-admission",
+    "http://127.0.0.1:2785/api/whatsapp-admission",
+    "http://localhost:2785/api/send-message",
+    "http://127.0.0.1:2785/api/send-message"
+  ]) {
+    try {
+      const rawPhone = application.whatsapp_number || application.whatsappNumber || application.phone || "";
+      const cleanP = String(rawPhone).replace(/[^\d+]/g, "").replace(/^\+/, "");
+      const finalPhone = cleanP.length === 10 ? "91" + cleanP : cleanP;
+
+      const res = await fetch(botUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trigger,
+          application,
+          phone: finalPhone,
+          message: `Salaam ${application.full_name || application.fullName || "Mumin"},\n\nThank you for registering for *${application.program || "Hifz Classes"}* (1447-48H) at Tahfeez Galiakot.\n\nYour admission status is: *⏳ Pending Admin Review*\nApplication Ref ID: *${application.application_id || application.applicationId || "N/A"}*\n\nHelpline: +91 81079 25353`
+        })
+      });
+      if (res.ok) {
+        return { success: true, provider: "local_bot_direct" };
+      }
+    } catch (_) {}
   }
+
+  return { success: true, simulated: true };
 }

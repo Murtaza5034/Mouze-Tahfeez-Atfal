@@ -1015,49 +1015,52 @@ export default function AdmissionForm({ onGoToAdmin = () => {} }) {
                 Admission Form Submitted!
               </h2>
               <p className="adm-subtext" style={{ maxWidth: "540px", margin: "0 auto 24px auto" }}>
-                Shukran <strong style={{ color: "#fde68a" }}>{submissionResult.applicantName}</strong>. Your application for <strong style={{ color: "#fde68a" }}>{submissionResult.program}</strong> has been received by Tahfeez Galiakot administration.
+                Shukran <strong style={{ color: "var(--adm-espresso-main)" }}>{submissionResult.applicantName}</strong>. Your application for <strong style={{ color: "var(--adm-gold-dark)" }}>{submissionResult.program}</strong> has been received by Tahfeez Galiakot administration.
               </p>
 
               {/* Reference Card */}
               <div
                 style={{
-                  background: "rgba(11, 15, 25, 0.8)",
-                  border: "1px solid rgba(245, 158, 11, 0.3)",
-                  borderRadius: "16px",
-                  padding: "20px",
-                  maxWidth: "440px",
+                  background: "#fdfbf7",
+                  border: "1.5px solid var(--adm-gold-border)",
+                  borderRadius: "20px",
+                  padding: "24px",
+                  maxWidth: "460px",
                   margin: "0 auto 24px auto",
                   textAlign: "left",
                   display: "flex",
                   flexDirection: "column",
-                  gap: "10px"
+                  gap: "12px",
+                  boxShadow: "var(--adm-shadow-sm)"
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #334155", paddingBottom: "8px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "#94a3b8" }}>Application Ref ID</span>
-                  <span style={{ fontSize: "14px", fontWeight: 800, color: "#fbbf24", fontFamily: "monospace" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--adm-border-soft)", paddingBottom: "10px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-text-muted)", letterSpacing: "0.5px" }}>Application Ref ID</span>
+                  <span style={{ fontSize: "15px", fontWeight: 900, color: "var(--adm-gold-dark)", fontFamily: "monospace" }}>
                     {submissionResult.applicationId}
                   </span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
-                  <span style={{ color: "#94a3b8" }}>Initial Status</span>
-                  <span className="status-pill status-pending">Pending Admin Review</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
+                  <span style={{ color: "var(--adm-text-muted)" }}>Initial Status</span>
+                  <span className="adm-brand-tag" style={{ background: "#fef3c7", color: "#b45309", borderColor: "#fde68a" }}>
+                    Pending Admin Review
+                  </span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
-                  <span style={{ color: "#94a3b8" }}>WhatsApp Phone</span>
-                  <span style={{ fontFamily: "monospace", color: "#f8fafc" }}>{submissionResult.phone}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                  <span style={{ color: "var(--adm-text-muted)" }}>WhatsApp Phone</span>
+                  <span style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--adm-espresso-main)" }}>{submissionResult.phone}</span>
                 </div>
               </div>
 
               {/* WhatsApp Notice */}
-              <div className="adm-notice-pill" style={{ maxWidth: "440px", margin: "0 auto 28px auto", background: "rgba(16, 185, 129, 0.1)", borderColor: "rgba(16, 185, 129, 0.3)", color: "#6ee7b7" }}>
-                <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
-                <span style={{ textAlign: "left", fontSize: "12px" }}>
-                  An automated WhatsApp acknowledgement has been sent. Status updates and approval messages will arrive directly on your phone.
+              <div className="adm-notice-pill" style={{ maxWidth: "460px", margin: "0 auto 28px auto" }}>
+                <CheckCircle2 size={18} style={{ flexShrink: 0, color: "var(--adm-gold-dark)" }} />
+                <span style={{ textAlign: "left", fontSize: "12.5px" }}>
+                  An automated WhatsApp acknowledgement has been dispatched. You will receive further updates and approval messages directly on your phone.
                 </span>
               </div>
 
-              <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", justifyContent: "center", gap: "12px" }}>
                 <button
                   type="button"
                   onClick={() => {
@@ -1067,18 +1070,9 @@ export default function AdmissionForm({ onGoToAdmin = () => {} }) {
                     setGuidelinesTimer(10);
                     setGuidelinesTimerDone(false);
                   }}
-                  className="adm-btn-secondary"
+                  className="adm-btn-primary"
                 >
                   Submit Another Form
-                </button>
-
-                <button
-                  type="button"
-                  onClick={onGoToAdmin}
-                  className="adm-btn-primary"
-                  style={{ padding: "10px 24px", fontSize: "13px" }}
-                >
-                  Go to Admin Portal
                 </button>
               </div>
             </motion.div>

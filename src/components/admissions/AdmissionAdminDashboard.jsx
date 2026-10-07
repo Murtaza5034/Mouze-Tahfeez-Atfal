@@ -97,17 +97,19 @@ export default function AdmissionAdminDashboard({
 
       // Role & Tab filtering
       if (activeRole === "kibar") {
-        if (app.program !== "Al-Kibar (Adults)") return false;
+        if (app.program !== "Al-Kibar (Adults)" && !app.program?.toLowerCase().includes("kibar")) return false;
       } else if (activeRole === "atfal") {
-        if (activeTab === "general_sigar") {
-          if (app.program !== "Al-Sigar (4 to 6 yrs old)") return false;
-        } else {
-          if (app.program !== "Al-Atfal (7 to 15 yrs old)") return false;
+        if (activeTab === "general_sigar" || activeTab === "sigar") {
+          if (app.program !== "Al-Sigar (4 to 6 yrs old)" && !app.program?.toLowerCase().includes("sigar")) return false;
+        } else if (activeTab === "atfal") {
+          if (app.program !== "Al-Atfal (7 to 15 yrs old)" && !app.program?.toLowerCase().includes("atfal")) return false;
+        } else if (activeTab === "all") {
+          if (app.program === "Al-Kibar (Adults)" || app.program?.toLowerCase().includes("kibar")) return false;
         }
       } else {
-        if (activeTab === "kibar" && app.program !== "Al-Kibar (Adults)") return false;
-        if (activeTab === "atfal" && app.program !== "Al-Atfal (7 to 15 yrs old)") return false;
-        if (activeTab === "sigar" && app.program !== "Al-Sigar (4 to 6 yrs old)") return false;
+        if (activeTab === "kibar" && app.program !== "Al-Kibar (Adults)" && !app.program?.toLowerCase().includes("kibar")) return false;
+        if (activeTab === "atfal" && app.program !== "Al-Atfal (7 to 15 yrs old)" && !app.program?.toLowerCase().includes("atfal")) return false;
+        if (activeTab === "sigar" && app.program !== "Al-Sigar (4 to 6 yrs old)" && !app.program?.toLowerCase().includes("sigar")) return false;
       }
 
       if (statusFilter !== "all" && app.status !== statusFilter) return false;
@@ -415,6 +417,13 @@ export default function AdmissionAdminDashboard({
 
           {activeRole === "atfal" && (
             <>
+              <button
+                type="button"
+                onClick={() => setActiveTab("all")}
+                className={`adm-tab-pill ${activeTab === "all" ? "active" : ""}`}
+              >
+                All Responses ({applications.filter(a => (a.program?.includes("Atfal") || a.program?.includes("Sigar")) && a.status !== 'exited').length})
+              </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("atfal")}

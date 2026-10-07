@@ -1,5 +1,7 @@
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import fs from "fs";
+import path from "path";
 
 const FALLBACK_SA = {
   type: "service_account",
@@ -13,6 +15,21 @@ const FALLBACK_SA = {
   auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
   client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/mauze-tahfeez-592%40mawaid-b929a.iam.gserviceaccount.com"
 };
+
+const CACHE_FILE = path.join("/tmp", "admission_applications_cache.json");
+
+function writeDiskCache(record) {
+  try {
+    let list = [];
+    if (fs.existsSync(CACHE_FILE)) {
+      list = JSON.parse(fs.readFileSync(CACHE_FILE, "utf8")) || [];
+    }
+    const idx = list.findIndex(r => r.application_id === record.application_id);
+    if (idx >= 0) list[idx] = record;
+    else list.unshift(record);
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(list), "utf8");
+  } catch (_) {}
+}
 
 function getAdminDb() {
   if (!getApps().length) {
@@ -34,8 +51,54 @@ function getAdminDb() {
   return getFirestore();
 }
 
+async function dispatchSubmissionWhatsApp(application) {
+  const { full_name, whatsapp_number, program, application_id } = application;
+  if (!whatsapp_number) return;
+
+  let cleanPhone = String(whatsapp_number).replace(/[^\d+]/g, "");
+  if (cleanPhone.startsWith("+")) cleanPhone = cleanPhone.substring(1);
+  else if (cleanPhone.length === 10) cleanPhone = "91" + cleanPhone;
+
+  const messageText = `Salaam ${full_name || "Mumin"},\n\nThank you for registering for *${program || "Hifz Classes"}* (1447-48H) at Tahfeez Galiakot.\n\nYour admission status is *Pending Admin Review*. You will receive an official update from the administration soon.\n\nRef ID: *${application_id || "N/A"}*\nHelpline: +918107925353`;
+
+  // 1. Meta WhatsApp Cloud API
+  const cloudApiToken = process.env.WHATSAPP_TOKEN || process.env.WHATSAPP_CLOUD_API_KEY;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  if (cloudApiToken && phoneNumberId) {
+    try {
+      await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${cloudApiToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: cleanPhone,
+          type: "text",
+          text: { preview_url: false, body: messageText }
+        })
+      });
+      return;
+    } catch (_) {}
+  }
+
+  // 2. Local Baileys WhatsApp Bot
+  for (const botUrl of ["http://localhost:2785/api/send-message", "http://127.0.0.1:2785/api/send-message"]) {
+    try {
+      await fetch(botUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: cleanPhone, message: messageText })
+      });
+      return;
+    } catch (_) {}
+  }
+}
+
 export default async function handler(req, res) {
-  // CORS configuration
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS,PATCH,DELETE,POST,PUT");
@@ -55,9 +118,7 @@ export default async function handler(req, res) {
   try {
     let rawData = req.body;
     if (typeof rawData === "string") {
-      try {
-        rawData = JSON.parse(rawData);
-      } catch (_) {}
+      try { rawData = JSON.parse(rawData); } catch (_) {}
     }
     const formData = rawData || {};
     const timestamp = new Date().toISOString();
@@ -109,22 +170,23 @@ export default async function handler(req, res) {
       updated_at: timestamp
     };
 
-    const db = getAdminDb();
-    // Save to Firestore 'admission_applications' with appId as document key
-    await db.collection("admission_applications").doc(appId).set(applicationRecord, { merge: true });
+    // 1. Write to cache
+    writeDiskCache(applicationRecord);
 
-    // Asynchronously trigger WhatsApp notification if possible
+    // 2. Write to Firestore
     try {
-      const waUrl = `${req.headers["x-forwarded-proto"] || "https"}://${req.headers.host}/api/whatsapp-admission`;
-      fetch(waUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          trigger: "submission",
-          application: applicationRecord
-        })
-      }).catch(err => console.warn("WhatsApp notification trigger note:", err.message));
-    } catch (_) {}
+      const db = getAdminDb();
+      await db.collection("admission_applications").doc(appId).set(applicationRecord, { merge: true });
+    } catch (dbErr) {
+      console.warn("Firestore setDoc note:", dbErr.message);
+    }
+
+    // 3. Dispatch WhatsApp notification
+    try {
+      await dispatchSubmissionWhatsApp(applicationRecord);
+    } catch (waErr) {
+      console.warn("WhatsApp dispatch warning:", waErr.message);
+    }
 
     return res.status(200).json({
       success: true,
