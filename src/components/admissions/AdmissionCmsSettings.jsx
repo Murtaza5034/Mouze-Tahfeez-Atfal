@@ -24,6 +24,7 @@ import {
   saveFormSettings,
   DEFAULT_CMS_SETTINGS
 } from "../../services/admissionService";
+import "./AdmissionStyles.css";
 
 export default function AdmissionCmsSettings({ onSaved = () => {} }) {
   const [settings, setSettings] = useState(DEFAULT_CMS_SETTINGS);
@@ -132,30 +133,30 @@ export default function AdmissionCmsSettings({ onSaved = () => {} }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-12 text-slate-400">
-        <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "48px", color: "var(--adm-text-muted)" }}>
+        <Loader2 size={32} className="animate-spin" style={{ color: "var(--adm-gold-primary)" }} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       {/* Top Header & Save Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-slate-900/80 border border-slate-800 backdrop-blur-md">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "14px", padding: "20px 24px", borderRadius: "20px", background: "#ffffff", border: "1.5px solid var(--adm-gold-border)", boxShadow: "var(--adm-shadow-sm)" }}>
         <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-amber-400" />
+          <h2 style={{ margin: 0, fontSize: "19px", fontWeight: 900, color: "var(--adm-espresso-main)", display: "flex", alignItems: "center", gap: "8px" }}>
+            <Sparkles size={20} color="var(--adm-gold-dark)" />
             <span>CMS Form Configurations</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Modify live form headings, introduction text, countdown timers, program URLs, and venue photos.
+          <p style={{ margin: "3px 0 0 0", fontSize: "12.5px", color: "var(--adm-text-muted)" }}>
+            Modify live form headings, introduction text, countdown timers, program details, and venue photo gallery.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           {saveSuccess && (
-            <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5 animate-fadeIn">
-              <CheckCircle2 className="w-4 h-4" /> Live changes published!
+            <span style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--adm-emerald-primary)", display: "flex", alignItems: "center", gap: "6px" }}>
+              <CheckCircle2 size={16} /> Live changes published!
             </span>
           )}
 
@@ -163,12 +164,13 @@ export default function AdmissionCmsSettings({ onSaved = () => {} }) {
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs tracking-wide shadow-lg shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
+            className="adm-btn-primary"
+            style={{ padding: "10px 24px", fontSize: "13px" }}
           >
             {saving ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 size={16} className="animate-spin" />
             ) : (
-              <Save className="w-4 h-4" />
+              <Save size={16} />
             )}
             <span>{saving ? "Publishing..." : "Save All Changes"}</span>
           </button>
@@ -176,7 +178,7 @@ export default function AdmissionCmsSettings({ onSaved = () => {} }) {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-800 gap-2 pb-1 overflow-x-auto">
+      <div style={{ display: "flex", gap: "8px", borderBottom: "1.5px solid var(--adm-gold-border)", paddingBottom: "8px", overflowX: "auto" }}>
         {[
           { id: "general", label: "General & Guidelines", icon: FileText },
           { id: "programs", label: "Program Details & URLs", icon: BookOpen },
@@ -188,13 +190,9 @@ export default function AdmissionCmsSettings({ onSaved = () => {} }) {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                isActive
-                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-              }`}
+              className={`adm-tab-pill ${isActive ? "active" : ""}`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon size={16} />
               <span>{tab.label}</span>
             </button>
           );
@@ -206,108 +204,99 @@ export default function AdmissionCmsSettings({ onSaved = () => {} }) {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="space-y-6"
+          style={{ display: "flex", flexDirection: "column", gap: "20px" }}
         >
-          <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-5">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-amber-300 flex items-center gap-2">
-              <FileText className="w-4 h-4" />
+          <div style={{ padding: "24px", borderRadius: "20px", background: "#ffffff", border: "1.5px solid var(--adm-gold-border)", boxShadow: "var(--adm-shadow-sm)", display: "flex", flexDirection: "column", gap: "18px" }}>
+            <h3 style={{ margin: 0, fontSize: "13px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-gold-dark)", display: "flex", alignItems: "center", gap: "8px" }}>
+              <FileText size={16} />
               Page 1: Title & Introduction Text
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-300">
-                  Form Main Title
-                </label>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
+              <div className="adm-field">
+                <label className="adm-label">Form Main Title</label>
                 <input
                   type="text"
                   value={settings.form_title}
                   onChange={(e) => handleGeneralChange("form_title", e.target.value)}
-                  className="adm-input"
+                  className="adm-input-custom adm-input-noicon"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-300">
-                  Organization / Subtitle
-                </label>
+              <div className="adm-field">
+                <label className="adm-label">Organization / Subtitle</label>
                 <input
                   type="text"
                   value={settings.organization_name}
                   onChange={(e) => handleGeneralChange("organization_name", e.target.value)}
-                  className="adm-input"
+                  className="adm-input-custom adm-input-noicon"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-300">
-                  WhatsApp Helpline Number
-                </label>
+              <div className="adm-field">
+                <label className="adm-label">WhatsApp Helpline Number</label>
                 <input
                   type="text"
                   value={settings.helpline_number}
                   onChange={(e) => handleGeneralChange("helpline_number", e.target.value)}
-                  className="adm-input"
+                  className="adm-input-custom adm-input-noicon"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-300">
-                  Page 1 Countdown Timer (Seconds)
-                </label>
+              <div className="adm-field">
+                <label className="adm-label">Page 1 Countdown Timer (Seconds)</label>
                 <input
                   type="number"
                   min={0}
                   max={60}
                   value={settings.intro_countdown_seconds}
                   onChange={(e) => handleGeneralChange("intro_countdown_seconds", parseInt(e.target.value, 10) || 0)}
-                  className="adm-input"
+                  className="adm-input-custom adm-input-noicon"
                 />
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-300">
-                Introduction Text Block (Displayed on Page 1)
-              </label>
+            <div className="adm-field">
+              <label className="adm-label">Introduction Text Block (Displayed on Page 1)</label>
               <textarea
                 rows={7}
                 value={settings.intro_text}
                 onChange={(e) => handleGeneralChange("intro_text", e.target.value)}
-                className="adm-input font-normal leading-relaxed text-sm"
+                className="adm-input-custom adm-input-noicon"
+                style={{ fontSize: "13.5px", lineHeight: "1.7", fontFamily: "inherit" }}
               />
             </div>
           </div>
 
-          <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-300 flex items-center gap-2">
-                <FileText className="w-4 h-4" />
+          <div style={{ padding: "24px", borderRadius: "20px", background: "#ffffff", border: "1.5px solid var(--adm-gold-border)", boxShadow: "var(--adm-shadow-sm)", display: "flex", flexDirection: "column", gap: "18px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: "13px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-emerald-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
+                <FileText size={16} />
                 Page 3: Guidelines & Code of Conduct
               </h3>
 
-              <div className="flex items-center gap-2">
-                <label className="text-xs text-slate-400">Timer (Seconds):</label>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <label style={{ fontSize: "12px", color: "var(--adm-text-muted)", fontWeight: 700 }}>Timer (Seconds):</label>
                 <input
                   type="number"
                   min={0}
                   max={60}
                   value={settings.guidelines_countdown_seconds}
                   onChange={(e) => handleGeneralChange("guidelines_countdown_seconds", parseInt(e.target.value, 10) || 0)}
-                  className="adm-input max-w-[80px] py-1.5 text-center"
+                  className="adm-input-custom adm-input-noicon"
+                  style={{ maxWidth: "80px", padding: "6px 10px", textAlign: "center" }}
                 />
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-300">
-                Guidelines Lines (One per bullet point)
-              </label>
+            <div className="adm-field">
+              <label className="adm-label">Guidelines Lines (One per bullet point)</label>
               <textarea
                 rows={6}
                 value={settings.guidelines_text}
                 onChange={(e) => handleGeneralChange("guidelines_text", e.target.value)}
-                className="adm-input font-normal leading-relaxed text-sm"
+                className="adm-input-custom adm-input-noicon"
+                style={{ fontSize: "13.5px", lineHeight: "1.7", fontFamily: "inherit" }}
               />
             </div>
           </div>
@@ -319,7 +308,7 @@ export default function AdmissionCmsSettings({ onSaved = () => {} }) {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="space-y-6"
+          style={{ display: "flex", flexDirection: "column", gap: "20px" }}
         >
           {["kibar", "atfal", "sigar"].map((pKey) => {
             const prog = settings.programs_info?.[pKey] || {};
@@ -332,98 +321,87 @@ export default function AdmissionCmsSettings({ onSaved = () => {} }) {
             return (
               <div
                 key={pKey}
-                className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4"
+                style={{ padding: "24px", borderRadius: "20px", background: "#ffffff", border: "1.5px solid var(--adm-gold-border)", boxShadow: "var(--adm-shadow-sm)", display: "flex", flexDirection: "column", gap: "16px" }}
               >
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-amber-400" />
-                    <h3 className="text-base font-bold text-white">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1.5px solid var(--adm-gold-border)", paddingBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ width: "10px", height: "10px", borderRadius: "50%", background: "var(--adm-gold-primary)" }} />
+                    <h3 style={{ margin: 0, fontSize: "16.5px", fontWeight: 800, color: "var(--adm-espresso-main)" }}>
                       {titleMap[pKey]} Configuration
                     </h3>
                   </div>
 
-                  <span className="text-xs text-amber-400 font-semibold bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                  <span className="adm-brand-tag">
                     {prog.badge || "Programme"}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-400">
-                      Hub Raqam Fee Text
-                    </label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
+                  <div className="adm-field">
+                    <label className="adm-label">Hub Raqam Fee Text</label>
                     <input
                       type="text"
                       value={prog.hub_raqam || ""}
                       onChange={(e) => handleProgramChange(pKey, "hub_raqam", e.target.value)}
-                      className="adm-input"
+                      className="adm-input-custom adm-input-noicon"
                       placeholder="e.g. ₹2,500 / month"
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-400">
-                      Timings Text
-                    </label>
+                  <div className="adm-field">
+                    <label className="adm-label">Timings Text</label>
                     <input
                       type="text"
                       value={prog.timings || ""}
                       onChange={(e) => handleProgramChange(pKey, "timings", e.target.value)}
-                      className="adm-input"
+                      className="adm-input-custom adm-input-noicon"
                       placeholder="e.g. Morning 8:30am to 10:30am"
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-400">
-                      Venues
-                    </label>
+                  <div className="adm-field">
+                    <label className="adm-label">Venues</label>
                     <input
                       type="text"
                       value={prog.venues || ""}
                       onChange={(e) => handleProgramChange(pKey, "venues", e.target.value)}
-                      className="adm-input"
+                      className="adm-input-custom adm-input-noicon"
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-400">
-                      Motto / Slogan
-                    </label>
+                  <div className="adm-field">
+                    <label className="adm-label">Motto / Slogan</label>
                     <input
                       type="text"
                       value={prog.motto || ""}
                       onChange={(e) => handleProgramChange(pKey, "motto", e.target.value)}
-                      className="adm-input"
+                      className="adm-input-custom adm-input-noicon"
                     />
                   </div>
 
-                  {/* Informational URL attached to the program */}
-                  <div className="md:col-span-2 space-y-1">
-                    <label className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
-                      <Link className="w-3.5 h-3.5" />
+                  {/* Informational URL */}
+                  <div className="adm-field adm-col-full">
+                    <label className="adm-label" style={{ color: "var(--adm-gold-dark)", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <Link size={14} />
                       Informational URL attached to Info Icon (Opened when user clicks (i))
                     </label>
-                    <div className="relative">
-                      <input
-                        type="url"
-                        value={prog.info_url || ""}
-                        onChange={(e) => handleProgramChange(pKey, "info_url", e.target.value)}
-                        className="adm-input text-sky-300"
-                        placeholder="https://mauze-tahfeez.vercel.app/info/..."
-                      />
-                    </div>
+                    <input
+                      type="url"
+                      value={prog.info_url || ""}
+                      onChange={(e) => handleProgramChange(pKey, "info_url", e.target.value)}
+                      className="adm-input-custom adm-input-noicon"
+                      placeholder="https://mouze-tahfeez-atfal.vercel.app/info/..."
+                    />
                   </div>
 
-                  <div className="md:col-span-2 space-y-1">
-                    <label className="text-xs font-semibold text-slate-400">
-                      Description & About Us
-                    </label>
+                  <div className="adm-field adm-col-full">
+                    <label className="adm-label">Description & About Us</label>
                     <textarea
                       rows={4}
                       value={prog.description || ""}
                       onChange={(e) => handleProgramChange(pKey, "description", e.target.value)}
-                      className="adm-input text-sm leading-relaxed"
+                      className="adm-input-custom adm-input-noicon"
+                      style={{ fontSize: "13px", lineHeight: "1.6" }}
                     />
                   </div>
                 </div>
@@ -438,113 +416,112 @@ export default function AdmissionCmsSettings({ onSaved = () => {} }) {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="space-y-6"
+          style={{ display: "flex", flexDirection: "column", gap: "20px" }}
         >
           {/* Add Photo Module */}
-          <div className="p-6 rounded-2xl bg-slate-900/90 border border-amber-500/30 space-y-4">
-            <h3 className="text-sm font-bold text-amber-300 uppercase tracking-wider flex items-center gap-2">
-              <Plus className="w-4 h-4 text-amber-400" />
+          <div style={{ padding: "24px", borderRadius: "20px", background: "#ffffff", border: "1.5px solid var(--adm-gold-border)", boxShadow: "var(--adm-shadow-sm)", display: "flex", flexDirection: "column", gap: "16px" }}>
+            <h3 style={{ margin: 0, fontSize: "13px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-gold-dark)", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Plus size={16} />
               Add New Venue Photo to Modal Gallery
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400">Photo Title</label>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
+              <div className="adm-field">
+                <label className="adm-label">Photo Title</label>
                 <input
                   type="text"
                   value={newPhoto.title}
                   onChange={(e) => setNewPhoto({ ...newPhoto, title: e.target.value })}
                   placeholder="e.g. Main Tahfeez Hall - Pakhti Mubarak"
-                  className="adm-input"
+                  className="adm-input-custom adm-input-noicon"
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400">Location Tag / Badge</label>
+              <div className="adm-field">
+                <label className="adm-label">Location Tag / Badge</label>
                 <input
                   type="text"
                   value={newPhoto.tag}
                   onChange={(e) => setNewPhoto({ ...newPhoto, tag: e.target.value })}
                   placeholder="e.g. Burhani Masjid or Evan e Badri"
-                  className="adm-input"
+                  className="adm-input-custom adm-input-noicon"
                 />
               </div>
 
-              <div className="md:col-span-2 space-y-1">
-                <label className="text-xs font-semibold text-slate-400">Image URL (Direct link or HTTPS CDN)</label>
+              <div className="adm-field adm-col-full">
+                <label className="adm-label">Image URL (Direct link or HTTPS CDN)</label>
                 <input
                   type="url"
                   value={newPhoto.url}
                   onChange={(e) => setNewPhoto({ ...newPhoto, url: e.target.value })}
                   placeholder="https://images.unsplash.com/..."
-                  className="adm-input"
+                  className="adm-input-custom adm-input-noicon"
                 />
               </div>
 
-              <div className="md:col-span-2 space-y-1">
-                <label className="text-xs font-semibold text-slate-400">Caption Description</label>
+              <div className="adm-field adm-col-full">
+                <label className="adm-label">Caption Description</label>
                 <input
                   type="text"
                   value={newPhoto.description}
                   onChange={(e) => setNewPhoto({ ...newPhoto, description: e.target.value })}
                   placeholder="A brief caption describing the classroom setup or facility..."
-                  className="adm-input"
+                  className="adm-input-custom adm-input-noicon"
                 />
               </div>
             </div>
 
-            <div className="pt-2 flex justify-end">
+            <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: "8px" }}>
               <button
                 type="button"
                 onClick={handleAddPhoto}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs tracking-wide transition-all cursor-pointer shadow-md"
+                className="adm-btn-primary"
+                style={{ padding: "10px 22px", fontSize: "13px" }}
               >
-                <Plus className="w-4 h-4" />
+                <Plus size={16} />
                 <span>Add Photo to Gallery</span>
               </button>
             </div>
           </div>
 
           {/* Existing Photos Grid */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            <h3 style={{ margin: 0, fontSize: "12px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-text-muted)" }}>
               Active Gallery Photos ({(settings.venue_photos || []).length})
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
               {(settings.venue_photos || []).map((photo, index) => (
                 <div
                   key={photo.id || index}
-                  className="rounded-2xl bg-slate-900/80 border border-slate-800 overflow-hidden flex flex-col group hover:border-amber-500/40 transition-all shadow-md"
+                  style={{ borderRadius: "18px", background: "#ffffff", border: "1.5px solid var(--adm-gold-border)", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "var(--adm-shadow-sm)" }}
                 >
-                  <div className="relative h-44 w-full bg-slate-950 overflow-hidden">
+                  <div style={{ position: "relative", height: "180px", width: "100%", background: "var(--adm-cream-soft)", overflow: "hidden" }}>
                     <img
                       src={photo.url}
                       alt={photo.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
                     />
-                    <div className="absolute top-3 left-3 bg-slate-950/80 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2.5 py-0.5 rounded-full backdrop-blur-md">
+                    <div style={{ position: "absolute", top: "12px", left: "12px", background: "rgba(255, 255, 255, 0.9)", color: "var(--adm-gold-dark)", border: "1px solid var(--adm-gold-border)", fontSize: "10.5px", fontWeight: 800, padding: "2px 10px", borderRadius: "999px" }}>
                       {photo.tag || "Venue"}
                     </div>
                     <button
                       type="button"
                       onClick={() => handleRemovePhoto(photo.id)}
-                      className="absolute top-3 right-3 p-2 rounded-xl bg-rose-500/80 hover:bg-rose-600 text-white shadow-lg transition-all cursor-pointer"
+                      style={{ position: "absolute", top: "12px", right: "12px", padding: "8px", borderRadius: "10px", background: "rgba(220, 38, 38, 0.9)", color: "#ffffff", border: "none", cursor: "pointer" }}
                       title="Remove Photo"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 size={14} />
                     </button>
                   </div>
 
-                  <div className="p-4 flex-1 flex flex-col justify-between">
-                    <div>
-                      <h4 className="text-sm font-bold text-white line-clamp-1">
-                        {photo.title}
-                      </h4>
-                      <p className="text-xs text-slate-300 mt-1 line-clamp-2">
-                        {photo.description}
-                      </p>
-                    </div>
+                  <div style={{ padding: "16px" }}>
+                    <h4 style={{ margin: 0, fontSize: "14.5px", fontWeight: 800, color: "var(--adm-espresso-main)" }}>
+                      {photo.title}
+                    </h4>
+                    <p style={{ margin: "4px 0 0 0", fontSize: "12.5px", color: "var(--adm-text-muted)" }}>
+                      {photo.description}
+                    </p>
                   </div>
                 </div>
               ))}

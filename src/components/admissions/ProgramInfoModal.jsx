@@ -1,42 +1,35 @@
 import React from "react";
-import { X, Clock, MapPin, Calendar, DollarSign, Award, ExternalLink, Sparkles, BookOpen } from "lucide-react";
+import { X, Clock, Calendar, Award, BookOpen, Sparkles, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import "./AdmissionStyles.css";
 
 export default function ProgramInfoModal({ isOpen, onClose, programData }) {
   if (!isOpen || !programData) return null;
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 md:p-6">
-        {/* Backdrop */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
-        />
-
+      <div className="adm-modal-overlay">
         {/* Modal Container */}
         <motion.div
-          initial={{ scale: 0.95, opacity: 0, y: 20 }}
+          initial={{ scale: 0.95, opacity: 0, y: 15 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.95, opacity: 0, y: 20 }}
-          transition={{ type: "spring", stiffness: 300, damping: 28 }}
-          className="relative w-full max-w-2xl bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-amber-500/30 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] z-10 text-slate-100"
+          exit={{ scale: 0.95, opacity: 0, y: 15 }}
+          transition={{ type: "spring", stiffness: 320, damping: 28 }}
+          className="adm-modal-card"
+          style={{ maxWidth: "620px", maxHeight: "90vh", display: "flex", flexDirection: "column", padding: 0, overflow: "hidden" }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header Bar */}
-          <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800 bg-slate-900/60">
-            <div className="flex items-center space-x-3">
-              <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                <BookOpen className="w-6 h-6" />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px", borderBottom: "1.5px solid var(--adm-gold-border)", background: "var(--adm-cream-soft)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+              <div style={{ padding: "10px", borderRadius: "14px", background: "var(--adm-gold-subtle)", color: "var(--adm-gold-dark)", border: "1.5px solid var(--adm-gold-border)" }}>
+                <BookOpen size={22} />
               </div>
               <div>
-                <span className="text-xs uppercase tracking-wider font-semibold text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                <span className="adm-brand-tag" style={{ marginBottom: "4px", display: "inline-block" }}>
                   {programData.badge || "Programme Details"}
                 </span>
-                <h3 className="text-xl font-bold text-white mt-1">
+                <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 900, color: "var(--adm-espresso-main)" }}>
                   {programData.name}
                 </h3>
               </div>
@@ -44,111 +37,94 @@ export default function ProgramInfoModal({ isOpen, onClose, programData }) {
 
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer"
+              className="adm-btn-text"
+              style={{ fontSize: "18px", padding: "6px 12px" }}
             >
-              <X className="w-5 h-5" />
+              ✕
             </button>
           </div>
 
           {/* Body Content */}
-          <div className="p-6 md:p-8 overflow-y-auto space-y-6">
+          <div style={{ padding: "24px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "18px" }}>
             {/* Motto Callout */}
             {programData.motto && (
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-amber-500/10 border border-amber-500/20 text-center">
-                <p className="text-xs font-semibold uppercase text-amber-400 tracking-wider">
+              <div style={{ padding: "16px", borderRadius: "16px", background: "linear-gradient(135deg, #fff9ea 0%, #fff2d1 100%)", border: "1.5px solid var(--adm-gold-border)", textAlign: "center" }}>
+                <p style={{ margin: 0, fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-gold-dark)", letterSpacing: "0.6px" }}>
                   Our Motto
                 </p>
-                <p className="text-base md:text-lg font-medium italic text-amber-100 mt-1">
+                <p style={{ margin: "4px 0 0 0", fontSize: "15px", fontStyle: "italic", fontWeight: 700, color: "var(--adm-espresso-main)" }}>
                   "{programData.motto}"
                 </p>
               </div>
             )}
 
             {/* Quick Spec Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
               {/* Age Group */}
-              <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60 flex items-start gap-3">
-                <Award className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div style={{ padding: "14px", borderRadius: "14px", background: "#ffffff", border: "1.5px solid var(--adm-border-soft)", display: "flex", alignItems: "flex-start", gap: "10px", boxShadow: "var(--adm-shadow-sm)" }}>
+                <Award size={18} color="var(--adm-gold-dark)" style={{ marginTop: "2px", flexShrink: 0 }} />
                 <div>
-                  <p className="text-xs text-slate-400 font-medium">Eligible Age</p>
-                  <p className="text-sm font-semibold text-slate-200 mt-0.5">
+                  <p style={{ margin: 0, fontSize: "11px", color: "var(--adm-text-muted)", fontWeight: 700 }}>Eligible Age</p>
+                  <p style={{ margin: "2px 0 0 0", fontSize: "13.5px", fontWeight: 800, color: "var(--adm-espresso-main)" }}>
                     {programData.age_group || "All Mumineen"}
                   </p>
                 </div>
               </div>
 
               {/* Schedule Days */}
-              <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60 flex items-start gap-3">
-                <Calendar className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+              <div style={{ padding: "14px", borderRadius: "14px", background: "#ffffff", border: "1.5px solid var(--adm-border-soft)", display: "flex", alignItems: "flex-start", gap: "10px", boxShadow: "var(--adm-shadow-sm)" }}>
+                <Calendar size={18} color="var(--adm-emerald-primary)" style={{ marginTop: "2px", flexShrink: 0 }} />
                 <div>
-                  <p className="text-xs text-slate-400 font-medium">Class Days</p>
-                  <p className="text-sm font-semibold text-slate-200 mt-0.5">
+                  <p style={{ margin: 0, fontSize: "11px", color: "var(--adm-text-muted)", fontWeight: 700 }}>Class Days</p>
+                  <p style={{ margin: "2px 0 0 0", fontSize: "13.5px", fontWeight: 800, color: "var(--adm-espresso-main)" }}>
                     {programData.days || "Mondays to Fridays"}
                   </p>
                 </div>
               </div>
 
               {/* Timings */}
-              <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60 flex items-start gap-3">
-                <Clock className="w-5 h-5 text-sky-400 flex-shrink-0 mt-0.5" />
+              <div style={{ padding: "14px", borderRadius: "14px", background: "#ffffff", border: "1.5px solid var(--adm-border-soft)", display: "flex", alignItems: "flex-start", gap: "10px", boxShadow: "var(--adm-shadow-sm)" }}>
+                <Clock size={18} color="var(--adm-gold-dark)" style={{ marginTop: "2px", flexShrink: 0 }} />
                 <div>
-                  <p className="text-xs text-slate-400 font-medium">Timings</p>
-                  <p className="text-sm font-semibold text-slate-200 mt-0.5">
+                  <p style={{ margin: 0, fontSize: "11px", color: "var(--adm-text-muted)", fontWeight: 700 }}>Timings</p>
+                  <p style={{ margin: "2px 0 0 0", fontSize: "13.5px", fontWeight: 800, color: "var(--adm-espresso-main)" }}>
                     {programData.timings || "Scheduled Batches"}
                   </p>
                 </div>
               </div>
 
-              {/* Hub Raqam */}
-              <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60 flex items-start gap-3">
-                <DollarSign className="w-5 h-5 text-amber-300 flex-shrink-0 mt-0.5" />
+              {/* Hifz Goal */}
+              <div style={{ padding: "14px", borderRadius: "14px", background: "#ffffff", border: "1.5px solid var(--adm-border-soft)", display: "flex", alignItems: "flex-start", gap: "10px", boxShadow: "var(--adm-shadow-sm)" }}>
+                <CheckCircle2 size={18} color="var(--adm-emerald-primary)" style={{ marginTop: "2px", flexShrink: 0 }} />
                 <div>
-                  <p className="text-xs text-slate-400 font-medium">Hub Raqam (Monthly)</p>
-                  <p className="text-sm font-bold text-amber-200 mt-0.5">
-                    {programData.hub_raqam || "Standard Hub"}
+                  <p style={{ margin: 0, fontSize: "11px", color: "var(--adm-text-muted)", fontWeight: 700 }}>Hifz Goal</p>
+                  <p style={{ margin: "2px 0 0 0", fontSize: "13.5px", fontWeight: 800, color: "var(--adm-espresso-main)" }}>
+                    {programData.goal || "Structured Marhala Syllabus"}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Venues */}
-            {programData.venues && (
-              <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700/60 flex items-start gap-3">
-                <MapPin className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs text-slate-400 font-medium">Venues</p>
-                  <p className="text-sm text-slate-200 mt-0.5 leading-relaxed">
-                    {programData.venues}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* About the Programme */}
-            <div>
-              <h4 className="text-sm font-bold uppercase tracking-wider text-slate-300 mb-2 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                About This Programme
+            {/* Description */}
+            <div style={{ background: "var(--adm-cream-soft)", padding: "18px", borderRadius: "16px", border: "1.5px solid var(--adm-gold-border)" }}>
+              <h4 style={{ margin: "0 0 8px 0", fontSize: "12px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-gold-dark)" }}>
+                Programme Description
               </h4>
-              <div className="text-sm text-slate-300 leading-relaxed space-y-3 bg-slate-900/80 p-5 rounded-2xl border border-slate-800 whitespace-pre-line">
+              <p style={{ margin: 0, fontSize: "13.5px", lineHeight: "1.7", color: "var(--adm-espresso-light)" }}>
                 {programData.description}
-              </div>
+              </p>
             </div>
+          </div>
 
-            {/* External Link configured by Admin */}
-            {programData.info_url && (
-              <div className="pt-2">
-                <a
-                  href={programData.info_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center w-full gap-2 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/25 transition-all cursor-pointer"
-                >
-                  <span>Explore Full Syllabus & Details Online</span>
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-              </div>
-            )}
+          {/* Footer Action */}
+          <div style={{ padding: "16px 24px", background: "#ffffff", borderTop: "1.5px solid var(--adm-gold-border)", display: "flex", justifyContent: "flex-end" }}>
+            <button
+              onClick={onClose}
+              className="adm-btn-primary"
+              style={{ padding: "10px 24px", fontSize: "13px" }}
+            >
+              Close Details
+            </button>
           </div>
         </motion.div>
       </div>
