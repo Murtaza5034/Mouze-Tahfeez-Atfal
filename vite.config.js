@@ -210,6 +210,160 @@ export function getRefreshReg() {
             }));
           }
         });
+
+        // 2. Dev server handler for /api/admission-admin
+        server.middlewares.use('/api/admission-admin', async (req, res) => {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+          if (req.method === 'OPTIONS') {
+            res.statusCode = 204;
+            res.end();
+            return;
+          }
+
+          const fs = await import('fs');
+          const path = await import('path');
+          const dataFile = path.resolve('public', 'admissions_data.json');
+
+          const readData = () => {
+            try {
+              if (fs.existsSync(dataFile)) {
+                return JSON.parse(fs.readFileSync(dataFile, 'utf8')) || [];
+              }
+            } catch (_) {}
+            return [];
+          };
+
+          const writeData = (list) => {
+            try {
+              fs.writeFileSync(dataFile, JSON.stringify(list, null, 2), 'utf8');
+            } catch (_) {}
+          };
+
+          if (req.method === 'GET') {
+            const list = readData();
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: true, data: list }));
+            return;
+          }
+
+          if (req.method === 'POST' || req.method === 'PATCH') {
+            const chunks = [];
+            for await (const chunk of req) chunks.push(chunk);
+            const body = JSON.parse(Buffer.concat(chunks).toString() || '{}');
+            const list = readData();
+            const appId = body.applicationId || body.application_id || body.id;
+            const idx = list.findIndex(r => r.application_id === appId);
+            let updated = null;
+            if (idx >= 0) {
+              list[idx] = { ...list[idx], ...body, updated_at: new Date().toISOString() };
+              updated = list[idx];
+            } else {
+              updated = { application_id: appId, ...body, created_at: new Date().toISOString() };
+              list.unshift(updated);
+            }
+            writeData(list);
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: true, data: updated }));
+            return;
+          }
+        });
+
+        // 3. Dev server handler for /api/submit-admission
+        server.middlewares.use('/api/submit-admission', async (req, res) => {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+          if (req.method === 'OPTIONS') {
+            res.statusCode = 204;
+            res.end();
+            return;
+          }
+
+          if (req.method === 'POST') {
+            const chunks = [];
+            for await (const chunk of req) chunks.push(chunk);
+            const formData = JSON.parse(Buffer.concat(chunks).toString() || '{}');
+            
+            const fs = await import('fs');
+            const path = await import('path');
+            const dataFile = path.resolve('public', 'admissions_data.json');
+
+            let list = [];
+            try {
+              if (fs.existsSync(dataFile)) {
+                list = JSON.parse(fs.readFileSync(dataFile, 'utf8')) || [];
+              }
+            } catch (_) {}
+
+            const year = '1447';
+            const randomPart = Math.floor(1000 + Math.random() * 9000);
+            const timePart = Date.now().toString().slice(-4);
+            const appId = formData.application_id || `MT-${year}-${randomPart}${timePart}`;
+            const timestamp = new Date().toISOString();
+
+            const record = {
+              application_id: appId,
+              full_name: formData.fullName?.trim() || formData.full_name?.trim() || '',
+              its_number: formData.itsNumber?.trim() || formData.its_number?.trim() || '',
+              gender: formData.gender || 'male',
+              age: parseInt(formData.age, 10) || null,
+              jamaat: formData.jamaat === 'Other' ? (formData.jamaatOther?.trim() || 'Other') : (formData.jamaat || 'Galiakot'),
+              email: formData.email?.trim()?.toLowerCase() || '',
+              whatsapp_number: formData.whatsappNumber?.trim() || formData.whatsapp_number?.trim() || '',
+              program: formData.program || 'Al-Atfal (7 to 15 yrs old)',
+              last_achieved_sanad: formData.lastAchievedSanad || formData.last_achieved_sanad || null,
+              venue_and_time: formData.venueAndTime || formData.venue_and_time || null,
+              dob: formData.dob || null,
+              hifz_till: formData.hifzTill || formData.hifz_till || null,
+              status: 'pending',
+              enrolled_count: 0,
+              exit_count: 0,
+              resume_count: 0,
+              timeline_audit_log: [
+                {
+                  id: `log_${Date.now()}`,
+                  action: 'submitted',
+                  from_status: 'none',
+                  to_status: 'pending',
+                  timestamp,
+                  actor: 'Applicant (Online Form)',
+                  note: 'Admission form successfully submitted online.'
+                }
+              ],
+              submitted_at: timestamp,
+              created_at: timestamp,
+              updated_at: timestamp
+            };
+
+            const idx = list.findIndex(r => r.application_id === appId);
+            if (idx >= 0) list[idx] = record;
+            else list.unshift(record);
+
+            try {
+              fs.writeFileSync(dataFile, JSON.stringify(list, null, 2), 'utf8');
+            } catch (_) {}
+
+            // Trigger WhatsApp bot
+            try {
+              fetch('http://127.0.0.1:2785/api/whatsapp-admission', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ trigger: 'submission', application: record })
+              }).catch(() => {});
+            } catch (_) {}
+
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: true, applicationId: appId, data: record }));
+            return;
+          }
+        });
       }
     },
     VitePWA({

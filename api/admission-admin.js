@@ -17,15 +17,33 @@ const FALLBACK_SA = {
 };
 
 const CACHE_FILE = path.join("/tmp", "admission_applications_cache.json");
+const PUBLIC_SEED_FILE = path.join(process.cwd(), "public", "admissions_data.json");
 
 function readDiskCache() {
+  const map = new Map();
+  try {
+    if (fs.existsSync(PUBLIC_SEED_FILE)) {
+      const pContent = fs.readFileSync(PUBLIC_SEED_FILE, "utf8");
+      const pList = JSON.parse(pContent) || [];
+      pList.forEach(item => {
+        const k = item.application_id || item.id;
+        if (k) map.set(k, item);
+      });
+    }
+  } catch (_) {}
+
   try {
     if (fs.existsSync(CACHE_FILE)) {
       const content = fs.readFileSync(CACHE_FILE, "utf8");
-      return JSON.parse(content) || [];
+      const cList = JSON.parse(content) || [];
+      cList.forEach(item => {
+        const k = item.application_id || item.id;
+        if (k) map.set(k, item);
+      });
     }
   } catch (_) {}
-  return [];
+
+  return Array.from(map.values());
 }
 
 export function writeDiskCache(record) {
@@ -38,6 +56,12 @@ export function writeDiskCache(record) {
       list.unshift(record);
     }
     fs.writeFileSync(CACHE_FILE, JSON.stringify(list), "utf8");
+    // Also update public/admissions_data.json if writable
+    try {
+      if (fs.existsSync(PUBLIC_SEED_FILE)) {
+        fs.writeFileSync(PUBLIC_SEED_FILE, JSON.stringify(list, null, 2), "utf8");
+      }
+    } catch (_) {}
   } catch (_) {}
 }
 

@@ -318,11 +318,24 @@ export async function fetchAdmissionApplications({ role = "all", program = "all"
       const res = await fetch("/api/admission-admin");
       if (res.ok) {
         const json = await res.json();
-        if (json.success && Array.isArray(json.data)) {
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
           rawList = json.data;
         }
       }
     } catch (_) {}
+
+    // 1b. Fallback to public admissions_data.json if needed
+    if (rawList.length === 0) {
+      try {
+        const staticRes = await fetch("/admissions_data.json");
+        if (staticRes.ok) {
+          const staticJson = await staticRes.json();
+          if (Array.isArray(staticJson) && staticJson.length > 0) {
+            rawList = staticJson;
+          }
+        }
+      } catch (_) {}
+    }
 
     // 2. Query Client DB adapter
     try {

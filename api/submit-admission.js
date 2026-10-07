@@ -17,17 +17,31 @@ const FALLBACK_SA = {
 };
 
 const CACHE_FILE = path.join("/tmp", "admission_applications_cache.json");
+const PUBLIC_SEED_FILE = path.join(process.cwd(), "public", "admissions_data.json");
 
 function writeDiskCache(record) {
   try {
-    let list = [];
-    if (fs.existsSync(CACHE_FILE)) {
-      list = JSON.parse(fs.readFileSync(CACHE_FILE, "utf8")) || [];
+    const map = new Map();
+    if (fs.existsSync(PUBLIC_SEED_FILE)) {
+      try {
+        const pList = JSON.parse(fs.readFileSync(PUBLIC_SEED_FILE, "utf8")) || [];
+        pList.forEach(item => { if (item.application_id) map.set(item.application_id, item); });
+      } catch (_) {}
     }
-    const idx = list.findIndex(r => r.application_id === record.application_id);
-    if (idx >= 0) list[idx] = record;
-    else list.unshift(record);
+    if (fs.existsSync(CACHE_FILE)) {
+      try {
+        const cList = JSON.parse(fs.readFileSync(CACHE_FILE, "utf8")) || [];
+        cList.forEach(item => { if (item.application_id) map.set(item.application_id, item); });
+      } catch (_) {}
+    }
+    map.set(record.application_id, record);
+    const list = Array.from(map.values());
     fs.writeFileSync(CACHE_FILE, JSON.stringify(list), "utf8");
+    try {
+      if (fs.existsSync(PUBLIC_SEED_FILE)) {
+        fs.writeFileSync(PUBLIC_SEED_FILE, JSON.stringify(list, null, 2), "utf8");
+      }
+    } catch (_) {}
   } catch (_) {}
 }
 

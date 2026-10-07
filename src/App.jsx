@@ -33688,7 +33688,7 @@ function AdminPortal({
           ) : activePage === "Admission" || activePage === "Admissions" ? (
             <div style={{ paddingBottom: "80px" }}>
               <AdmissionAdminDashboard
-                defaultRole={isKibarAdmin ? "kibar_admin" : "atfal_admin"}
+                defaultRole="super_admin"
                 currentUser={user?.email || user?.name || "Admin"}
                 onBackToMain={() => setActivePage("Overview")}
               />
