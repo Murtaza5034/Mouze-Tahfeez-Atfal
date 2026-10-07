@@ -120,6 +120,10 @@ const SHARED_COLLECTIONS = new Set([
   "online_tahfeez_logs",
   "tahfeez_recordings",
   "help_tutorials",
+  "admission_applications",
+  "admission_cms_settings",
+  "admission_audit_logs",
+  "admission_venue_photos",
 ]);
 
 export function resolveCollectionName(name) {

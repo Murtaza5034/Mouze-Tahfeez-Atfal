@@ -16924,7 +16924,7 @@ button:not(.rp-btn-gold):not(.support-bot-send):not(.quick-action-btn):not(.side
   border-top-right-radius: 18px !important;
   border-bottom-left-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
-  box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.12), 0 -1px 0 rgba(255, 255, 255, 0.25) inset !important;
+  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.25) inset !important;
   z-index: 9999;
   display: flex;
   flex-direction: column;

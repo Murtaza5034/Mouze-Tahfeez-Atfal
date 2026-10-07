@@ -136,6 +136,8 @@ import ParentViewsModal from "./components/ParentViewsModal";
 import TahfeezAudioRecordingsModal from "./components/TahfeezAudioRecordingsModal";
 import AppUpdatePopup from "./AppUpdatePopup";
 import PrivacyPolicy from "./PrivacyPolicy";
+import AdmissionForm from "./components/admissions/AdmissionForm";
+import AdmissionAdminDashboard from "./components/admissions/AdmissionAdminDashboard";
 import PremiumTodaySchedule from "./PremiumTodaySchedule";
 import AtfalGemLeagueCard from "./components/AtfalGemLeagueCard";
 import AtfalTeacherLeagueEntry from "./components/AtfalTeacherLeagueEntry";
@@ -51855,6 +51857,55 @@ export default function App() {
       new URLSearchParams(window.location.search).get("page") === "privacy")
   ) {
     return <PrivacyPolicy />;
+  }
+
+  // Public & Direct Routes for Admission Form and Admin Admission Management System
+  if (typeof window !== "undefined") {
+    const rawPath = (window.location.pathname || "").toLowerCase();
+    const pageParam = (new URLSearchParams(window.location.search).get("page") || "").toLowerCase();
+
+    // 1. User Admission Form (Public)
+    if (
+      rawPath === "/admission" ||
+      rawPath === "/admissions" ||
+      rawPath === "/apply" ||
+      rawPath === "/register" ||
+      rawPath === "/admission-form" ||
+      pageParam === "admission" ||
+      pageParam === "admissions" ||
+      pageParam === "apply" ||
+      pageParam === "register"
+    ) {
+      return (
+        <AdmissionForm
+          onGoToAdmin={() => {
+            window.history.pushState({}, "", "/admin/admissions");
+            window.dispatchEvent(new PopStateEvent("popstate"));
+          }}
+        />
+      );
+    }
+
+    // 2. Admin Admission Management Portal
+    if (
+      rawPath === "/admin/admissions" ||
+      rawPath === "/admin/admission" ||
+      rawPath === "/admin/cms" ||
+      rawPath === "/admissions-admin" ||
+      pageParam === "admin-admissions" ||
+      pageParam === "admissions-admin"
+    ) {
+      return (
+        <AdmissionAdminDashboard
+          defaultRole={user?.role === "kibar_admin" ? "kibar_admin" : user?.role === "atfal_admin" ? "atfal_admin" : "super_admin"}
+          currentUser={user?.email || user?.name || "Admin"}
+          onBackToMain={() => {
+            window.history.pushState({}, "", "/");
+            window.dispatchEvent(new PopStateEvent("popstate"));
+          }}
+        />
+      );
+    }
   }
 
   if (!user) {
