@@ -5,8 +5,8 @@ import fs from 'fs'
 
 export default defineConfig(({ mode }) => ({
   define: {
-    __APP_VERSION__: JSON.stringify("1.5.57"),
-    __APP_VERSION_CODE__: JSON.stringify(101),
+    __APP_VERSION__: JSON.stringify("1.5.59"),
+    __APP_VERSION_CODE__: JSON.stringify(102),
   },
   plugins: [
     react(),
