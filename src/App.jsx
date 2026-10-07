@@ -1655,34 +1655,48 @@ const broadcastNotification = async (
     }
   }
 
-  // Send FCM push notification via Edge Function / Cloud Functions
+  // Send FCM push notification via Edge Function / Cloud Functions / Direct Serverless Route
   try {
+    const fcmPayload = {
+      title,
+      body,
+      targetRole: targetRole === "user" ? null : targetRole,
+      targetUser: targetUser,
+      section: currentSection,
+      skipInbox: true,
+      data: {
+        ...extraData,
+        inbox_item_id: createdInboxId || "",
+        id: createdInboxId || "",
+        notification_id: createdInboxId || "",
+        redirectPage,
+        fileUrl: fileUrl || "",
+        timestamp: new Date().toISOString(),
+      },
+    };
+
     const { data, error } = await supabase.functions.invoke(
       "fcm-notification",
-      {
-        body: {
-          title,
-          body,
-          targetRole: targetRole === "user" ? null : targetRole,
-          targetUser: targetUser,
-          section: currentSection,
-          skipInbox: true,
-          data: {
-            ...extraData,
-            inbox_item_id: createdInboxId || "",
-            id: createdInboxId || "",
-            notification_id: createdInboxId || "",
-            redirectPage,
-            fileUrl: fileUrl || "",
-            timestamp: new Date().toISOString(),
-          },
-        },
-      },
+      { body: fcmPayload },
     );
 
     if (error) {
       fcmError = error;
-      console.error("FCM notification error:", error);
+      console.warn("FCM functions invoke note, attempting direct API route:", error);
+      // Resilient fallback direct fetch
+      try {
+        const directRes = await fetch("/api/send-fcm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(fcmPayload),
+        });
+        if (directRes.ok) {
+          fcmData = await directRes.json();
+          fcmError = null;
+        }
+      } catch (directErr) {
+        console.warn("Direct send-fcm route note:", directErr);
+      }
     } else {
       fcmData = data;
       console.log("FCM notification sent successfully:", data);

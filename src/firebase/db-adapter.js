@@ -43,6 +43,7 @@ async function callFunction(name, data) {
       const unwrappedData = (data && typeof data === "object" && data.body && typeof data.body === "object" && !Array.isArray(data.body))
         ? { ...data, ...data.body }
         : (data || {});
+      const isResultLive = name === "result-live-notifier" || name === "sendResultLiveNotifier";
       const payload = isResultLive
         ? { action: "result-live-notifier", ...unwrappedData }
         : unwrappedData;
