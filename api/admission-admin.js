@@ -184,39 +184,53 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: "Missing applicationId" });
       }
 
+      const cachedList = readDiskCache();
+      const existing = cachedList.find(r => r.application_id === appId) || {};
+      const prevStatus = existing.status || "pending";
       const timestamp = new Date().toISOString();
-      let updatedRecord = { ...body, updated_at: timestamp };
 
-      if (body.action === "update_status" || body.newStatus) {
-        const newStatus = body.newStatus || body.status;
-        const newLog = {
-          id: `log_${Date.now()}`,
-          action: newStatus,
-          timestamp,
-          actor: body.adminUser || "Admin",
-          note: body.adminNote || `Status updated to ${newStatus}`
-        };
-        updatedRecord = {
-          ...updatedRecord,
-          status: newStatus,
-          last_action_by: body.adminUser || "Admin"
-        };
-      } else if (body.action === "exit") {
-        updatedRecord = {
-          ...updatedRecord,
-          status: "exited",
-          last_action_by: body.adminUser || "Admin"
-        };
+      let newStatus = body.newStatus || body.status || existing.status || "pending";
+      let newEnrolled = existing.enrolled_count || 0;
+      let newExit = existing.exit_count || 0;
+      let newResume = existing.resume_count || 0;
+
+      if (body.action === "exit") {
+        newStatus = "exited";
+        newExit += 1;
       } else if (body.action === "resume") {
-        updatedRecord = {
-          ...updatedRecord,
-          status: "approved",
-          last_action_by: body.adminUser || "Admin"
-        };
+        newStatus = "approved";
+        newResume += 1;
+      } else if (newStatus === "approved" && prevStatus !== "approved") {
+        newEnrolled += 1;
       }
 
+      const newLog = {
+        id: `log_${Date.now()}`,
+        action: newStatus,
+        from_status: prevStatus,
+        to_status: newStatus,
+        timestamp,
+        actor: body.adminUser || "Admin",
+        note: body.adminNote || (body.exitReason ? `Exited: ${body.exitReason}` : body.resumeNote ? `Resumed: ${body.resumeNote}` : `Status updated from ${prevStatus} to ${newStatus}`)
+      };
+
+      const existingLogs = Array.isArray(existing.timeline_audit_log) ? existing.timeline_audit_log : [];
+
+      const updatedRecord = {
+        ...existing,
+        ...body,
+        application_id: appId,
+        status: newStatus,
+        enrolled_count: newEnrolled,
+        exit_count: newExit,
+        resume_count: newResume,
+        timeline_audit_log: [newLog, ...existingLogs],
+        updated_at: timestamp,
+        last_action_by: body.adminUser || "Admin"
+      };
+
       // Update disk cache
-      writeDiskCache({ application_id: appId, ...updatedRecord });
+      writeDiskCache(updatedRecord);
 
       // Update Firestore
       try {

@@ -1166,3 +1166,126 @@
     max-width: 95vw;
   }
 }
+
+/* --- Interactive KPI Cards --- */
+.adm-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+@media (max-width: 1200px) {
+  .adm-kpi-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 680px) {
+  .adm-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+}
+
+.adm-kpi-card {
+  background: var(--adm-white-pure);
+  border: 1.5px solid var(--adm-gold-border);
+  border-radius: 18px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  justifyContent: space-between;
+  box-shadow: var(--adm-shadow-sm);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.adm-kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--adm-shadow-md);
+}
+
+.adm-kpi-card:active {
+  transform: scale(0.98);
+}
+
+.adm-kpi-card.active {
+  border-width: 2.5px;
+  box-shadow: 0 0 0 3px rgba(197, 155, 39, 0.25), var(--adm-shadow-md);
+  transform: translateY(-2px);
+}
+
+.adm-kpi-card.active-total {
+  border-color: var(--adm-gold-primary);
+  box-shadow: 0 0 0 3px rgba(197, 155, 39, 0.28), var(--adm-shadow-md);
+}
+
+.adm-kpi-card.active-pending {
+  border-color: var(--adm-gold-dark);
+  box-shadow: 0 0 0 3px rgba(197, 155, 39, 0.35), var(--adm-shadow-md);
+}
+
+.adm-kpi-card.active-approved {
+  border-color: var(--adm-emerald-primary);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.35), var(--adm-shadow-md);
+}
+
+.adm-kpi-card.active-waiting {
+  border-color: var(--adm-amber-primary);
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.35), var(--adm-shadow-md);
+}
+
+.adm-kpi-card.active-rejected {
+  border-color: var(--adm-rose-primary);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.35), var(--adm-shadow-md);
+}
+
+.adm-kpi-card.active-exited {
+  border-color: var(--adm-espresso-main);
+  box-shadow: 0 0 0 3px rgba(43, 23, 14, 0.25), var(--adm-shadow-md);
+}
+
+.adm-kpi-num {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--adm-espresso-main);
+  margin-top: 6px;
+  font-family: 'Outfit', sans-serif;
+  line-height: 1;
+}
+
+.adm-active-indicator {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--adm-gold-primary);
+  box-shadow: 0 0 8px var(--adm-gold-primary);
+}
+
+.adm-btn-quick-action {
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  border: 1px solid transparent;
+}
+
+.adm-btn-quick-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.adm-btn-quick-action:active {
+  transform: scale(0.96);
+}

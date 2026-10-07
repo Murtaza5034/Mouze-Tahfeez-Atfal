@@ -13,11 +13,29 @@
     "venue_and_time": "Venue 1: Burhani Masjid (Morning Batch)",
     "dob": null,
     "hifz_till": null,
-    "status": "pending",
+    "status": "waiting",
     "enrolled_count": 0,
     "exit_count": 0,
     "resume_count": 0,
     "timeline_audit_log": [
+      {
+        "id": "log_1791377092779",
+        "action": "waiting",
+        "from_status": "waiting",
+        "to_status": "waiting",
+        "timestamp": "2026-10-07T12:44:52.779Z",
+        "actor": "Test Admin",
+        "note": "Status updated from waiting to waiting"
+      },
+      {
+        "id": "log_1791376989381",
+        "action": "waiting",
+        "from_status": "pending",
+        "to_status": "waiting",
+        "timestamp": "2026-10-07T12:43:09.381Z",
+        "actor": "murtaza.mohammed.hamid@mahadalzahra.com",
+        "note": "Status updated from pending to waiting"
+      },
       {
         "id": "log_init_1",
         "action": "submitted",
@@ -30,11 +48,12 @@
     ],
     "submitted_at": "2026-10-07T10:40:18.000Z",
     "created_at": "2026-10-07T10:40:18.000Z",
-    "updated_at": "2026-10-07T10:58:42.437Z",
+    "updated_at": "2026-10-07T12:44:52.779Z",
     "applicationId": "MT-1447-96664789",
     "action": "update_status",
     "newStatus": "waiting",
-    "adminUser": "murtaza.mohammed.hamid@mahadalzahra.com",
-    "adminNote": ""
+    "adminUser": "Test Admin",
+    "adminNote": "",
+    "last_action_by": "Test Admin"
   }
 ]

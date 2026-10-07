@@ -258,11 +258,56 @@ export function getRefreshReg() {
             const appId = body.applicationId || body.application_id || body.id;
             const idx = list.findIndex(r => r.application_id === appId);
             let updated = null;
+            const timestamp = new Date().toISOString();
+
             if (idx >= 0) {
-              list[idx] = { ...list[idx], ...body, updated_at: new Date().toISOString() };
+              const current = list[idx];
+              const newStatus = body.newStatus || body.status || (body.action === 'exit' ? 'exited' : body.action === 'resume' ? 'approved' : current.status);
+              const prevStatus = current.status;
+              let newEnrolled = current.enrolled_count || 0;
+              let newExit = current.exit_count || 0;
+              let newResume = current.resume_count || 0;
+
+              if (newStatus === "approved" && prevStatus !== "approved") {
+                newEnrolled += 1;
+              } else if (newStatus === "exited" && prevStatus !== "exited") {
+                newExit += 1;
+              } else if (body.action === "resume") {
+                newResume += 1;
+              }
+
+              const newLog = {
+                id: `log_${Date.now()}`,
+                action: newStatus,
+                from_status: prevStatus,
+                to_status: newStatus,
+                timestamp,
+                actor: body.adminUser || "Admin",
+                note: body.adminNote || (body.exitReason ? `Exited: ${body.exitReason}` : body.resumeNote ? `Resumed: ${body.resumeNote}` : `Status updated from ${prevStatus} to ${newStatus}`)
+              };
+
+              const existingLogs = Array.isArray(current.timeline_audit_log) ? current.timeline_audit_log : [];
+
+              list[idx] = {
+                ...current,
+                ...body,
+                status: newStatus,
+                enrolled_count: newEnrolled,
+                exit_count: newExit,
+                resume_count: newResume,
+                timeline_audit_log: [newLog, ...existingLogs],
+                updated_at: timestamp,
+                last_action_by: body.adminUser || "Admin"
+              };
               updated = list[idx];
             } else {
-              updated = { application_id: appId, ...body, created_at: new Date().toISOString() };
+              updated = {
+                application_id: appId,
+                ...body,
+                status: body.newStatus || body.status || "pending",
+                created_at: timestamp,
+                updated_at: timestamp
+              };
               list.unshift(updated);
             }
             writeData(list);

@@ -23,7 +23,12 @@ import {
   Send,
   Check,
   Building,
-  GraduationCap
+  GraduationCap,
+  Copy,
+  ExternalLink,
+  UserCheck,
+  UserX,
+  AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -55,6 +60,8 @@ export default function AdmissionAdminDashboard({
   const [refreshing, setRefreshing] = useState(false);
   const [expandedCardId, setExpandedCardId] = useState(null);
   const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
+  const [toastMessage, setToastMessage] = useState(null);
 
   // WhatsApp Bot Simulator
   const [showBotModal, setShowBotModal] = useState(false);
@@ -63,12 +70,17 @@ export default function AdmissionAdminDashboard({
   const [botSimOutput, setBotSimOutput] = useState(null);
   const [botSimLoading, setBotSimLoading] = useState(false);
 
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetchAdmissionApplications();
-      if (res.success) {
-        setApplications(res.data || []);
+      if (res.success && Array.isArray(res.data)) {
+        setApplications(res.data);
       }
     } catch (e) {
       console.error(e);
@@ -82,17 +94,18 @@ export default function AdmissionAdminDashboard({
     loadData();
   }, [loadData]);
 
-  // Filtered Applications according to active role and subtab
+  // Filtered Applications according to active role, subtab, statusFilter and search
   const filteredApplications = useMemo(() => {
     return applications.filter((app) => {
       // Exit list tab
       if (activeTab === "exit_list") {
         if (app.status !== "exited") return false;
-        if (activeRole === "kibar") return app.program === "Al-Kibar (Adults)";
-        if (activeRole === "atfal") return app.program === "Al-Atfal (7 to 15 yrs old)" || app.program === "Al-Sigar (4 to 6 yrs old)";
+        if (activeRole === "kibar") return app.program === "Al-Kibar (Adults)" || app.program?.toLowerCase().includes("kibar");
+        if (activeRole === "atfal") return app.program?.toLowerCase().includes("atfal") || app.program?.toLowerCase().includes("sigar");
         return true;
       }
 
+      // Hide exited unless on exit list
       if (app.status === "exited") return false;
 
       // Role & Tab filtering
@@ -112,8 +125,10 @@ export default function AdmissionAdminDashboard({
         if (activeTab === "sigar" && app.program !== "Al-Sigar (4 to 6 yrs old)" && !app.program?.toLowerCase().includes("sigar")) return false;
       }
 
+      // Status filter
       if (statusFilter !== "all" && app.status !== statusFilter) return false;
 
+      // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         return (
@@ -121,7 +136,8 @@ export default function AdmissionAdminDashboard({
           app.its_number?.includes(q) ||
           app.whatsapp_number?.includes(q) ||
           app.email?.toLowerCase().includes(q) ||
-          app.application_id?.toLowerCase().includes(q)
+          app.application_id?.toLowerCase().includes(q) ||
+          app.jamaat?.toLowerCase().includes(q)
         );
       }
 
@@ -129,18 +145,19 @@ export default function AdmissionAdminDashboard({
     });
   }, [applications, activeRole, activeTab, statusFilter, searchQuery]);
 
+  // Overall & Scoped metrics
   const stats = useMemo(() => {
     let scoped = applications;
     if (activeRole === "kibar") {
-      scoped = scoped.filter((a) => a.program === "Al-Kibar (Adults)");
+      scoped = scoped.filter((a) => a.program === "Al-Kibar (Adults)" || a.program?.toLowerCase().includes("kibar"));
     } else if (activeRole === "atfal") {
       scoped = scoped.filter(
-        (a) => a.program === "Al-Atfal (7 to 15 yrs old)" || a.program === "Al-Sigar (4 to 6 yrs old)"
+        (a) => a.program?.toLowerCase().includes("atfal") || a.program?.toLowerCase().includes("sigar")
       );
     }
 
     return {
-      total: scoped.length,
+      total: scoped.filter((a) => a.status !== "exited").length,
       pending: scoped.filter((a) => a.status === "pending").length,
       approved: scoped.filter((a) => a.status === "approved").length,
       waiting: scoped.filter((a) => a.status === "waiting").length,
@@ -149,8 +166,46 @@ export default function AdmissionAdminDashboard({
     };
   }, [applications, activeRole]);
 
+  // Instant status change with immediate optimistic state update
   const handleStatusChange = async (appId, newStatus) => {
     setActionLoadingId(appId);
+    const timestamp = new Date().toISOString();
+
+    // 1. Optimistic Local State Update (Instant UI shift)
+    setApplications((prev) =>
+      prev.map((item) => {
+        if (item.application_id === appId) {
+          const prevStatus = item.status;
+          let newEnrolled = item.enrolled_count || 0;
+          if (newStatus === "approved" && prevStatus !== "approved") {
+            newEnrolled += 1;
+          }
+          const newLog = {
+            id: `log_${Date.now()}`,
+            action: newStatus,
+            from_status: prevStatus,
+            to_status: newStatus,
+            timestamp,
+            actor: currentUser,
+            note: `Status updated to ${newStatus}`
+          };
+          const existingLogs = Array.isArray(item.timeline_audit_log) ? item.timeline_audit_log : [];
+          return {
+            ...item,
+            status: newStatus,
+            enrolled_count: newEnrolled,
+            timeline_audit_log: [newLog, ...existingLogs],
+            updated_at: timestamp,
+            last_action_by: currentUser
+          };
+        }
+        return item;
+      })
+    );
+
+    showToast(`Status updated to "${newStatus.toUpperCase()}". Syncing & WhatsApp message triggered...`);
+
+    // 2. Background API Sync
     try {
       const res = await updateAdmissionStatus({
         applicationId: appId,
@@ -158,25 +213,55 @@ export default function AdmissionAdminDashboard({
         adminUser: currentUser
       });
 
-      if (res.success) {
+      if (res.success && res.data) {
         setApplications((prev) =>
-          prev.map((item) => (item.application_id === appId ? res.data : item))
+          prev.map((item) => (item.application_id === appId ? { ...item, ...res.data } : item))
         );
-      } else {
-        alert(`Failed to update status: ${res.error}`);
       }
     } catch (err) {
-      alert("Error updating status.");
+      console.error("Error updating status:", err);
     } finally {
       setActionLoadingId(null);
     }
   };
 
+  // Exit applicant handler
   const handleExitUser = async (appId) => {
     const reason = prompt("Enter reason for course exit (optional):", "Student completed phase / requested exit");
     if (reason === null) return;
 
     setActionLoadingId(appId);
+    const timestamp = new Date().toISOString();
+
+    // Optimistic Local State Update
+    setApplications((prev) =>
+      prev.map((item) => {
+        if (item.application_id === appId) {
+          const newLog = {
+            id: `log_${Date.now()}`,
+            action: "exited",
+            from_status: item.status,
+            to_status: "exited",
+            timestamp,
+            actor: currentUser,
+            note: reason || "Exited from active cohort"
+          };
+          const existingLogs = Array.isArray(item.timeline_audit_log) ? item.timeline_audit_log : [];
+          return {
+            ...item,
+            status: "exited",
+            exit_count: (item.exit_count || 0) + 1,
+            timeline_audit_log: [newLog, ...existingLogs],
+            updated_at: timestamp,
+            last_action_by: currentUser
+          };
+        }
+        return item;
+      })
+    );
+
+    showToast(`Applicant shifted to Exit List.`);
+
     try {
       const res = await exitAdmissionUser({
         applicationId: appId,
@@ -184,26 +269,56 @@ export default function AdmissionAdminDashboard({
         exitReason: reason || "Exited from active cohort"
       });
 
-      if (res.success) {
+      if (res.success && res.data) {
         setApplications((prev) =>
-          prev.map((item) => (item.application_id === appId ? res.data : item))
+          prev.map((item) => (item.application_id === appId ? { ...item, ...res.data } : item))
         );
-      } else {
-        alert(`Failed to exit user: ${res.error}`);
       }
     } catch (err) {
-      alert("Error processing exit.");
+      console.error("Error exiting user:", err);
     } finally {
       setActionLoadingId(null);
     }
   };
 
+  // Resume applicant handler
   const handleResumeUser = async (appId) => {
     if (!confirm("Resume this user to active approved status? This sends them an approval confirmation message.")) {
       return;
     }
 
     setActionLoadingId(appId);
+    const timestamp = new Date().toISOString();
+
+    // Optimistic Local State Update
+    setApplications((prev) =>
+      prev.map((item) => {
+        if (item.application_id === appId) {
+          const newLog = {
+            id: `log_${Date.now()}`,
+            action: "approved",
+            from_status: "exited",
+            to_status: "approved",
+            timestamp,
+            actor: currentUser,
+            note: "Resumed from exit list to active approved status"
+          };
+          const existingLogs = Array.isArray(item.timeline_audit_log) ? item.timeline_audit_log : [];
+          return {
+            ...item,
+            status: "approved",
+            resume_count: (item.resume_count || 0) + 1,
+            timeline_audit_log: [newLog, ...existingLogs],
+            updated_at: timestamp,
+            last_action_by: currentUser
+          };
+        }
+        return item;
+      })
+    );
+
+    showToast(`Applicant resumed to Approved status.`);
+
     try {
       const res = await resumeAdmissionUser({
         applicationId: appId,
@@ -211,18 +326,35 @@ export default function AdmissionAdminDashboard({
         resumeNote: "Resumed from exit list to active approved status"
       });
 
-      if (res.success) {
+      if (res.success && res.data) {
         setApplications((prev) =>
-          prev.map((item) => (item.application_id === appId ? res.data : item))
+          prev.map((item) => (item.application_id === appId ? { ...item, ...res.data } : item))
         );
-      } else {
-        alert(`Failed to resume user: ${res.error}`);
       }
     } catch (err) {
-      alert("Error processing resume.");
+      console.error("Error resuming user:", err);
     } finally {
       setActionLoadingId(null);
     }
+  };
+
+  const handleCopyRefId = (e, refId) => {
+    e.stopPropagation();
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(refId);
+      setCopiedId(refId);
+      setTimeout(() => setCopiedId(null), 2000);
+      showToast(`Copied Ref ID: ${refId}`);
+    }
+  };
+
+  const handleOpenWhatsAppDirect = (e, phone, name, program) => {
+    e.stopPropagation();
+    if (!phone) return;
+    let clean = String(phone).replace(/[^\d]/g, "");
+    if (clean.length === 10) clean = "91" + clean;
+    const msg = encodeURIComponent(`Salaam ${name || "Mumin"},\nRegarding your application for ${program || "Tahfeez Galiakot"}:`);
+    window.open(`https://wa.me/${clean}?text=${msg}`, "_blank");
   };
 
   const handleSimulateBotReply = async () => {
@@ -251,12 +383,56 @@ export default function AdmissionAdminDashboard({
     }
   };
 
+  // Helper to switch KPI tab
+  const handleKpiCardClick = (targetStatus) => {
+    if (targetStatus === "exit_list") {
+      setActiveTab("exit_list");
+      setStatusFilter("all");
+    } else {
+      if (activeTab === "exit_list") {
+        setActiveTab(activeRole === "kibar" ? "kibar" : activeRole === "atfal" ? "atfal" : "all");
+      }
+      setStatusFilter(targetStatus);
+    }
+  };
+
   return (
-    <div className="admission-root-container" style={{ padding: "20px", background: "transparent" }}>
+    <div className="admission-root-container" style={{ padding: "16px 20px 80px 20px", background: "transparent" }}>
       <div className="admission-bg-pattern" />
 
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            style={{
+              position: "fixed",
+              top: "24px",
+              right: "24px",
+              zIndex: 9999,
+              background: "var(--adm-espresso-main)",
+              color: "#ffffff",
+              padding: "12px 20px",
+              borderRadius: "14px",
+              boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+              border: "1.5px solid var(--adm-gold-primary)",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              fontSize: "13px",
+              fontWeight: 700
+            }}
+          >
+            <Sparkles size={16} color="var(--adm-gold-light)" />
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Top Header Box */}
-      <header className="adm-admin-header-box">
+      <header className="adm-admin-header-box" style={{ marginBottom: "18px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
             <img
@@ -288,7 +464,7 @@ export default function AdmissionAdminDashboard({
             <div style={{ background: "var(--adm-cream-soft)", padding: "4px", borderRadius: "14px", border: "1.5px solid var(--adm-gold-border)", display: "flex", gap: "4px" }}>
               <button
                 type="button"
-                onClick={() => { setActiveRole("super"); setActiveTab("all"); }}
+                onClick={() => { setActiveRole("super"); setActiveTab("all"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeRole === "super" ? "active" : ""}`}
                 style={{ padding: "6px 14px", fontSize: "12px" }}
               >
@@ -296,7 +472,7 @@ export default function AdmissionAdminDashboard({
               </button>
               <button
                 type="button"
-                onClick={() => { setActiveRole("kibar"); setActiveTab("kibar"); }}
+                onClick={() => { setActiveRole("kibar"); setActiveTab("kibar"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeRole === "kibar" ? "active" : ""}`}
                 style={{ padding: "6px 14px", fontSize: "12px" }}
               >
@@ -304,7 +480,7 @@ export default function AdmissionAdminDashboard({
               </button>
               <button
                 type="button"
-                onClick={() => { setActiveRole("atfal"); setActiveTab("atfal"); }}
+                onClick={() => { setActiveRole("atfal"); setActiveTab("atfal"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeRole === "atfal" ? "active" : ""}`}
                 style={{ padding: "6px 14px", fontSize: "12px" }}
               >
@@ -341,63 +517,121 @@ export default function AdmissionAdminDashboard({
         </div>
       </header>
 
-      {/* KPI Stats Overview */}
+      {/* Interactive KPI Stats Overview Grid */}
       <div className="adm-kpi-grid">
-        <div className="adm-kpi-card">
-          <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-text-muted)" }}>Total Submissions</span>
+        {/* Total Submissions Card */}
+        <div
+          onClick={() => handleKpiCardClick("all")}
+          className={`adm-kpi-card ${statusFilter === "all" && activeTab !== "exit_list" ? "active active-total" : ""}`}
+          title="Click to view all submissions"
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-text-muted)" }}>Total Submissions</span>
+            {statusFilter === "all" && activeTab !== "exit_list" && <span className="adm-active-indicator" />}
+          </div>
           <span className="adm-kpi-num">{stats.total}</span>
         </div>
-        <div className="adm-kpi-card" style={{ background: "linear-gradient(135deg, #fffdf8 0%, #fff7e4 100%)", borderColor: "var(--adm-gold-border)" }}>
-          <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-gold-dark)" }}>Pending</span>
+
+        {/* Pending Card */}
+        <div
+          onClick={() => handleKpiCardClick("pending")}
+          className={`adm-kpi-card ${statusFilter === "pending" && activeTab !== "exit_list" ? "active active-pending" : ""}`}
+          style={{ background: "linear-gradient(135deg, #fffdf8 0%, #fff7e4 100%)", borderColor: "var(--adm-gold-border)" }}
+          title="Click to filter Pending applicants"
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-gold-dark)" }}>Pending</span>
+            {statusFilter === "pending" && activeTab !== "exit_list" && <span className="adm-active-indicator" style={{ background: "var(--adm-gold-dark)" }} />}
+          </div>
           <span className="adm-kpi-num" style={{ color: "var(--adm-gold-dark)" }}>{stats.pending}</span>
         </div>
-        <div className="adm-kpi-card" style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)", borderColor: "var(--adm-emerald-border)" }}>
-          <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-emerald-primary)" }}>Approved</span>
+
+        {/* Approved Card */}
+        <div
+          onClick={() => handleKpiCardClick("approved")}
+          className={`adm-kpi-card ${statusFilter === "approved" && activeTab !== "exit_list" ? "active active-approved" : ""}`}
+          style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)", borderColor: "var(--adm-emerald-border)" }}
+          title="Click to filter Approved applicants"
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-emerald-primary)" }}>Approved</span>
+            {statusFilter === "approved" && activeTab !== "exit_list" && <span className="adm-active-indicator" style={{ background: "var(--adm-emerald-primary)" }} />}
+          </div>
           <span className="adm-kpi-num" style={{ color: "var(--adm-emerald-primary)" }}>{stats.approved}</span>
         </div>
-        <div className="adm-kpi-card" style={{ background: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)", borderColor: "var(--adm-amber-border)" }}>
-          <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-amber-primary)" }}>Waiting</span>
+
+        {/* Waiting Card */}
+        <div
+          onClick={() => handleKpiCardClick("waiting")}
+          className={`adm-kpi-card ${statusFilter === "waiting" && activeTab !== "exit_list" ? "active active-waiting" : ""}`}
+          style={{ background: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)", borderColor: "var(--adm-amber-border)" }}
+          title="Click to filter Waiting list"
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-amber-primary)" }}>Waiting</span>
+            {statusFilter === "waiting" && activeTab !== "exit_list" && <span className="adm-active-indicator" style={{ background: "var(--adm-amber-primary)" }} />}
+          </div>
           <span className="adm-kpi-num" style={{ color: "var(--adm-amber-primary)" }}>{stats.waiting}</span>
         </div>
-        <div className="adm-kpi-card" style={{ background: "linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)", borderColor: "var(--adm-rose-border)" }}>
-          <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-rose-primary)" }}>Rejected</span>
+
+        {/* Rejected Card */}
+        <div
+          onClick={() => handleKpiCardClick("rejected")}
+          className={`adm-kpi-card ${statusFilter === "rejected" && activeTab !== "exit_list" ? "active active-rejected" : ""}`}
+          style={{ background: "linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)", borderColor: "var(--adm-rose-border)" }}
+          title="Click to filter Rejected applications"
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-rose-primary)" }}>Rejected</span>
+            {statusFilter === "rejected" && activeTab !== "exit_list" && <span className="adm-active-indicator" style={{ background: "var(--adm-rose-primary)" }} />}
+          </div>
           <span className="adm-kpi-num" style={{ color: "var(--adm-rose-primary)" }}>{stats.rejected}</span>
         </div>
-        <div className="adm-kpi-card" style={{ background: "linear-gradient(135deg, #fdfbf7 0%, #f5eee6 100%)", borderColor: "var(--adm-border-soft)" }}>
-          <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-espresso-muted)" }}>Exit List</span>
+
+        {/* Exit List Card */}
+        <div
+          onClick={() => handleKpiCardClick("exit_list")}
+          className={`adm-kpi-card ${activeTab === "exit_list" ? "active active-exited" : ""}`}
+          style={{ background: "linear-gradient(135deg, #fdfbf7 0%, #f5eee6 100%)", borderColor: "var(--adm-border-soft)" }}
+          title="Click to view Exit List / Former students"
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-espresso-muted)" }}>Exit List</span>
+            {activeTab === "exit_list" && <span className="adm-active-indicator" style={{ background: "var(--adm-espresso-main)" }} />}
+          </div>
           <span className="adm-kpi-num" style={{ color: "var(--adm-espresso-muted)" }}>{stats.exited}</span>
         </div>
       </div>
 
       {/* Tabs Ribbon */}
-      <div className="adm-tab-ribbon">
+      <div className="adm-tab-ribbon" style={{ marginBottom: "16px" }}>
         <div className="adm-tabs-row">
           {activeRole === "super" && (
             <>
               <button
                 type="button"
-                onClick={() => setActiveTab("all")}
+                onClick={() => { setActiveTab("all"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeTab === "all" ? "active" : ""}`}
               >
                 All Responses ({applications.filter(a => a.status !== 'exited').length})
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("kibar")}
+                onClick={() => { setActiveTab("kibar"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeTab === "kibar" ? "active" : ""}`}
               >
-                Al-Kibar ({applications.filter(a => a.program === "Al-Kibar (Adults)" && a.status !== 'exited').length})
+                Al-Kibar ({applications.filter(a => (a.program === "Al-Kibar (Adults)" || a.program?.toLowerCase().includes("kibar")) && a.status !== 'exited').length})
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("atfal")}
+                onClick={() => { setActiveTab("atfal"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeTab === "atfal" ? "active" : ""}`}
               >
                 Al-Atfal ({applications.filter(a => a.program === "Al-Atfal (7 to 15 yrs old)" && a.status !== 'exited').length})
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("sigar")}
+                onClick={() => { setActiveTab("sigar"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeTab === "sigar" ? "active" : ""}`}
               >
                 Al-Sigar ({applications.filter(a => a.program === "Al-Sigar (4 to 6 yrs old)" && a.status !== 'exited').length})
@@ -408,10 +642,10 @@ export default function AdmissionAdminDashboard({
           {activeRole === "kibar" && (
             <button
               type="button"
-              onClick={() => setActiveTab("kibar")}
+              onClick={() => { setActiveTab("kibar"); setStatusFilter("all"); }}
               className={`adm-tab-pill ${activeTab === "kibar" ? "active" : ""}`}
             >
-              Kibar Responses ({applications.filter(a => a.program === "Al-Kibar (Adults)" && a.status !== 'exited').length})
+              Kibar Responses ({applications.filter(a => (a.program === "Al-Kibar (Adults)" || a.program?.toLowerCase().includes("kibar")) && a.status !== 'exited').length})
             </button>
           )}
 
@@ -419,21 +653,21 @@ export default function AdmissionAdminDashboard({
             <>
               <button
                 type="button"
-                onClick={() => setActiveTab("all")}
+                onClick={() => { setActiveTab("all"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeTab === "all" ? "active" : ""}`}
               >
                 All Responses ({applications.filter(a => (a.program?.includes("Atfal") || a.program?.includes("Sigar")) && a.status !== 'exited').length})
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("atfal")}
+                onClick={() => { setActiveTab("atfal"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeTab === "atfal" ? "active" : ""}`}
               >
                 Atfal Program ({applications.filter(a => a.program === "Al-Atfal (7 to 15 yrs old)" && a.status !== 'exited').length})
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("general_sigar")}
+                onClick={() => { setActiveTab("general_sigar"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeTab === "general_sigar" ? "active-emerald" : ""}`}
               >
                 <Layers size={14} /> General Tab (Al-Sigar) ({applications.filter(a => a.program === "Al-Sigar (4 to 6 yrs old)" && a.status !== 'exited').length})
@@ -444,7 +678,7 @@ export default function AdmissionAdminDashboard({
           {/* Exit List Tab */}
           <button
             type="button"
-            onClick={() => setActiveTab("exit_list")}
+            onClick={() => { setActiveTab("exit_list"); setStatusFilter("all"); }}
             className={`adm-tab-pill ${activeTab === "exit_list" ? "active-rose" : ""}`}
           >
             <LogOut size={14} /> Exit Bar / List ({stats.exited})
@@ -468,23 +702,23 @@ export default function AdmissionAdminDashboard({
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="adm-input-custom adm-input-noicon"
-                style={{ maxWidth: "140px", padding: "8px 12px", fontSize: "12px", color: "var(--adm-gold-dark)", fontWeight: 700 }}
+                style={{ maxWidth: "150px", padding: "8px 12px", fontSize: "12px", color: "var(--adm-gold-dark)", fontWeight: 700 }}
               >
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="waiting">Waiting</option>
-                <option value="rejected">Rejected</option>
+                <option value="all">All Status ({stats.total})</option>
+                <option value="pending">Pending ({stats.pending})</option>
+                <option value="approved">Approved ({stats.approved})</option>
+                <option value="waiting">Waiting ({stats.waiting})</option>
+                <option value="rejected">Rejected ({stats.rejected})</option>
               </select>
             )}
 
-            <div className="adm-input-icon-wrap" style={{ maxWidth: "220px" }}>
+            <div className="adm-input-icon-wrap" style={{ maxWidth: "240px" }}>
               <Search size={14} className="adm-input-icon" style={{ left: "12px" }} />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search name, ITS..."
+                placeholder="Search name, ITS, ref..."
                 className="adm-input-custom"
                 style={{ padding: "8px 12px 8px 34px", fontSize: "12.5px" }}
               />
@@ -498,276 +732,472 @@ export default function AdmissionAdminDashboard({
         <AdmissionCmsSettings onSaved={() => loadData()} />
       )}
 
-      {/* Applications List */}
+      {/* Applications List with Animated Dynamic Card Shifting */}
       {activeTab !== "cms_settings" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
           {loading ? (
             <div style={{ textAlign: "center", padding: "48px 20px", color: "var(--adm-text-muted)" }}>
               <RotateCw size={32} className="animate-spin" style={{ margin: "0 auto 12px auto", color: "var(--adm-gold-primary)" }} />
-              <p style={{ margin: 0, fontSize: "14px", fontWeight: 600 }}>Loading admission records from Firebase...</p>
+              <p style={{ margin: 0, fontSize: "14px", fontWeight: 600 }}>Loading admission records from database...</p>
             </div>
           ) : filteredApplications.length === 0 ? (
             <div style={{ textAlign: "center", padding: "54px 20px", background: "#ffffff", borderRadius: "24px", border: "1.5px solid var(--adm-gold-border)", boxShadow: "var(--adm-shadow-sm)" }}>
               <Users size={36} style={{ margin: "0 auto 12px auto", color: "var(--adm-gold-primary)" }} />
               <h3 style={{ margin: 0, fontSize: "17px", fontWeight: 800, color: "var(--adm-espresso-main)" }}>No Submissions Found</h3>
               <p style={{ margin: "6px 0 0 0", fontSize: "13px", color: "var(--adm-text-muted)" }}>
-                {activeTab === "exit_list" ? "The Exit List is currently empty." : "No applications match the active filters."}
+                {activeTab === "exit_list" ? "The Exit List is currently empty." : statusFilter !== "all" ? `No applications found with status "${statusFilter}". Click another status above.` : "No applications match the active filters."}
               </p>
             </div>
           ) : (
-            filteredApplications.map((app) => {
-              const isExpanded = expandedCardId === app.application_id;
-              const logs = Array.isArray(app.timeline_audit_log) ? app.timeline_audit_log : [];
+            <AnimatePresence mode="popLayout">
+              {filteredApplications.map((app) => {
+                const isExpanded = expandedCardId === app.application_id;
+                const logs = Array.isArray(app.timeline_audit_log) ? app.timeline_audit_log : [];
+                const isItemLoading = actionLoadingId === app.application_id;
 
-              return (
-                <div
-                  key={app.application_id}
-                  style={{
-                    background: "#ffffff",
-                    border: isExpanded ? "2px solid var(--adm-gold-primary)" : "1.5px solid var(--adm-gold-border)",
-                    borderRadius: "20px",
-                    overflow: "hidden",
-                    boxShadow: isExpanded ? "var(--adm-shadow-md)" : "var(--adm-shadow-sm)",
-                    transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)"
-                  }}
-                >
-                  {/* Summary Header */}
-                  <div
-                    onClick={() => setExpandedCardId(isExpanded ? null : app.application_id)}
+                return (
+                  <motion.div
+                    layout
+                    key={app.application_id}
+                    initial={{ opacity: 0, y: 15, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.18 } }}
+                    transition={{ duration: 0.24, ease: "easeOut" }}
                     style={{
-                      padding: "18px 22px",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: "14px",
-                      cursor: "pointer",
-                      flexWrap: "wrap",
-                      background: isExpanded ? "var(--adm-cream-soft)" : "#ffffff"
+                      background: "#ffffff",
+                      border: isExpanded ? "2px solid var(--adm-gold-primary)" : "1.5px solid var(--adm-gold-border)",
+                      borderRadius: "20px",
+                      overflow: "hidden",
+                      boxShadow: isExpanded ? "var(--adm-shadow-md)" : "var(--adm-shadow-sm)",
+                      transition: "border-color 0.2s, box-shadow 0.2s"
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                    {/* Summary Header Card */}
+                    <div
+                      onClick={() => setExpandedCardId(isExpanded ? null : app.application_id)}
+                      style={{
+                        padding: "16px 20px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "14px",
+                        cursor: "pointer",
+                        flexWrap: "wrap",
+                        background: isExpanded ? "var(--adm-cream-soft)" : "#ffffff"
+                      }}
+                    >
+                      {/* Left: Avatar & Identity */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "14px", flex: "1 1 300px" }}>
+                        <div
+                          style={{
+                            width: "44px",
+                            height: "44px",
+                            borderRadius: "14px",
+                            background: "var(--adm-gold-gradient)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: 900,
+                            color: "#ffffff",
+                            fontSize: "18px",
+                            boxShadow: "var(--adm-shadow-gold)",
+                            fontFamily: "'Amiri', serif",
+                            flexShrink: 0
+                          }}
+                        >
+                          {app.full_name?.charAt(0) || "ط"}
+                        </div>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                            <h3 style={{ margin: 0, fontSize: "16.5px", fontWeight: 800, color: "var(--adm-espresso-main)" }}>
+                              {app.full_name}
+                            </h3>
+                            <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--adm-espresso-main)", background: "var(--adm-cream-soft)", border: "1px solid var(--adm-border-soft)", padding: "2px 8px", borderRadius: "6px" }}>
+                              ITS: {app.its_number}
+                            </span>
+                            <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--adm-gold-dark)", background: "var(--adm-gold-subtle)", border: "1px solid var(--adm-gold-border)", padding: "2px 8px", borderRadius: "6px" }}>
+                              {app.program}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", gap: "10px", fontSize: "12px", color: "var(--adm-text-muted)", marginTop: "4px", flexWrap: "wrap", alignItems: "center" }}>
+                            <span>{app.gender} • Age {app.age || "N/A"}</span>
+                            <span>• Jamaat: <strong style={{ color: "var(--adm-espresso-main)" }}>{app.jamaat}</strong></span>
+                            <span>• Phone: <strong style={{ color: "var(--adm-gold-dark)", fontFamily: "monospace" }}>{app.whatsapp_number}</strong></span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Quick Action Buttons & Status Pill */}
                       <div
-                        style={{
-                          width: "44px",
-                          height: "44px",
-                          borderRadius: "14px",
-                          background: "var(--adm-gold-gradient)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontWeight: 900,
-                          color: "#ffffff",
-                          fontSize: "18px",
-                          boxShadow: "var(--adm-shadow-gold)",
-                          fontFamily: "'Amiri', serif"
-                        }}
+                        style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        {app.full_name?.charAt(0) || "ط"}
-                      </div>
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                          <h3 style={{ margin: 0, fontSize: "16.5px", fontWeight: 800, color: "var(--adm-espresso-main)" }}>
-                            {app.full_name}
-                          </h3>
-                          <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--adm-espresso-main)", background: "var(--adm-cream-soft)", border: "1px solid var(--adm-border-soft)", padding: "2px 8px", borderRadius: "6px" }}>
-                            ITS: {app.its_number}
-                          </span>
-                          <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--adm-gold-dark)", background: "var(--adm-gold-subtle)", border: "1px solid var(--adm-gold-border)", padding: "2px 8px", borderRadius: "6px" }}>
-                            {app.program}
-                          </span>
-                        </div>
-                        <div style={{ display: "flex", gap: "12px", fontSize: "12.5px", color: "var(--adm-text-muted)", marginTop: "4px", flexWrap: "wrap" }}>
-                          <span>{app.gender} • Age {app.age || "N/A"}</span>
-                          <span>• Jamaat: <strong style={{ color: "var(--adm-espresso-main)" }}>{app.jamaat}</strong></span>
-                          <span>• Phone: <strong style={{ color: "var(--adm-gold-dark)", fontFamily: "monospace" }}>{app.whatsapp_number}</strong></span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                      <span className={`status-pill status-${app.status}`}>
-                        {app.status}
-                      </span>
-                      {isExpanded ? <ChevronUp size={20} color="var(--adm-gold-primary)" /> : <ChevronDown size={20} color="var(--adm-text-muted)" />}
-                    </div>
-                  </div>
-
-                  {/* Expanded Card View */}
-                  {isExpanded && (
-                    <div style={{ borderTop: "1.5px solid var(--adm-gold-border)", padding: "24px", background: "var(--adm-ivory-warm)", display: "flex", flexDirection: "column", gap: "22px" }}>
-                      {/* Detailed Grid */}
-                      <div className="adm-form-grid" style={{ background: "#ffffff", padding: "20px", borderRadius: "16px", border: "1.5px solid var(--adm-gold-border)", boxShadow: "var(--adm-shadow-sm)", marginBottom: 0 }}>
-                        <div>
-                          <span style={{ fontSize: "10.5px", textTransform: "uppercase", color: "var(--adm-text-muted)", fontWeight: 800 }}>Email Address</span>
-                          <p style={{ margin: "2px 0 0 0", fontSize: "13.5px", color: "var(--adm-espresso-main)", fontWeight: 700 }}>{app.email}</p>
-                        </div>
-                        <div>
-                          <span style={{ fontSize: "10.5px", textTransform: "uppercase", color: "var(--adm-text-muted)", fontWeight: 800 }}>WhatsApp Phone</span>
-                          <p style={{ margin: "2px 0 0 0", fontSize: "13.5px", color: "var(--adm-gold-dark)", fontFamily: "monospace", fontWeight: 800 }}>{app.whatsapp_number}</p>
-                        </div>
-                        <div>
-                          <span style={{ fontSize: "10.5px", textTransform: "uppercase", color: "var(--adm-text-muted)", fontWeight: 800 }}>Program Chosen</span>
-                          <p style={{ margin: "2px 0 0 0", fontSize: "13.5px", color: "var(--adm-espresso-main)", fontWeight: 700 }}>{app.program}</p>
-                        </div>
-                        <div>
-                          <span style={{ fontSize: "10.5px", textTransform: "uppercase", color: "var(--adm-text-muted)", fontWeight: 800 }}>Application Ref ID</span>
-                          <p style={{ margin: "2px 0 0 0", fontSize: "13.5px", color: "var(--adm-emerald-primary)", fontFamily: "monospace", fontWeight: 900 }}>{app.application_id}</p>
-                        </div>
-
-                        {app.last_achieved_sanad && (
-                          <div>
-                            <span style={{ fontSize: "10.5px", textTransform: "uppercase", color: "var(--adm-text-muted)", fontWeight: 800 }}>Last Achieved Sanad</span>
-                            <p style={{ margin: "2px 0 0 0", fontSize: "13.5px", color: "var(--adm-emerald-primary)", fontWeight: 800 }}>{app.last_achieved_sanad}</p>
+                        {/* Quick Shift Status Buttons directly on card */}
+                        {app.status === "pending" && (
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                            <button
+                              type="button"
+                              onClick={() => handleStatusChange(app.application_id, "approved")}
+                              disabled={isItemLoading}
+                              className="adm-btn-quick-action"
+                              style={{ background: "var(--adm-emerald-bg)", color: "var(--adm-emerald-primary)", borderColor: "var(--adm-emerald-border)" }}
+                              title="Quick Approve"
+                            >
+                              <CheckCircle2 size={13} /> Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleStatusChange(app.application_id, "waiting")}
+                              disabled={isItemLoading}
+                              className="adm-btn-quick-action"
+                              style={{ background: "var(--adm-amber-bg)", color: "var(--adm-amber-primary)", borderColor: "var(--adm-amber-border)" }}
+                              title="Move to Waiting List"
+                            >
+                              <Clock size={13} /> Waiting
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleStatusChange(app.application_id, "rejected")}
+                              disabled={isItemLoading}
+                              className="adm-btn-quick-action"
+                              style={{ background: "var(--adm-rose-bg)", color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)" }}
+                              title="Reject Application"
+                            >
+                              <XCircle size={13} /> Reject
+                            </button>
                           </div>
                         )}
 
-                        {app.venue_and_time && (
-                          <div className="adm-col-full">
-                            <span style={{ fontSize: "10.5px", textTransform: "uppercase", color: "var(--adm-text-muted)", fontWeight: 800 }}>Selected Venue & Time</span>
-                            <p style={{ margin: "2px 0 0 0", fontSize: "13.5px", color: "var(--adm-espresso-main)", fontWeight: 700 }}>{app.venue_and_time}</p>
+                        {app.status === "waiting" && (
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                            <button
+                              type="button"
+                              onClick={() => handleStatusChange(app.application_id, "approved")}
+                              disabled={isItemLoading}
+                              className="adm-btn-quick-action"
+                              style={{ background: "var(--adm-emerald-bg)", color: "var(--adm-emerald-primary)", borderColor: "var(--adm-emerald-border)" }}
+                              title="Approve from Waiting List"
+                            >
+                              <CheckCircle2 size={13} /> Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleStatusChange(app.application_id, "rejected")}
+                              disabled={isItemLoading}
+                              className="adm-btn-quick-action"
+                              style={{ background: "var(--adm-rose-bg)", color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)" }}
+                              title="Reject Application"
+                            >
+                              <XCircle size={13} /> Reject
+                            </button>
                           </div>
                         )}
 
-                        {app.dob && (
-                          <div>
-                            <span style={{ fontSize: "10.5px", textTransform: "uppercase", color: "var(--adm-text-muted)", fontWeight: 800 }}>Date of Birth</span>
-                            <p style={{ margin: "2px 0 0 0", fontSize: "13.5px", color: "var(--adm-espresso-main)", fontWeight: 700 }}>{app.dob}</p>
-                          </div>
-                        )}
-
-                        {app.hifz_till && (
-                          <div>
-                            <span style={{ fontSize: "10.5px", textTransform: "uppercase", color: "var(--adm-text-muted)", fontWeight: 800 }}>Hifz Till</span>
-                            <p style={{ margin: "2px 0 0 0", fontSize: "13.5px", color: "var(--adm-espresso-main)", fontWeight: 700 }}>{app.hifz_till}</p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Numeric Counters */}
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", background: "#ffffff", padding: "14px", borderRadius: "16px", textAlign: "center", border: "1.5px solid var(--adm-gold-border)", boxShadow: "var(--adm-shadow-sm)" }}>
-                        <div>
-                          <span style={{ fontSize: "10.5px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-emerald-primary)" }}>Times Enrolled</span>
-                          <p style={{ margin: "2px 0 0 0", fontSize: "20px", fontWeight: 900, color: "var(--adm-espresso-main)" }}>{app.enrolled_count || (app.status === "approved" ? 1 : 0)}</p>
-                        </div>
-                        <div>
-                          <span style={{ fontSize: "10.5px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-rose-primary)" }}>Times Exited</span>
-                          <p style={{ margin: "2px 0 0 0", fontSize: "20px", fontWeight: 900, color: "var(--adm-espresso-main)" }}>{app.exit_count || 0}</p>
-                        </div>
-                        <div>
-                          <span style={{ fontSize: "10.5px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-gold-dark)" }}>Times Resumed</span>
-                          <p style={{ margin: "2px 0 0 0", fontSize: "20px", fontWeight: 900, color: "var(--adm-espresso-main)" }}>{app.resume_count || 0}</p>
-                        </div>
-                      </div>
-
-                      {/* Action Buttons: Approved, Reject, Waiting + Exit & Resume System */}
-                      <div style={{ background: "linear-gradient(135deg, #fffdf8 0%, #fff7e6 100%)", border: "1.5px solid var(--adm-gold-border)", borderRadius: "18px", padding: "18px", display: "flex", flexDirection: "column", gap: "14px", boxShadow: "var(--adm-shadow-sm)" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <span style={{ fontSize: "12px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-gold-dark)", display: "flex", alignItems: "center", gap: "6px" }}>
-                            <Sparkles size={15} /> Status Actions & Automated WhatsApp Notifications
-                          </span>
-                        </div>
-
-                        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(app.application_id, "approved")}
-                            disabled={actionLoadingId === app.application_id || app.status === "approved"}
-                            className="adm-btn-primary adm-btn-emerald"
-                            style={{ padding: "9px 20px", fontSize: "13px" }}
-                          >
-                            <CheckCircle2 size={16} /> Approved
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(app.application_id, "waiting")}
-                            disabled={actionLoadingId === app.application_id || app.status === "waiting"}
-                            className="adm-btn-secondary"
-                            style={{ padding: "9px 20px", fontSize: "13px", color: "var(--adm-amber-primary)", borderColor: "var(--adm-amber-border)" }}
-                          >
-                            <Clock size={16} /> Waiting
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(app.application_id, "rejected")}
-                            disabled={actionLoadingId === app.application_id || app.status === "rejected"}
-                            className="adm-btn-secondary"
-                            style={{ padding: "9px 20px", fontSize: "13px", color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)" }}
-                          >
-                            <XCircle size={16} /> Reject
-                          </button>
-
-                          {/* The Exit Button (Visible when Approved) */}
-                          {app.status === "approved" && (
+                        {app.status === "approved" && (
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                            <button
+                              type="button"
+                              onClick={() => handleStatusChange(app.application_id, "waiting")}
+                              disabled={isItemLoading}
+                              className="adm-btn-quick-action"
+                              style={{ background: "var(--adm-amber-bg)", color: "var(--adm-amber-primary)", borderColor: "var(--adm-amber-border)" }}
+                              title="Shift to Waiting List"
+                            >
+                              <Clock size={13} /> Move to Waiting
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleExitUser(app.application_id)}
-                              className="adm-btn-secondary"
-                              style={{ marginLeft: "auto", color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)" }}
+                              disabled={isItemLoading}
+                              className="adm-btn-quick-action"
+                              style={{ background: "var(--adm-rose-bg)", color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)" }}
+                              title="Move to Exit List"
                             >
-                              <LogOut size={16} /> Move to Exit List
+                              <LogOut size={13} /> Exit
                             </button>
-                          )}
+                          </div>
+                        )}
 
-                          {/* The Resume Button (Visible in Exit List) */}
-                          {app.status === "exited" && (
+                        {app.status === "rejected" && (
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                             <button
                               type="button"
-                              onClick={() => handleResumeUser(app.application_id)}
-                              className="adm-btn-primary adm-btn-emerald"
-                              style={{ marginLeft: "auto", padding: "9px 22px", fontSize: "13px" }}
+                              onClick={() => handleStatusChange(app.application_id, "approved")}
+                              disabled={isItemLoading}
+                              className="adm-btn-quick-action"
+                              style={{ background: "var(--adm-emerald-bg)", color: "var(--adm-emerald-primary)", borderColor: "var(--adm-emerald-border)" }}
+                              title="Reconsider & Approve"
                             >
-                              <RotateCw size={16} /> Resume to Active Approved
+                              <CheckCircle2 size={13} /> Reconsider
                             </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Historical Timeline */}
-                      <div>
-                        <h4 style={{ margin: "0 0 12px 0", fontSize: "12px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-espresso-main)", display: "flex", alignItems: "center", gap: "6px" }}>
-                          <History size={15} color="var(--adm-gold-dark)" /> Audit Timeline Log ({logs.length})
-                        </h4>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                          {logs.map((l, lIdx) => (
-                            <div
-                              key={l.id || lIdx}
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                padding: "12px 16px",
-                                borderRadius: "12px",
-                                background: "#ffffff",
-                                border: "1px solid var(--adm-gold-border)",
-                                fontSize: "12.5px",
-                                boxShadow: "var(--adm-shadow-sm)"
-                              }}
+                            <button
+                              type="button"
+                              onClick={() => handleStatusChange(app.application_id, "waiting")}
+                              disabled={isItemLoading}
+                              className="adm-btn-quick-action"
+                              style={{ background: "var(--adm-amber-bg)", color: "var(--adm-amber-primary)", borderColor: "var(--adm-amber-border)" }}
+                              title="Move to Waiting"
                             >
-                              <div>
-                                <span className={`status-pill status-${l.action || "pending"}`} style={{ marginRight: "10px" }}>
-                                  {l.action}
-                                </span>
-                                <span style={{ color: "var(--adm-espresso-main)", fontWeight: 600 }}>{l.note || "Status updated"}</span>
-                              </div>
-                              <span style={{ fontSize: "11px", color: "var(--adm-text-muted)", fontFamily: "monospace" }}>
-                                {l.timestamp ? new Date(l.timestamp).toLocaleString() : ""}
-                              </span>
-                            </div>
-                          ))}
+                              <Clock size={13} /> Waiting
+                            </button>
+                          </div>
+                        )}
+
+                        {app.status === "exited" && (
+                          <button
+                            type="button"
+                            onClick={() => handleResumeUser(app.application_id)}
+                            disabled={isItemLoading}
+                            className="adm-btn-quick-action"
+                            style={{ background: "var(--adm-emerald-bg)", color: "var(--adm-emerald-primary)", borderColor: "var(--adm-emerald-border)" }}
+                            title="Resume to active Approved"
+                          >
+                            <RotateCw size={13} /> Resume
+                          </button>
+                        )}
+
+                        {/* Direct WhatsApp Chat Action */}
+                        <button
+                          type="button"
+                          onClick={(e) => handleOpenWhatsAppDirect(e, app.whatsapp_number, app.full_name, app.program)}
+                          className="adm-btn-quick-action"
+                          style={{ background: "var(--adm-emerald-bg)", color: "var(--adm-emerald-primary)", borderColor: "var(--adm-emerald-border)" }}
+                          title="Open WhatsApp Chat"
+                        >
+                          <MessageCircle size={13} />
+                        </button>
+
+                        <span className={`status-pill status-${app.status}`}>
+                          {app.status}
+                        </span>
+
+                        <div style={{ marginLeft: "4px", color: isExpanded ? "var(--adm-gold-primary)" : "var(--adm-text-muted)" }}>
+                          {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                         </div>
                       </div>
                     </div>
-                  )}
-                </div>
-              );
-            })
+
+                    {/* Expanded Drawer View with Full Details */}
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.25, ease: "easeInOut" }}
+                          style={{ borderTop: "1.5px solid var(--adm-gold-border)", padding: "20px 22px", background: "var(--adm-ivory-warm)", display: "flex", flexDirection: "column", gap: "18px" }}
+                        >
+                          {/* Detailed Grid */}
+                          <div className="adm-form-grid" style={{ background: "#ffffff", padding: "18px", borderRadius: "16px", border: "1.5px solid var(--adm-gold-border)", boxShadow: "var(--adm-shadow-sm)", marginBottom: 0 }}>
+                            <div>
+                              <span style={{ fontSize: "10.5px", textTransform: "uppercase", color: "var(--adm-text-muted)", fontWeight: 800 }}>Email Address</span>
+                              <p style={{ margin: "3px 0 0 0", fontSize: "13.5px", color: "var(--adm-espresso-main)", fontWeight: 700 }}>
+                                <a href={`mailto:${app.email}`} style={{ color: "inherit", textDecoration: "none" }}>{app.email || "N/A"}</a>
+                              </p>
+                            </div>
+                            <div>
+                              <span style={{ fontSize: "10.5px", textTransform: "uppercase", color: "var(--adm-text-muted)", fontWeight: 800 }}>WhatsApp Phone</span>
+                              <p style={{ margin: "3px 0 0 0", fontSize: "13.5px", color: "var(--adm-gold-dark)", fontFamily: "monospace", fontWeight: 800, display: "flex", alignItems: "center", gap: "6px" }}>
+                                <span>{app.whatsapp_number}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleOpenWhatsAppDirect(e, app.whatsapp_number, app.full_name, app.program)}
+                                  style={{ background: "transparent", border: "none", cursor: "pointer", padding: "2px", color: "var(--adm-emerald-primary)" }}
+                                  title="Chat on WhatsApp"
+                                >
+                                  <ExternalLink size={13} />
+                                </button>
+                              </p>
+                            </div>
+                            <div>
+                              <span style={{ fontSize: "10.5px", textTransform: "uppercase", color: "var(--adm-text-muted)", fontWeight: 800 }}>Program Chosen</span>
+                              <p style={{ margin: "3px 0 0 0", fontSize: "13.5px", color: "var(--adm-espresso-main)", fontWeight: 700 }}>{app.program}</p>
+                            </div>
+                            <div>
+                              <span style={{ fontSize: "10.5px", textTransform: "uppercase", color: "var(--adm-text-muted)", fontWeight: 800 }}>Application Ref ID</span>
+                              <p style={{ margin: "3px 0 0 0", fontSize: "13.5px", color: "var(--adm-emerald-primary)", fontFamily: "monospace", fontWeight: 900, display: "flex", alignItems: "center", gap: "6px" }}>
+                                <span>{app.application_id}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleCopyRefId(e, app.application_id)}
+                                  style={{ background: "transparent", border: "none", cursor: "pointer", padding: "2px", color: copiedId === app.application_id ? "var(--adm-emerald-primary)" : "var(--adm-text-muted)" }}
+                                  title="Copy Ref ID"
+                                >
+                                  {copiedId === app.application_id ? <Check size={13} /> : <Copy size={13} />}
+                                </button>
+                              </p>
+                            </div>
+
+                            {app.last_achieved_sanad && (
+                              <div>
+                                <span style={{ fontSize: "10.5px", textTransform: "uppercase", color: "var(--adm-text-muted)", fontWeight: 800 }}>Last Achieved Sanad</span>
+                                <p style={{ margin: "3px 0 0 0", fontSize: "13.5px", color: "var(--adm-emerald-primary)", fontWeight: 800 }}>{app.last_achieved_sanad}</p>
+                              </div>
+                            )}
+
+                            {app.venue_and_time && (
+                              <div className="adm-col-full">
+                                <span style={{ fontSize: "10.5px", textTransform: "uppercase", color: "var(--adm-text-muted)", fontWeight: 800 }}>Selected Venue & Time</span>
+                                <p style={{ margin: "3px 0 0 0", fontSize: "13.5px", color: "var(--adm-espresso-main)", fontWeight: 700 }}>{app.venue_and_time}</p>
+                              </div>
+                            )}
+
+                            {app.dob && (
+                              <div>
+                                <span style={{ fontSize: "10.5px", textTransform: "uppercase", color: "var(--adm-text-muted)", fontWeight: 800 }}>Date of Birth</span>
+                                <p style={{ margin: "3px 0 0 0", fontSize: "13.5px", color: "var(--adm-espresso-main)", fontWeight: 700 }}>{app.dob}</p>
+                              </div>
+                            )}
+
+                            {app.hifz_till && (
+                              <div>
+                                <span style={{ fontSize: "10.5px", textTransform: "uppercase", color: "var(--adm-text-muted)", fontWeight: 800 }}>Hifz Till</span>
+                                <p style={{ margin: "3px 0 0 0", fontSize: "13.5px", color: "var(--adm-espresso-main)", fontWeight: 700 }}>{app.hifz_till}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Numeric Counters */}
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px", background: "#ffffff", padding: "14px", borderRadius: "16px", textAlign: "center", border: "1.5px solid var(--adm-gold-border)", boxShadow: "var(--adm-shadow-sm)" }}>
+                            <div>
+                              <span style={{ fontSize: "10.5px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-emerald-primary)" }}>Times Enrolled</span>
+                              <p style={{ margin: "2px 0 0 0", fontSize: "20px", fontWeight: 900, color: "var(--adm-espresso-main)" }}>{app.enrolled_count || (app.status === "approved" ? 1 : 0)}</p>
+                            </div>
+                            <div>
+                              <span style={{ fontSize: "10.5px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-rose-primary)" }}>Times Exited</span>
+                              <p style={{ margin: "2px 0 0 0", fontSize: "20px", fontWeight: 900, color: "var(--adm-espresso-main)" }}>{app.exit_count || 0}</p>
+                            </div>
+                            <div>
+                              <span style={{ fontSize: "10.5px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-gold-dark)" }}>Times Resumed</span>
+                              <p style={{ margin: "2px 0 0 0", fontSize: "20px", fontWeight: 900, color: "var(--adm-espresso-main)" }}>{app.resume_count || 0}</p>
+                            </div>
+                          </div>
+
+                          {/* Status Actions Command Bar */}
+                          <div style={{ background: "linear-gradient(135deg, #fffdf8 0%, #fff7e6 100%)", border: "1.5px solid var(--adm-gold-border)", borderRadius: "18px", padding: "16px", display: "flex", flexDirection: "column", gap: "12px", boxShadow: "var(--adm-shadow-sm)" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <span style={{ fontSize: "12px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-gold-dark)", display: "flex", alignItems: "center", gap: "6px" }}>
+                                <Sparkles size={15} /> Status Actions & Automated WhatsApp Dispatch
+                              </span>
+                              <span style={{ fontSize: "11px", color: "var(--adm-text-muted)" }}>
+                                Current: <strong style={{ textTransform: "uppercase", color: "var(--adm-espresso-main)" }}>{app.status}</strong>
+                              </span>
+                            </div>
+
+                            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                              {/* Approved Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleStatusChange(app.application_id, "approved")}
+                                disabled={isItemLoading || app.status === "approved"}
+                                className={`adm-btn-primary adm-btn-emerald ${app.status === "approved" ? "opacity-50" : ""}`}
+                                style={{ padding: "9px 20px", fontSize: "13px" }}
+                              >
+                                <CheckCircle2 size={16} /> Approved
+                              </button>
+
+                              {/* Waiting Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleStatusChange(app.application_id, "waiting")}
+                                disabled={isItemLoading || app.status === "waiting"}
+                                className="adm-btn-secondary"
+                                style={{ padding: "9px 20px", fontSize: "13px", color: "var(--adm-amber-primary)", borderColor: "var(--adm-amber-border)", background: app.status === "waiting" ? "var(--adm-amber-bg)" : "" }}
+                              >
+                                <Clock size={16} /> Waiting
+                              </button>
+
+                              {/* Reject Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleStatusChange(app.application_id, "rejected")}
+                                disabled={isItemLoading || app.status === "rejected"}
+                                className="adm-btn-secondary"
+                                style={{ padding: "9px 20px", fontSize: "13px", color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)", background: app.status === "rejected" ? "var(--adm-rose-bg)" : "" }}
+                              >
+                                <XCircle size={16} /> Reject
+                              </button>
+
+                              {/* Exit Button (for Approved students) */}
+                              {app.status === "approved" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleExitUser(app.application_id)}
+                                  disabled={isItemLoading}
+                                  className="adm-btn-secondary"
+                                  style={{ marginLeft: "auto", color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)" }}
+                                >
+                                  <LogOut size={16} /> Move to Exit List
+                                </button>
+                              )}
+
+                              {/* Resume Button (for Exited students) */}
+                              {app.status === "exited" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleResumeUser(app.application_id)}
+                                  disabled={isItemLoading}
+                                  className="adm-btn-primary adm-btn-emerald"
+                                  style={{ marginLeft: "auto", padding: "9px 22px", fontSize: "13px" }}
+                                >
+                                  <RotateCw size={16} /> Resume to Active Approved
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Historical Audit Timeline */}
+                          <div>
+                            <h4 style={{ margin: "0 0 10px 0", fontSize: "12px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-espresso-main)", display: "flex", alignItems: "center", gap: "6px" }}>
+                              <History size={15} color="var(--adm-gold-dark)" /> Audit Timeline Log ({logs.length})
+                            </h4>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                              {logs.length === 0 ? (
+                                <p style={{ fontSize: "12px", color: "var(--adm-text-muted)", margin: 0 }}>No audit logs recorded yet.</p>
+                              ) : (
+                                logs.map((l, lIdx) => (
+                                  <div
+                                    key={l.id || lIdx}
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      alignItems: "center",
+                                      padding: "10px 14px",
+                                      borderRadius: "12px",
+                                      background: "#ffffff",
+                                      border: "1px solid var(--adm-gold-border)",
+                                      fontSize: "12px",
+                                      boxShadow: "var(--adm-shadow-sm)",
+                                      flexWrap: "wrap",
+                                      gap: "8px"
+                                    }}
+                                  >
+                                    <div>
+                                      <span className={`status-pill status-${l.action || "pending"}`} style={{ marginRight: "8px" }}>
+                                        {l.action}
+                                      </span>
+                                      <span style={{ color: "var(--adm-espresso-main)", fontWeight: 600 }}>{l.note || "Status updated"}</span>
+                                    </div>
+                                    <span style={{ fontSize: "11px", color: "var(--adm-text-muted)", fontFamily: "monospace" }}>
+                                      {l.timestamp ? new Date(l.timestamp).toLocaleString() : ""}
+                                    </span>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
           )}
         </div>
       )}
 
-      {/* Simulator Modal */}
+      {/* WhatsApp Webhook Simulator Modal */}
       {showBotModal && (
         <div className="adm-modal-overlay">
           <div className="adm-modal-card">
@@ -792,7 +1222,7 @@ export default function AdmissionAdminDashboard({
                   type="text"
                   value={botTestPhone}
                   onChange={(e) => setBotTestPhone(e.target.value)}
-                  placeholder="e.g. 918107925353"
+                  placeholder="e.g. 919930852533"
                   className="adm-input-custom adm-input-noicon"
                   style={{ marginTop: "6px" }}
                 />
