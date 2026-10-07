@@ -1,5 +1,38 @@
 [
   {
+    "application_id": "MT-1447-85979204",
+    "full_name": "Murtaza jamali",
+    "its_number": "50340002",
+    "gender": "male",
+    "age": 30,
+    "jamaat": "Galiakot",
+    "email": "murtaza.jamali@gmail.com",
+    "whatsapp_number": "+918530124938",
+    "program": "Al-Kibar (Adults)",
+    "last_achieved_sanad": "Sanad 1",
+    "venue_and_time": "Venue 1: Burhani Masjid (Morning Batch)",
+    "dob": null,
+    "hifz_till": null,
+    "status": "pending",
+    "enrolled_count": 0,
+    "exit_count": 0,
+    "resume_count": 0,
+    "timeline_audit_log": [
+      {
+        "id": "log_init_jamali",
+        "action": "submitted",
+        "from_status": "none",
+        "to_status": "pending",
+        "timestamp": "2026-10-07T13:11:00.000Z",
+        "actor": "Murtaza jamali (Online Form)",
+        "note": "Admission form successfully submitted online."
+      }
+    ],
+    "submitted_at": "2026-10-07T13:11:00.000Z",
+    "created_at": "2026-10-07T13:11:00.000Z",
+    "updated_at": "2026-10-07T13:11:00.000Z"
+  },
+  {
     "application_id": "MT-1447-96664789",
     "full_name": "murtaza hamid",
     "its_number": "50340001",
@@ -13,28 +46,19 @@
     "venue_and_time": "Venue 1: Burhani Masjid (Morning Batch)",
     "dob": null,
     "hifz_till": null,
-    "status": "waiting",
-    "enrolled_count": 0,
+    "status": "approved",
+    "enrolled_count": 1,
     "exit_count": 0,
     "resume_count": 0,
     "timeline_audit_log": [
       {
-        "id": "log_1791377092779",
-        "action": "waiting",
+        "id": "log_1791377175557",
+        "action": "approved",
         "from_status": "waiting",
-        "to_status": "waiting",
-        "timestamp": "2026-10-07T12:44:52.779Z",
-        "actor": "Test Admin",
-        "note": "Status updated from waiting to waiting"
-      },
-      {
-        "id": "log_1791376989381",
-        "action": "waiting",
-        "from_status": "pending",
-        "to_status": "waiting",
-        "timestamp": "2026-10-07T12:43:09.381Z",
+        "to_status": "approved",
+        "timestamp": "2026-10-07T12:46:15.557Z",
         "actor": "murtaza.mohammed.hamid@mahadalzahra.com",
-        "note": "Status updated from pending to waiting"
+        "note": "Status updated from waiting to approved"
       },
       {
         "id": "log_init_1",
@@ -48,12 +72,6 @@
     ],
     "submitted_at": "2026-10-07T10:40:18.000Z",
     "created_at": "2026-10-07T10:40:18.000Z",
-    "updated_at": "2026-10-07T12:44:52.779Z",
-    "applicationId": "MT-1447-96664789",
-    "action": "update_status",
-    "newStatus": "waiting",
-    "adminUser": "Test Admin",
-    "adminNote": "",
-    "last_action_by": "Test Admin"
+    "updated_at": "2026-10-07T12:46:15.557Z"
   }
 ]

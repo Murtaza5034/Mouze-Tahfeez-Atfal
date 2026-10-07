@@ -19,8 +19,13 @@ const FALLBACK_SA = {
 const CACHE_FILE = path.join("/tmp", "admission_applications_cache.json");
 const PUBLIC_SEED_FILE = path.join(process.cwd(), "public", "admissions_data.json");
 
+global.__ADMISSIONS_CACHE__ = global.__ADMISSIONS_CACHE__ || new Map();
+
 function writeDiskCache(record) {
   try {
+    if (record && record.application_id) {
+      global.__ADMISSIONS_CACHE__.set(record.application_id, record);
+    }
     const map = new Map();
     if (fs.existsSync(PUBLIC_SEED_FILE)) {
       try {
@@ -33,6 +38,11 @@ function writeDiskCache(record) {
         const cList = JSON.parse(fs.readFileSync(CACHE_FILE, "utf8")) || [];
         cList.forEach(item => { if (item.application_id) map.set(item.application_id, item); });
       } catch (_) {}
+    }
+    if (global.__ADMISSIONS_CACHE__) {
+      for (const [k, v] of global.__ADMISSIONS_CACHE__.entries()) {
+        map.set(k, v);
+      }
     }
     map.set(record.application_id, record);
     const list = Array.from(map.values());

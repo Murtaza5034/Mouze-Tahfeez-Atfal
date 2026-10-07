@@ -5539,6 +5539,67 @@ export function startWhatsAppBotEngine() {
       });
     }, 30 * 1000);
     console.log(`[WHATSAPP BOT] ⏱ Monday-Saturday Teacher Scheduler Active (4:25 PM Self-Attendance & 10:00 PM eLearning/Attendance Summary).`);
+
+    // Live Admissions Auto-Sync & Instant Auto-Dispatch Worker (Connects Vercel form submissions directly to WhatsApp bot)
+    const dispatchedAdmissionsSet = new Set();
+    const syncAdmissionsFromCloud = async () => {
+      try {
+        const cloudUrl = 'https://mouze-tahfeez-atfal.vercel.app/api/admission-admin';
+        const res = await fetch(cloudUrl, { signal: AbortSignal.timeout(4000) });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data)) {
+            const dataPath = path.resolve('public', 'admissions_data.json');
+            let localList = [];
+            try {
+              if (fs.existsSync(dataPath)) {
+                localList = JSON.parse(fs.readFileSync(dataPath, 'utf8')) || [];
+              }
+            } catch (_) {}
+
+            const map = new Map();
+            localList.forEach(item => { if (item.application_id) map.set(item.application_id, item); });
+
+            let hasNew = false;
+            for (const item of json.data) {
+              if (!item.application_id) continue;
+              if (!map.has(item.application_id)) {
+                map.set(item.application_id, item);
+                hasNew = true;
+              }
+
+              // Auto-dispatch welcome notification if new and not yet dispatched
+              if (!dispatchedAdmissionsSet.has(item.application_id) && item.status === 'pending') {
+                dispatchedAdmissionsSet.add(item.application_id);
+                const rawPhone = item.whatsapp_number || item.phone || '';
+                const phone = cleanPhone(rawPhone);
+                const fullName = item.full_name || 'Mumin';
+                const prog = item.program || 'Hifz Classes';
+                const appId = item.application_id;
+
+                if (sock && baileysStatus === 'CONNECTED' && phone) {
+                  const jid = `${phone}@s.whatsapp.net`;
+                  const welcomeMsg = `Salaam ${fullName},\n\nThank you for registering for *${prog}* (1447-48H) at Tahfeez Galiakot.\n\nYour admission status is: *⏳ Pending Admin Review*\nApplication Ref ID: *${appId}*\n\nWe have received your application and our administration will review and update you shortly.\n\nHelpline: +91 81079 25353\nTahfeez – Galiakot`;
+                  await sock.sendMessage(jid, { text: welcomeMsg });
+                  console.log(`[ADMISSION-CLOUD-SYNC] 🚀 Auto-dispatched welcome WhatsApp to +${phone} for ${fullName} (${appId})`);
+                }
+              }
+            }
+
+            if (hasNew) {
+              const merged = Array.from(map.values());
+              fs.writeFileSync(dataPath, JSON.stringify(merged, null, 2), 'utf8');
+              console.log(`[ADMISSION-CLOUD-SYNC] 📥 Synced ${merged.length} admissions from Vercel cloud to local disk.`);
+            }
+          }
+        }
+      } catch (_) {}
+    };
+
+    // Run admission sync every 5 seconds
+    setInterval(syncAdmissionsFromCloud, 5000);
+    setTimeout(syncAdmissionsFromCloud, 1000);
+    console.log(`[WHATSAPP BOT] 🔄 Cloud Admission Auto-Sync Worker active (polling Vercel every 5s).`);
   });
 
   // Universal multi-port listeners: bind all common Railway/cloud ports (2785, 8080, 3000)
