@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     region: singapore
-    buildCommand: npm ci --legacy-peer-deps --omit=dev
+    buildCommand: npm install --omit=dev --legacy-peer-deps
     startCommand: node scripts/mauze-whatsapp-bot.js
     healthCheckPath: /api/status
     envVars:

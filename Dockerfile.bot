@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install production dependencies only
-RUN npm ci --legacy-peer-deps --omit=dev
+RUN npm install --omit=dev --legacy-peer-deps
 
 # Copy all application and bot scripts
 COPY . .
