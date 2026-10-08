@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: mauze-whatsapp-bot
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm ci --legacy-peer-deps --omit=dev
+    startCommand: node scripts/mauze-whatsapp-bot.js
+    healthCheckPath: /api/status
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 2785
+      - key: OPENWA_SESSION_ID
+        value: mauze-helpline-8107925353
+      - key: HELPLINE_NUMBER
+        value: "+91 81079 25353"
+      - key: PORTAL_URL
+        value: https://mouze-tahfeez-atfal.vercel.app/

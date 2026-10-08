@@ -9,6 +9,8 @@
  * - Monthly total = 4 weeks * 120 gems = max 480 gems.
  */
 
+import { cleanPhotoUrl } from "./imageUtils";
+
 export const MONTHS_CONFIG = [
   {
     id: "safar",
@@ -170,12 +172,13 @@ export function getLeagueCandidates(leagueEntries = [], monthId = "safar", stude
       (entry.avatar_url && !entry.avatar_url.includes("unsplash.com") ? entry.avatar_url : null) ||
       (entry.photo && !entry.photo.includes("unsplash.com") ? entry.photo : null);
 
-    const resolvedPhoto =
+    const resolvedPhoto = cleanPhotoUrl(
       rawPhoto ||
       studentPhotosMap[sId] ||
       studentPhotosMap[fullName.trim().toLowerCase()] ||
       studentPhotosMap[cleanName] ||
-      null;
+      ""
+    );
 
     const candidate = {
       id: sId,
@@ -187,7 +190,7 @@ export function getLeagueCandidates(leagueEntries = [], monthId = "safar", stude
       maxGems: 480,
       isFilled: calc.isFilled,
       weeks: calc.weeks,
-      photo: resolvedPhoto,
+      photo: resolvedPhoto || null,
     };
 
     if (candidateMap.has(sId)) {

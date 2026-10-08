@@ -29,24 +29,24 @@ const NoToggleButton = ({ value, onChange, label }) => {
       }}
       title={isNo ? `Clear ${label}` : `Mark ${label} as not applicable`}
       style={{
-        padding: '4px 10px',
-        borderRadius: '6px',
-        border: isNo ? '2px solid #c62828' : '1px solid #ccc',
-        background: isNo ? '#ffebee' : '#f5f5f5',
-        color: isNo ? '#c62828' : '#999',
+        padding: '5px 10px',
+        borderRadius: '8px',
+        border: isNo ? '1.5px solid #ef5350' : '1px solid rgba(197, 160, 89, 0.25)',
+        background: isNo ? '#ffebee' : '#fdfcf9',
+        color: isNo ? '#c62828' : '#8d7362',
         fontSize: '11px',
-        fontWeight: isNo ? 800 : 500,
+        fontWeight: isNo ? 800 : 600,
         cursor: 'pointer',
-        fontFamily: 'Inter, sans-serif',
-        letterSpacing: '0.5px',
-        transition: 'all 0.15s ease',
+        fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif",
+        letterSpacing: '0.04em',
+        transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
         whiteSpace: 'nowrap',
         flexShrink: 0,
         lineHeight: 1,
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'scale(1.05)';
-        e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.12)';
+        e.currentTarget.style.transform = 'scale(1.06)';
+        e.currentTarget.style.boxShadow = '0 2px 8px rgba(197, 160, 89, 0.2)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'scale(1)';
@@ -2015,18 +2015,18 @@ onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme, teacher
             </div>
           )}
           <div className="jadwal-mode-row">
-            <label style={{ fontWeight: 600, color: '#5d4037', fontSize: '14px' }}>Schedule Mode:</label>
+            <label style={{ fontWeight: 700, color: '#3d2b1f', fontSize: '14px', fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif" }}>Schedule Mode:</label>
             <select
               value={mode}
               onChange={(e) => setMode(e.target.value)}
               className="premium-select"
-              style={{ padding: '8px 16px', borderRadius: '10px', border: '1px solid #dfcbb5', background: '#fdfaf4', fontFamily: 'Inter, sans-serif', fontSize: '13px', cursor: 'pointer' }}
+              style={{ padding: '8px 16px', borderRadius: '12px', border: '1px solid rgba(197, 160, 89, 0.35)', background: '#fdfaf4', fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif", fontSize: '13px', fontWeight: 600, color: '#3d2b1f', cursor: 'pointer', outline: 'none' }}
             >
               <option value="juz-wise">Juz Wise</option>
               <option value="surah-wise">Surah Wise</option>
             </select>
             {mode === 'surah-wise' && (
-              <span style={{ fontSize: '12px', color: '#8b6d31', fontStyle: 'italic' }}>Free text: English or Arabic</span>
+              <span style={{ fontSize: '12px', color: '#8a6515', fontStyle: 'italic', fontFamily: "'Outfit', sans-serif" }}>Free text: English or Arabic</span>
             )}
             <select
               value={teacherDisplayStyle}

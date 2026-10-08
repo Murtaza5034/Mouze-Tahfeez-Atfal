@@ -315,7 +315,9 @@ export default function TeacherLeaveApprovalPanel({
   };
 
   const filteredTl = tlLeaves.filter(l => l.status === tlFilter);
-  const teacherProfilesList = teacherProfiles || [];
+  const teacherProfilesList = [...(teacherProfiles || [])].sort((a, b) =>
+    String(a.full_name || a.name || "").trim().localeCompare(String(b.full_name || b.name || "").trim(), undefined, { sensitivity: "base" })
+  );
 
   return (
     <>

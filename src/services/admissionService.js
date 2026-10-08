@@ -178,6 +178,53 @@ export async function saveFormSettings(settings) {
 }
 
 // ============================================================================
+// SECURITY WALL & INPUT SANITIZATION
+// ============================================================================
+
+/**
+ * Sanitizes input string to prevent XSS, HTML/Script injections, and invalid characters.
+ */
+export function sanitizeAdmissionInput(str, maxLength = 200) {
+  if (typeof str !== "string") return "";
+  return str
+    .replace(/<[^>]*>?/gm, "") // Strip HTML tags
+    .replace(/[<>"'`\\]/g, "")  // Strip potentially dangerous injection chars
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Strip control characters
+    .trim()
+    .slice(0, maxLength);
+}
+
+/**
+ * Anti-spam submission rate limiter wall (Max 5 submissions per 10 minutes per device).
+ */
+function checkSubmissionRateLimit() {
+  try {
+    const RATE_KEY = "adm_sub_rate_timestamps";
+    const now = Date.now();
+    const windowMs = 10 * 60 * 1000; // 10 minutes
+    const maxSubmissions = 5;
+
+    let timestamps = [];
+    try {
+      const raw = localStorage.getItem(RATE_KEY);
+      if (raw) timestamps = JSON.parse(raw);
+    } catch (_) {}
+
+    timestamps = timestamps.filter(t => now - t < windowMs);
+
+    if (timestamps.length >= maxSubmissions) {
+      return { allowed: false, error: "Too many submissions detected. For security, please wait a few minutes before submitting again." };
+    }
+
+    timestamps.push(now);
+    localStorage.setItem(RATE_KEY, JSON.stringify(timestamps));
+    return { allowed: true };
+  } catch (_) {
+    return { allowed: true };
+  }
+}
+
+// ============================================================================
 // ADMISSION SUBMISSION & LIFECYCLE MANAGEMENT
 // ============================================================================
 
@@ -214,8 +261,42 @@ export function generateApplicationId() {
 
 export async function submitAdmissionApplication(formData) {
   try {
+    // 1. Anti-spam security wall check
+    const rateCheck = checkSubmissionRateLimit();
+    if (!rateCheck.allowed) {
+      return { success: false, error: rateCheck.error };
+    }
+
     const appId = formData.application_id || generateApplicationId();
     const timestamp = new Date().toISOString();
+
+    // 2. Strict Input Sanitization & Clamping
+    const cleanFullName = sanitizeAdmissionInput(formData.fullName || formData.full_name || "", 100);
+    const cleanIts = (formData.itsNumber || formData.its_number || "").toString().replace(/[^\d]/g, "").slice(0, 8);
+    const rawPhone = (formData.whatsappNumber || formData.whatsapp_number || "").toString().replace(/[^\d+]/g, "").slice(0, 20);
+    const cleanEmail = sanitizeAdmissionInput(formData.email || "", 120).toLowerCase();
+    const cleanJamaat = sanitizeAdmissionInput(
+      formData.jamaat === "Other"
+        ? (formData.jamaatOther || "Other")
+        : (formData.jamaat || "Galiakot"),
+      80
+    );
+    const cleanProgram = sanitizeAdmissionInput(formData.program || "Al-Atfal (7 to 15 yrs old)", 80);
+    const cleanSanad = sanitizeAdmissionInput(formData.lastAchievedSanad || formData.last_achieved_sanad || "", 100);
+    const cleanVenue = sanitizeAdmissionInput(formData.venueAndTime || formData.venue_and_time || "", 150);
+    const cleanHifzTill = sanitizeAdmissionInput(formData.hifzTill || formData.hifz_till || "", 100);
+
+    let parsedAge = parseInt(formData.age, 10);
+    if (isNaN(parsedAge) || parsedAge < 3 || parsedAge > 120) {
+      parsedAge = null;
+    }
+
+    if (!cleanFullName) {
+      return { success: false, error: "Full Name is required and must contain valid characters." };
+    }
+    if (!cleanIts || cleanIts.length !== 8) {
+      return { success: false, error: "Valid 8-digit ITS Number is required." };
+    }
 
     const initialAuditLog = [
       {
@@ -231,20 +312,20 @@ export async function submitAdmissionApplication(formData) {
 
     const applicationRecord = {
       application_id: appId,
-      full_name: formData.fullName?.trim() || formData.full_name?.trim() || "",
-      its_number: formData.itsNumber?.trim() || formData.its_number?.trim() || "",
-      gender: formData.gender || "male",
-      age: parseInt(formData.age, 10) || null,
-      jamaat: formData.jamaat === "Other" ? (formData.jamaatOther?.trim() || "Other") : (formData.jamaat || "Galiakot"),
-      email: formData.email?.trim()?.toLowerCase() || "",
-      whatsapp_number: formData.whatsappNumber?.trim() || formData.whatsapp_number?.trim() || "",
-      program: formData.program || "Al-Atfal (7 to 15 yrs old)",
+      full_name: cleanFullName,
+      its_number: cleanIts,
+      gender: formData.gender === "female" ? "female" : "male",
+      age: parsedAge,
+      jamaat: cleanJamaat,
+      email: cleanEmail,
+      whatsapp_number: rawPhone,
+      program: cleanProgram,
       
       // Program-specific fields
-      last_achieved_sanad: formData.lastAchievedSanad || formData.last_achieved_sanad || null,
-      venue_and_time: formData.venueAndTime || formData.venue_and_time || null,
-      dob: formData.dob || null,
-      hifz_till: formData.hifzTill || formData.hifz_till || null,
+      last_achieved_sanad: cleanSanad || null,
+      venue_and_time: cleanVenue || null,
+      dob: formData.dob ? sanitizeAdmissionInput(formData.dob, 20) : null,
+      hifz_till: cleanHifzTill || null,
       
       // Status & Lifecycle
       status: "pending", // pending | approved | waiting | rejected | exited
@@ -365,6 +446,10 @@ export async function fetchAdmissionApplications({ role = "all", program = "all"
     });
 
     let results = Array.from(finalMap.values());
+    
+    // Auto-purge any trashed applications older than 15 days
+    results = autoPurgeOldTrashedApplications(results);
+
     results.sort((a, b) => {
       const ta = new Date(b.created_at || b.submitted_at || 0).getTime();
       const tb = new Date(a.created_at || a.submitted_at || 0).getTime();
@@ -683,3 +768,236 @@ export async function triggerWhatsappAdmissionNotification({ trigger, applicatio
 
   return { success: true, simulated: true };
 }
+
+// ============================================================================
+// TRASH & PERMANENT DELETE LIFECYCLE (15-DAY RETENTION)
+// ============================================================================
+
+export const TRASH_RETENTION_DAYS = 15;
+export const TRASH_RETENTION_MS = TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+
+export async function moveToTrash({ applicationId, adminUser = "Admin" }) {
+  try {
+    const timestamp = new Date().toISOString();
+    const list = getLocalSubmissions();
+    const item = list.find(r => r.application_id === applicationId || r.id === applicationId);
+    const prevStatus = item?.status && item.status !== "trash" ? item.status : "pending";
+
+    const newLogEntry = {
+      id: `log_${Date.now()}`,
+      action: "trashed",
+      from_status: prevStatus,
+      to_status: "trash",
+      timestamp,
+      actor: adminUser,
+      note: "Moved to Trash (will auto-delete permanently in 15 days)"
+    };
+
+    const existingLogs = Array.isArray(item?.timeline_audit_log) ? item.timeline_audit_log : [];
+
+    const updatedRecord = {
+      ...(item || {}),
+      application_id: applicationId,
+      status: "trash",
+      is_trash: true,
+      trashed_at: timestamp,
+      trashed_from_status: prevStatus,
+      timeline_audit_log: [newLogEntry, ...existingLogs],
+      updated_at: timestamp,
+      last_action_by: adminUser
+    };
+
+    saveLocalSubmission(updatedRecord);
+
+    // Sync to Supabase
+    try {
+      await supabase
+        .from("admission_applications")
+        .update({
+          status: "trash",
+          is_trash: true,
+          trashed_at: timestamp,
+          trashed_from_status: prevStatus,
+          timeline_audit_log: updatedRecord.timeline_audit_log,
+          updated_at: timestamp,
+          last_action_by: adminUser
+        })
+        .eq("application_id", applicationId);
+    } catch (_) {}
+
+    // Sync to serverless API
+    try {
+      await fetch("/api/admission-admin", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId,
+          action: "move_to_trash",
+          adminUser
+        })
+      });
+    } catch (_) {}
+
+    return { success: true, data: updatedRecord };
+  } catch (err) {
+    console.error("Error moving to trash:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function restoreFromTrash({ applicationId, adminUser = "Admin" }) {
+  try {
+    const timestamp = new Date().toISOString();
+    const list = getLocalSubmissions();
+    const item = list.find(r => r.application_id === applicationId || r.id === applicationId);
+    const restoreToStatus = item?.trashed_from_status || "pending";
+
+    const newLogEntry = {
+      id: `log_${Date.now()}`,
+      action: "restored",
+      from_status: "trash",
+      to_status: restoreToStatus,
+      timestamp,
+      actor: adminUser,
+      note: `Restored from Trash back to ${restoreToStatus}`
+    };
+
+    const existingLogs = Array.isArray(item?.timeline_audit_log) ? item.timeline_audit_log : [];
+
+    const updatedRecord = {
+      ...(item || {}),
+      application_id: applicationId,
+      status: restoreToStatus,
+      is_trash: false,
+      trashed_at: null,
+      timeline_audit_log: [newLogEntry, ...existingLogs],
+      updated_at: timestamp,
+      last_action_by: adminUser
+    };
+
+    saveLocalSubmission(updatedRecord);
+
+    try {
+      await supabase
+        .from("admission_applications")
+        .update({
+          status: restoreToStatus,
+          is_trash: false,
+          trashed_at: null,
+          timeline_audit_log: updatedRecord.timeline_audit_log,
+          updated_at: timestamp,
+          last_action_by: adminUser
+        })
+        .eq("application_id", applicationId);
+    } catch (_) {}
+
+    try {
+      await fetch("/api/admission-admin", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId,
+          action: "restore_from_trash",
+          adminUser
+        })
+      });
+    } catch (_) {}
+
+    return { success: true, data: updatedRecord };
+  } catch (err) {
+    console.error("Error restoring from trash:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function permanentlyDeleteAdmission({ applicationId }) {
+  try {
+    // 1. Wipe from LocalStorage
+    try {
+      const list = getLocalSubmissions().filter(r => r.application_id !== applicationId && r.id !== applicationId);
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+    } catch (_) {}
+
+    // 2. Wipe from Supabase
+    try {
+      await supabase
+        .from("admission_applications")
+        .delete()
+        .or(`application_id.eq.${applicationId},id.eq.${applicationId}`);
+    } catch (err) {
+      console.warn("Supabase delete note:", err?.message);
+    }
+
+    // 3. Wipe from Serverless API / Backend store
+    try {
+      await fetch("/api/admission-admin", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId })
+      });
+    } catch (_) {}
+
+    return { success: true, applicationId };
+  } catch (err) {
+    console.error("Error permanently deleting:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function emptyTrash() {
+  try {
+    const list = getLocalSubmissions();
+    const trashed = list.filter(r => r.status === "trash" || r.is_trash);
+    const nonTrashed = list.filter(r => r.status !== "trash" && !r.is_trash);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(nonTrashed));
+
+    for (const item of trashed) {
+      const id = item.application_id || item.id;
+      if (id) {
+        try {
+          await supabase.from("admission_applications").delete().or(`application_id.eq.${id},id.eq.${id}`);
+          await fetch("/api/admission-admin", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ applicationId: id })
+          });
+        } catch (_) {}
+      }
+    }
+
+    return { success: true, count: trashed.length };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+export function autoPurgeOldTrashedApplications(applicationsList = []) {
+  if (!Array.isArray(applicationsList) || applicationsList.length === 0) return applicationsList;
+  const now = Date.now();
+  const toKeep = [];
+  const expiredIds = [];
+
+  for (const app of applicationsList) {
+    const isTrash = app.status === "trash" || app.is_trash;
+    if (isTrash) {
+      const trashedTime = new Date(app.trashed_at || app.updated_at || 0).getTime();
+      if (trashedTime > 0 && (now - trashedTime) >= TRASH_RETENTION_MS) {
+        expiredIds.push(app.application_id || app.id);
+        continue;
+      }
+    }
+    toKeep.push(app);
+  }
+
+  // Purge expired items asynchronously
+  if (expiredIds.length > 0) {
+    setTimeout(() => {
+      expiredIds.forEach(id => {
+        permanentlyDeleteAdmission({ applicationId: id }).catch(console.warn);
+      });
+    }, 100);
+  }
+
+  return toKeep;
+}
+

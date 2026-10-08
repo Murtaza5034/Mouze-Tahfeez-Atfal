@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-08T10:59:00.000Z",
+  "title": "Design System: Mauze Tahfeez Atfal",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Primary Gold",
+        "canonical": "#c5a059",
+        "tonalRamp": ["#3a2c10", "#634c1b", "#8e6d27", "#b88f34", "#c5a059", "#d8b87a", "#e9d3a7", "#faf3e5"]
+      },
+      "primary-accent": {
+        "role": "primary",
+        "displayName": "Radiant Gold",
+        "canonical": "#d4af37",
+        "tonalRamp": ["#3f320b", "#6b5512", "#97771a", "#c49a22", "#d4af37", "#dec25e", "#ebd78f", "#f8f1d5"]
+      },
+      "secondary-brown": {
+        "role": "secondary",
+        "displayName": "Espresso Brown",
+        "canonical": "#3d2b1f",
+        "tonalRamp": ["#19120d", "#2e2017", "#3d2b1f", "#5c412f", "#7c573f", "#9d7459", "#bf987e", "#dfc5b3"]
+      },
+      "neutral-bg": {
+        "role": "neutral",
+        "displayName": "Cream Canvas",
+        "canonical": "#fcfaf5",
+        "tonalRamp": ["#2e2b24", "#5c5748", "#8b836d", "#b9af92", "#d8d1bc", "#ede8db", "#f5f2eb", "#fcfaf5"]
+      },
+      "neutral-surface": {
+        "role": "neutral",
+        "displayName": "Pure White",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#2b2b2b", "#575757", "#828282", "#adadad", "#d6d6d6", "#ebebeb", "#f5f5f5", "#ffffff"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Cinzel Display",
+        "purpose": "Sacred and imperial page titles and major milestones."
+      },
+      "headline": {
+        "displayName": "Outfit Headline",
+        "purpose": "Section titles and modal headers."
+      },
+      "body": {
+        "displayName": "Outfit / Inter Body",
+        "purpose": "Standard reading text, notes, and general UI."
+      }
+    },
+    "shadows": [
+      {
+        "name": "ambient-card",
+        "value": "0 12px 40px rgba(61, 43, 31, 0.08)",
+        "purpose": "Resting elevation for cards and containers."
+      },
+      {
+        "name": "gold-glow",
+        "value": "0 8px 24px rgba(197, 160, 89, 0.25)",
+        "purpose": "Hover and focus glow on interactive buttons and chips."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-spring",
+        "value": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+        "purpose": "Micro-bounces on interactive icons and toggle chips."
+      },
+      {
+        "name": "ease-smooth",
+        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Page transitions and drawer slides."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Action Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main submission, login, and confirmation triggers.",
+      "html": "<button class=\"ds-btn-primary\">SAVE JADWAL RECORD</button>",
+      "css": ".ds-btn-primary { background: linear-gradient(135deg, #d4af37 0%, #c5a059 100%); color: #ffffff; padding: 12px 24px; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.05em; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 14px rgba(197, 160, 89, 0.3); transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease; } .ds-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(197, 160, 89, 0.45); } .ds-btn-primary:active { transform: translateY(0); }"
+    },
+    {
+      "name": "Ghost Gold Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary actions, cancel buttons, and filter toggles.",
+      "html": "<button class=\"ds-btn-ghost\">VIEW HISTORY</button>",
+      "css": ".ds-btn-ghost { background: #f9f4e8; color: #8a6515; padding: 12px 20px; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 600; border: 1px solid rgba(197, 160, 89, 0.4); border-radius: 12px; cursor: pointer; transition: all 0.2s ease; } .ds-btn-ghost:hover { background: #f0e6d3; color: #3d2b1f; border-color: #c5a059; }"
+    },
+    {
+      "name": "Claymorphic Info Card",
+      "kind": "card",
+      "refersTo": "card-surface",
+      "description": "Primary content wrapper for student progress, attendance stats, and Jadwal logs.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-title\">Surah Al-Baqarah</div><div class=\"ds-card-meta\">Juz 2 • Ayah 142-176 • Takhteet Completed</div></div>",
+      "css": ".ds-card { background: #ffffff; border: 1px solid rgba(197, 160, 89, 0.2); border-radius: 24px; padding: 22px 24px; box-shadow: 0 12px 40px rgba(61, 43, 31, 0.08); font-family: 'Outfit', sans-serif; transition: transform 0.2s ease, box-shadow 0.2s ease; } .ds-card:hover { transform: translateY(-2px); box-shadow: 0 16px 48px rgba(197, 160, 89, 0.16); } .ds-card-title { font-size: 18px; font-weight: 700; color: #2c1e14; margin-bottom: 6px; } .ds-card-meta { font-size: 13px; font-weight: 500; color: #8d7362; }"
+    },
+    {
+      "name": "Status Pill Chip",
+      "kind": "chip",
+      "refersTo": "chip-status",
+      "description": "Attendance status, Takhteet verification, and exam grades.",
+      "html": "<span class=\"ds-chip ds-chip-present\">PRESENT • MUTQIN</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 9999px; font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; } .ds-chip-present { background: #e8f5e9; color: #2e7d32; border: 1px solid rgba(46, 125, 50, 0.25); }"
+    },
+    {
+      "name": "Luminous Form Input",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Student search, marks entry, and teacher notes.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Search student ITS or name...\" />",
+      "css": ".ds-input { width: 100%; box-sizing: border-box; background: #ffffff; border: 1.5px solid rgba(197, 160, 89, 0.25); border-radius: 12px; padding: 12px 16px; font-family: 'Outfit', sans-serif; font-size: 14px; color: #2c1e14; outline: none; transition: border-color 0.2s ease, box-shadow 0.2s ease; } .ds-input:focus { border-color: #c5a059; box-shadow: 0 0 0 4px rgba(197, 160, 89, 0.2); } .ds-input::placeholder { color: #8d7362; opacity: 0.7; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Sacred Illumination",
+    "overview": "The Mauze Tahfeez Atfal design language balances sacred institutional reverence with modern tactile clarity. Rooted in traditional Fatemi aesthetics—warm hand-finished parchment, luminous antique gold, and deep espresso walnut—the system avoids both sterile corporate SaaS dryness and oversaturated neon dashboards. Every surface is sculpted to feel luminous, authentic, and peaceful, fostering focus during intense Quranic memorization and study.",
+    "keyCharacteristics": [
+      "Luminous Warmth: Cream parchment backgrounds (#fcfaf5), radiant gold gradients, and deep espresso text.",
+      "Tactile Claymorphism: Soft, pillowy 18px–26px corner radii paired with subtle inner highlights and warm ambient shadows.",
+      "Sacred Typography: Classical majestic serif display headers (Cinzel), crisp modern geometric sans for UI density (Outfit / Plus Jakarta Sans), and authentic Quranic calligraphy (Kanz al Marjaan).",
+      "High-Velocity Ergonomics: Optimized touch targets, zero-distraction layout, and instant visual state feedback."
+    ],
+    "rules": [
+      {
+        "name": "The Sacred Accent Rule",
+        "body": "Gold is a beacon, not a background fill. Solid gold backgrounds are reserved for primary action triggers and milestone achievements; ambient cards remain cream or white with gold perimeter illumination.",
+        "section": "colors"
+      },
+      {
+        "name": "The No-Cold-Gray Rule",
+        "body": "Never use pure #808080 or cold slate gray. All muted tones and borders must carry warm walnut (#8d7362) or golden amber undertones.",
+        "section": "colors"
+      },
+      {
+        "name": "The Quranic Integrity Rule",
+        "body": "Arabic Quranic verses must never be displayed below 1.8rem on mobile and must maintain at least 2.5 line-height with correct right-to-left directional isolation.",
+        "section": "typography"
+      },
+      {
+        "name": "The Warm Glow Rule",
+        "body": "Elevation is signaled by warm brown ambient diffusion and subtle golden inner rim highlights rather than harsh black drop shadows.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use warm cream (#fcfaf5) as the standard canvas backdrop for all content screens.",
+      "Do preserve the golden accent hierarchy: reserve solid gold fills for primary user goals and celebratory milestones.",
+      "Do ensure all interactive inputs and buttons have at least 48px minimum touch target height on mobile screens.",
+      "Do render Quranic Arabic text in dedicated large serif fonts (Kanz al Marjaan / Al-Kanz) with ample line height.",
+      "Do use warm espresso (#3d2b1f) and walnut (#6d4c41) for typography and iconography instead of pure black or cool slate."
+    ],
+    "donts": [
+      "Don't use stark pure black (#000000) or cold blue-gray shadows.",
+      "Don't crowd teacher data entry screens with decorative clutter; keep daily Jadwal workflows rapid and clean.",
+      "Don't use square, sharp-cornered (0px) rectangular boxes for primary cards or buttons.",
+      "Don't apply low-contrast gray text on cream or gold backgrounds; maintain WCAG AA contrast.",
+      "Don't mix discordant neon accents into the sacred gold-and-espresso palette."
+    ]
+  }
+}

@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import { doc, onSnapshot, getDoc, getDocs, collection, getFirestore } from 'firebase/firestore';
 import { firebaseApp } from '../firebase/config';
 import { calculateStudentMonthlyGems, getMonthlyTop3 } from '../utils/atfalLeagueUtils';
+import { cleanPhotoUrl } from '../utils/imageUtils';
 
 // ---------------------------------------------------------------------------
 // 4 DISTINCT REAL 3D GEM ASSETS (WEEK 1-4)
@@ -174,7 +175,13 @@ const MONTHS_LIST = [
 
 export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, customGemsData, allProfiles }) {
   const studentName = studentProfile?.name || studentProfile?.full_name || studentProfile?.student_name || "Student";
-  const rawStudentAvatar = studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url || studentProfile?.photo || null;
+  const rawStudentAvatar = cleanPhotoUrl(
+    studentProfile?.photoUrl ||
+    studentProfile?.photo_url ||
+    studentProfile?.avatar_url ||
+    studentProfile?.photo ||
+    ""
+  );
   const studentAvatar = rawStudentAvatar && !rawStudentAvatar.includes("unsplash.com") ? rawStudentAvatar : null;
   const studentId = String(studentProfile?.student_id || studentProfile?.id || "");
 
@@ -460,14 +467,15 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
     // Map to podium display format
     return top3.map((player) => {
       const isCurrentStudent = String(player.id) === String(studentId);
-      let photo = player.photo;
+      let photo = cleanPhotoUrl(player.photo || "");
       if (!photo || photo.includes("unsplash.com")) {
-        photo =
+        photo = cleanPhotoUrl(
           studentPhotosMap[player.id] ||
           studentPhotosMap[player.name?.trim().toLowerCase()] ||
           studentPhotosMap[player.name?.replace(/\s+(bhai|ben|kakaji)\b/gi, "").trim().toLowerCase()] ||
-          (isCurrentStudent && studentAvatar && !studentAvatar.includes("unsplash.com") ? studentAvatar : null) ||
-          null;
+          (isCurrentStudent && studentAvatar && !studentAvatar.includes("unsplash.com") ? studentAvatar : "") ||
+          ""
+        );
       }
 
       // Elegant initial medallion SVG if no uploaded photo exists

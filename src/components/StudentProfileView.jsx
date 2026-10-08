@@ -26,7 +26,9 @@ import {
   Check,
 } from "lucide-react";
 import "./StudentProfileView.css";
-import { compressImageToDataUrl } from "../utils/imageUtils.js";
+import { compressImageToDataUrl, cleanPhotoUrl } from "../utils/imageUtils.js";
+
+const resolveStudentPhoto = cleanPhotoUrl;
 
 /**
  * Helper to test if background color is White, Grey, or Cream,
@@ -153,33 +155,7 @@ function analyzePassportImage(imgElement) {
   }
 }
 
-function resolveStudentPhoto(url) {
-  if (!url || typeof url !== "string") return "";
-  const trimmed = url.trim();
-  if (!trimmed) return "";
-  if (
-    trimmed.startsWith("data:") ||
-    trimmed.startsWith("blob:") ||
-    trimmed.startsWith("/") ||
-    trimmed.startsWith("./")
-  ) {
-    return trimmed;
-  }
-  const storagePatterns = [
-    "child profile pictures/",
-    "child_profile_pictures/",
-    "profiles/",
-    "student-photos/",
-    "student_photos/",
-    "teacher_photos/",
-    "teacher-photos/",
-  ];
-  if (storagePatterns.some((pattern) => trimmed.startsWith(pattern))) {
-    const encodedPath = encodeURIComponent(trimmed);
-    return `https://firebasestorage.googleapis.com/v0/b/mawaid-b929a.firebasestorage.app/o/${encodedPath}?alt=media`;
-  }
-  return trimmed;
-}
+
 
 export default function StudentProfileView({
   studentProfile,

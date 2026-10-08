@@ -18,6 +18,7 @@ import {
   ArrowRight,
   Flag,
 } from "lucide-react";
+import { cleanPhotoUrl } from "../utils/imageUtils";
 import "./AdminTeacherRankingCard.css";
 
 /**
@@ -759,15 +760,32 @@ export function AdminTeacherRankingModal({
                   </div>
 
                   <div className="teacher-rank-avatar-wrap">
-                    {teacher.photo_url ? (
-                      <img
-                        src={teacher.photo_url}
-                        alt={teacher.name}
-                        className="teacher-rank-avatar-img"
-                      />
-                    ) : (
-                      teacher.name.charAt(0).toUpperCase()
-                    )}
+                    {(() => {
+                      const teacherPhoto = cleanPhotoUrl(
+                        teacher.photo_url ||
+                        teacher.photoUrl ||
+                        teacher.avatar_url ||
+                        teacher.photo ||
+                        ""
+                      );
+                      if (teacherPhoto) {
+                        return (
+                          <img
+                            src={teacherPhoto}
+                            alt={teacher.name}
+                            className="teacher-rank-avatar-img"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.style.display = "none";
+                              if (e.currentTarget.parentElement) {
+                                e.currentTarget.parentElement.innerText = teacher.name.charAt(0).toUpperCase();
+                              }
+                            }}
+                          />
+                        );
+                      }
+                      return teacher.name.charAt(0).toUpperCase();
+                    })()}
                   </div>
 
                   <div className="teacher-rank-name-col">

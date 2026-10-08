@@ -125,7 +125,10 @@ const FUNCTION_NAMES = {
 async function rpcGetAllChildProfiles() {
   const { data, error } = await from("child_profiles").select("*").limit(100000);
   if (error) return { data: [], error };
-  return { data: data || [], error: null };
+  const sorted = (data || []).slice().sort((a, b) =>
+    String(a.full_name || a.name || "").trim().localeCompare(String(b.full_name || b.name || "").trim(), undefined, { sensitivity: 'base' })
+  );
+  return { data: sorted, error: null };
 }
 
 async function rpcGetMyChildProfiles({ p_user_id, p_email } = {}) {
@@ -223,7 +226,10 @@ async function rpcGetUserIdByEmail({ target_email } = {}) {
 async function rpcGetAllKibarChildProfiles() {
   const { data, error } = await from("kibar_child_profiles").select("*").limit(100000);
   if (error) return { data: [], error };
-  return { data: data || [], error: null };
+  const sorted = (data || []).slice().sort((a, b) =>
+    String(a.full_name || a.name || "").trim().localeCompare(String(b.full_name || b.name || "").trim(), undefined, { sensitivity: 'base' })
+  );
+  return { data: sorted, error: null };
 }
 
 // Kibar equivalent: get my kibar child profiles
@@ -287,14 +293,20 @@ async function rpcGetMyKibarChildProfiles({ p_user_id, p_email } = {}) {
 async function rpcGetAllKibarStudentProfiles() {
   const { data, error } = await from("kibar_student_profiles").select("*").limit(100000);
   if (error) return { data: [], error };
-  return { data: data || [], error: null };
+  const sorted = (data || []).slice().sort((a, b) =>
+    String(a.full_name || a.name || "").trim().localeCompare(String(b.full_name || b.name || "").trim(), undefined, { sensitivity: 'base' })
+  );
+  return { data: sorted, error: null };
 }
 
 // Kibar Teacher Profiles - for admin access to all kibar teacher profiles
 async function rpcGetAllKibarTeacherProfiles() {
   const { data, error } = await from("kibar_teacher_profiles").select("*").limit(100000);
   if (error) return { data: [], error };
-  return { data: data || [], error: null };
+  const sorted = (data || []).slice().sort((a, b) =>
+    String(a.full_name || a.name || "").trim().localeCompare(String(b.full_name || b.name || "").trim(), undefined, { sensitivity: 'base' })
+  );
+  return { data: sorted, error: null };
 }
 
 const RPC_LOCAL = {

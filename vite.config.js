@@ -99,17 +99,20 @@ export function getRefreshReg() {
             const check = await fetch('http://127.0.0.1:2785/api/status', { signal: AbortSignal.timeout(1000) }).catch(() => null);
             if (!check || !check.ok) {
               const { spawn } = await import('child_process');
-              const botProc = spawn('node', ['scripts/mauze-whatsapp-bot.js'], {
+              const { resolve } = await import('path');
+              const scriptPath = resolve('scripts', 'mauze-whatsapp-bot.js');
+              const botProc = spawn('node', [scriptPath], {
                 detached: true,
                 stdio: 'ignore',
-                shell: true
+                shell: true,
+                cwd: process.cwd()
               });
               botProc.unref();
               console.log('\x1b[32m[VITE-BOT-AUTORUN] 📱 WhatsApp Bot daemon automatically launched in background on port 2785.\x1b[0m');
             }
           } catch (_) {}
         };
-        setTimeout(ensureBotRunning, 1500);
+        setTimeout(ensureBotRunning, 1000);
 
         server.middlewares.use('/api/whatsapp-bot', async (req, res) => {
           res.setHeader('Access-Control-Allow-Origin', '*');
@@ -124,26 +127,30 @@ export function getRefreshReg() {
 
           const urlObj = new URL(req.url, 'http://localhost');
           const subPath = urlObj.pathname;
+          const isStartReq = subPath === '/start' || subPath.endsWith('/start') || subPath === '/api/whatsapp-bot/start';
 
           // 1. Start bot daemon process if requested
-          if (subPath === '/start' && req.method === 'POST') {
+          if (isStartReq && req.method === 'POST') {
             try {
               const check = await fetch('http://127.0.0.1:2785/api/status', { signal: AbortSignal.timeout(1000) }).catch(() => null);
               if (check && check.ok) {
                 res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ success: true, message: 'Bot process is already running on port 2785' }));
+                res.end(JSON.stringify({ success: true, message: 'Bot process is already running on port 2785', online: true }));
                 return;
               }
               const { spawn } = await import('child_process');
-              const botProc = spawn('node', ['scripts/mauze-whatsapp-bot.js'], {
+              const { resolve } = await import('path');
+              const scriptPath = resolve('scripts', 'mauze-whatsapp-bot.js');
+              const botProc = spawn('node', [scriptPath], {
                 detached: true,
                 stdio: 'ignore',
-                shell: true
+                shell: true,
+                cwd: process.cwd()
               });
               botProc.unref();
               await new Promise(r => setTimeout(r, 2000));
               res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ success: true, message: 'Bot process launched on port 2785' }));
+              res.end(JSON.stringify({ success: true, message: 'Bot process launched on port 2785', online: true }));
               return;
             } catch (startErr) {
               res.statusCode = 500;
@@ -155,12 +162,12 @@ export function getRefreshReg() {
 
           // 2. Map subPath to upstream bot path on http://127.0.0.1:2785
           let targetPath = '/api/status';
-          if (subPath === '/status') targetPath = '/api/status';
-          else if (subPath === '/toggle') targetPath = '/api/toggle-bot';
-          else if (subPath === '/request-pairing-code') targetPath = '/api/request-pairing-code';
-          else if (subPath === '/test-message') targetPath = '/api/test-message';
-          else if (subPath === '/qr') targetPath = '/qr';
-          else if (subPath === '/dispatches') targetPath = '/api/dispatches';
+          if (subPath === '/status' || subPath.endsWith('/status')) targetPath = '/api/status';
+          else if (subPath === '/toggle' || subPath.endsWith('/toggle')) targetPath = '/api/toggle-bot';
+          else if (subPath === '/request-pairing-code' || subPath.endsWith('/request-pairing-code')) targetPath = '/api/request-pairing-code';
+          else if (subPath === '/test-message' || subPath.endsWith('/test-message')) targetPath = '/api/test-message';
+          else if (subPath === '/qr' || subPath.endsWith('/qr')) targetPath = '/qr';
+          else if (subPath === '/dispatches' || subPath.endsWith('/dispatches')) targetPath = '/api/dispatches';
           else targetPath = subPath.startsWith('/api') ? subPath : `/api${subPath}`;
 
           try {

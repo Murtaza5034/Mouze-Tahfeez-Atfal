@@ -11,6 +11,7 @@ import {
   Calendar,
   Layers,
 } from "lucide-react";
+import { cleanPhotoUrl } from "../utils/imageUtils";
 import "./ParentViewsModal.css";
 
 function formatViewDate(isoString) {
@@ -265,25 +266,38 @@ Shukran!`;
                   className={`pvm-student-row ${student.isViewed ? "is-viewed" : "not-viewed"}`}
                 >
                   <div className="pvm-student-info">
-                    {student.photo_url ? (
-                      <img
-                        src={student.photo_url}
-                        alt={studentName}
-                        className="pvm-avatar"
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.style.display = "none";
-                          const fb = e.currentTarget.parentElement?.querySelector(".pvm-avatar-placeholder");
-                          if (fb) fb.style.display = "flex";
-                        }}
-                      />
-                    ) : null}
-                    <div
-                      className="pvm-avatar-placeholder"
-                      style={{ display: student.photo_url ? "none" : "flex" }}
-                    >
-                      {initials}
-                    </div>
+                    {(() => {
+                      const studentPhoto = cleanPhotoUrl(
+                        student.photo_url ||
+                        student.photoUrl ||
+                        student.avatar_url ||
+                        student.photo ||
+                        ""
+                      );
+                      return (
+                        <>
+                          {studentPhoto ? (
+                            <img
+                              src={studentPhoto}
+                              alt={studentName}
+                              className="pvm-avatar"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.style.display = "none";
+                                const fb = e.currentTarget.parentElement?.querySelector(".pvm-avatar-placeholder");
+                                if (fb) fb.style.display = "flex";
+                              }}
+                            />
+                          ) : null}
+                          <div
+                            className="pvm-avatar-placeholder"
+                            style={{ display: studentPhoto ? "none" : "flex" }}
+                          >
+                            {initials}
+                          </div>
+                        </>
+                      );
+                    })()}
                     <div className="pvm-student-names">
                       <h4 className="pvm-student-name">{studentName}</h4>
                       {student.arabic_name && (

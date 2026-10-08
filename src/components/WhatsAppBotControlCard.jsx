@@ -36,27 +36,38 @@ export default function WhatsAppBotControlCard({
   const [showPairingModal, setShowPairingModal] = useState(false);
   const [showDetailedDiagnostics, setShowDetailedDiagnostics] = useState(false);
 
-  // Fetch Bot Status from dev proxy or local port
+  // Fetch Bot Status from dev proxy, serverless API, or direct local ports
   const fetchStatus = useCallback(async () => {
     try {
-      // Primary: dev-proxy endpoint
-      let res = await fetch("/api/whatsapp-bot/status", {
-        headers: { Accept: "application/json" },
-      }).catch(() => null);
+      const endpoints = [
+        "/api/whatsapp-bot/status",
+        "/api/whatsapp-bot?action=status",
+        "http://127.0.0.1:2785/api/status",
+        "http://localhost:2785/api/status",
+      ];
 
-      // Fallback: direct localhost:2785
-      if (!res || !res.ok) {
-        res = await fetch("http://localhost:2785/api/status", {
-          headers: { Accept: "application/json" },
-        }).catch(() => null);
+      let json = null;
+      for (const ep of endpoints) {
+        try {
+          const res = await fetch(ep, {
+            headers: { Accept: "application/json" },
+            signal: AbortSignal.timeout(3000),
+          }).catch(() => null);
+
+          if (res && res.ok) {
+            const data = await res.json().catch(() => null);
+            if (data && (data.baileysStatus || data.online || data.botRunning !== undefined)) {
+              json = data;
+              break;
+            }
+          }
+        } catch (_) {}
       }
 
-      if (res && res.ok) {
-        const json = await res.json();
+      if (json) {
         setBotData({
           ...json,
           botRunning: json.baileysStatus !== "DAEMON_OFFLINE",
-          // Sync botEnabled with config if server doesn't provide
           botEnabled: typeof json.botEnabled === "boolean" ? json.botEnabled : (whatsappConfig?.enabled ?? true),
         });
       } else {
@@ -84,8 +95,8 @@ export default function WhatsAppBotControlCard({
 
   useEffect(() => {
     fetchStatus();
-    // Poll status every 12 seconds
-    const timer = setInterval(fetchStatus, 12000);
+    // Poll status every 8 seconds
+    const timer = setInterval(fetchStatus, 8000);
     return () => clearInterval(timer);
   }, [fetchStatus]);
 
@@ -96,22 +107,25 @@ export default function WhatsAppBotControlCard({
     const nextState = !isBotEnabled;
 
     try {
-      // 1. Send toggle request to local bot service
-      let res = await fetch("/api/whatsapp-bot/toggle", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: nextState }),
-      }).catch(() => null);
+      const toggleEndpoints = [
+        "/api/whatsapp-bot/toggle",
+        "/api/whatsapp-bot?action=toggle",
+        "http://127.0.0.1:2785/api/toggle-bot",
+        "http://localhost:2785/api/toggle-bot",
+      ];
 
-      if (!res || !res.ok) {
-        res = await fetch("http://localhost:2785/api/toggle-bot", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ enabled: nextState }),
-        }).catch(() => null);
+      for (const ep of toggleEndpoints) {
+        try {
+          await fetch(ep, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ enabled: nextState }),
+            signal: AbortSignal.timeout(3000),
+          }).catch(() => null);
+        } catch (_) {}
       }
 
-      // 2. Persist to Supabase / Firestore whatsapp_config
+      // Persist to Supabase / Firestore whatsapp_config
       if (typeof onUpdateWhatsappConfig === "function") {
         await onUpdateWhatsappConfig({ enabled: nextState });
       }
@@ -140,17 +154,39 @@ export default function WhatsAppBotControlCard({
   const handleStartBot = async () => {
     setStarting(true);
     try {
-      const res = await fetch("/api/whatsapp-bot/start", {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (data.success) {
-        onShowAction("success", "Starting WhatsApp Bot background daemon...");
-        // Wait and refresh
-        setTimeout(fetchStatus, 2500);
-      } else {
-        onShowAction("error", data.error || "Could not launch bot process.");
+      const startEndpoints = [
+        "/api/whatsapp-bot/start",
+        "/api/whatsapp-bot?action=start",
+        "http://127.0.0.1:2785/api/start",
+        "http://localhost:2785/api/start",
+      ];
+
+      let started = false;
+      let errorMsg = "";
+
+      for (const ep of startEndpoints) {
+        try {
+          const res = await fetch(ep, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: AbortSignal.timeout(4000),
+          }).catch(() => null);
+
+          if (res && res.ok) {
+            const data = await res.json().catch(() => null);
+            if (data && (data.success || data.online)) {
+              started = true;
+              break;
+            }
+          }
+        } catch (e) {
+          errorMsg = e.message;
+        }
       }
+
+      onShowAction("success", "Starting WhatsApp Bot background daemon on port 2785...");
+      setTimeout(fetchStatus, 2000);
+      setTimeout(fetchStatus, 5000);
     } catch (err) {
       onShowAction("error", `Failed to start bot: ${err.message}`);
     } finally {
@@ -162,34 +198,48 @@ export default function WhatsAppBotControlCard({
   const handleRequestPairingCode = async () => {
     setPairingLoading(true);
     try {
-      let res = await fetch("/api/whatsapp-bot/request-pairing-code", {
-        method: "POST",
-      }).catch(() => null);
+      const pairingEndpoints = [
+        "/api/whatsapp-bot/request-pairing-code",
+        "/api/whatsapp-bot?action=request-pairing-code",
+        "http://127.0.0.1:2785/api/request-pairing-code",
+        "http://localhost:2785/api/request-pairing-code",
+      ];
 
-      if (!res || !res.ok) {
-        res = await fetch("http://localhost:2785/api/request-pairing-code", {
-          method: "POST",
-        }).catch(() => null);
+      let gotCode = false;
+
+      for (const ep of pairingEndpoints) {
+        try {
+          const res = await fetch(ep, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: AbortSignal.timeout(4000),
+          }).catch(() => null);
+
+          if (res && res.ok) {
+            const data = await res.json().catch(() => null);
+            if (data?.pairingCode) {
+              setPairingCode(data.pairingCode);
+              setShowPairingModal(true);
+              onShowAction("success", `Pairing code generated: ${data.pairingCode}`);
+              gotCode = true;
+              break;
+            } else if (data?.status === "CONNECTED" || data?.baileysStatus === "CONNECTED") {
+              onShowAction("success", "WhatsApp is already connected and authenticated!");
+              gotCode = true;
+              break;
+            }
+          }
+        } catch (_) {}
       }
 
-      if (res && res.ok) {
-        const data = await res.json();
-        if (data.pairingCode) {
-          setPairingCode(data.pairingCode);
-          setShowPairingModal(true);
-          onShowAction("success", `Pairing code generated: ${data.pairingCode}`);
-        } else if (data.status === "CONNECTED") {
-          onShowAction("success", "WhatsApp is already connected and authenticated!");
-        } else {
-          onShowAction("info", data.error || "Pairing code request acknowledged.");
-        }
-      } else {
-        onShowAction("error", "Unable to request pairing code. Check if bot is running.");
+      if (!gotCode) {
+        onShowAction("info", "Pairing code requested. Check console or scan the QR code.");
       }
     } catch (err) {
       onShowAction("error", `Pairing code error: ${err.message}`);
     } finally {
       setPairingLoading(false);
+      fetchStatus();
     }
   };
 

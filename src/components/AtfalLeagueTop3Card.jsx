@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { reshapeArabic } from "../utils/arabicReshaper";
 import { MONTHS_CONFIG, getMonthlyTop3, getPodiumOrder } from "../utils/atfalLeagueUtils";
+import { cleanPhotoUrl } from "../utils/imageUtils";
 
 // Ornate Crown SVGs for Top 3 Podiums
 const RoyalCrown = ({ rank }) => {
@@ -149,7 +150,8 @@ export default function AtfalLeagueTop3Card({
             const data = d.data();
             const sid = String(data.student_id || d.id || "").trim();
             const name = (data.full_name || data.student_name || data.name || "").trim().toLowerCase();
-            const photo = data.photo_url || data.photoUrl || data.avatar_url || data.photo || null;
+            const rawPhoto = data.photo_url || data.photoUrl || data.avatar_url || data.photo || "";
+            const photo = cleanPhotoUrl(rawPhoto);
             if (photo && !photo.includes("unsplash.com")) {
               if (sid) map[sid] = photo;
               if (name) map[name] = photo;
@@ -167,9 +169,10 @@ export default function AtfalLeagueTop3Card({
                 data.forEach((st) => {
                   const sid = String(st.student_id || "").trim();
                   const name = (st.full_name || "").trim().toLowerCase();
-                  if (st.photo_url) {
-                    if (sid) map[sid] = st.photo_url;
-                    if (name) map[name] = st.photo_url;
+                  const photo = cleanPhotoUrl(st.photo_url || "");
+                  if (photo) {
+                    if (sid) map[sid] = photo;
+                    if (name) map[name] = photo;
                   }
                 });
                 setStudentPhotosMap(map);

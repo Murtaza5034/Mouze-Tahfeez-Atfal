@@ -24,8 +24,6 @@ import makeWASocket, {
   makeCacheableSignalKeyStore
 } from '@whiskeysockets/baileys';
 import QRCode from 'qrcode';
-import { initializeApp as initAdminApp, getApps as getAdminApps, cert } from 'firebase-admin/app';
-import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
 
 // Resilient dynamic imports for native / optional modules
 let pino = null;
@@ -117,7 +115,7 @@ export let connectedUser = null;
 export const DISPATCH_LOG = [];
 export let botEnabled = true;
 export function setBotEnabled(val) { botEnabled = !!val; }
-const AUTH_DIR = path.resolve('baileys_auth_info');
+const AUTH_DIR = process.env.AUTH_DIR || process.env.BAILEYS_AUTH_DIR || path.resolve('baileys_auth_info');
 
 // ---------------------------------------------------------------------------
 // High-Speed In-Memory LID <-> Phone Mapping Cache (Sub-millisecond resolution)

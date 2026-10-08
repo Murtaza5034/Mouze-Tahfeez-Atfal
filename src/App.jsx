@@ -1275,14 +1275,7 @@ const NotificationStatus = ({ role }) => {
 function SidebarHeader({ photoUrl, name, arabicName, tag }) {
   const isArabic = (text) => /[\u0600-\u06FF]/.test(text);
   const nameIsArabic = isArabic(name);
-  const finalPhoto =
-    photoUrl &&
-    photoUrl !== "" &&
-    photoUrl !== "null" &&
-    photoUrl !== "undefined" &&
-    photoUrl !== "/logo.png"
-      ? photoUrl
-      : "";
+  const finalPhoto = cleanPhotoUrl(photoUrl);
 
   return (
     <div className="sidebar-profile-centered">
@@ -1290,7 +1283,7 @@ function SidebarHeader({ photoUrl, name, arabicName, tag }) {
         {finalPhoto ? (
           <img
             src={finalPhoto}
-            alt="Profile"
+            alt={name || "Profile"}
             className="sidebar-avatar-img"
             onError={(e) => {
               e.currentTarget.style.display = "none";
@@ -1529,18 +1522,66 @@ function getFileNameFromUrl(url) {
 // internet. Rendering those URLs fires ERR_NAME_NOT_RESOLVED requests. Filter
 // them out so the UI falls back to the default avatar without ever requesting
 // the dead host.
-const DEAD_PHOTO_HOSTS = ["xmlmfijikkptvwbkkoil.supabase.co"];
+const DEAD_PHOTO_HOSTS = [
+  "xmlmfijikkptvwbkkoil.supabase.co",
+  "medypnbcsjytbxiwenob.supabase.co",
+];
 function cleanPhotoUrl(url) {
   if (!url) return "";
   try {
     if (typeof url !== "string") return "";
     const trimmed = url.trim();
-    if (!trimmed || trimmed === "null" || trimmed === "undefined" || trimmed === "/logo.png") return "";
-    if (trimmed.startsWith("data:") || trimmed.startsWith("blob:") || trimmed.startsWith("/")) {
+    if (
+      !trimmed ||
+      trimmed === "null" ||
+      trimmed === "undefined" ||
+      trimmed === "/logo.png" ||
+      trimmed === "LOGO.png"
+    ) {
+      return "";
+    }
+    if (trimmed.startsWith("data:") || trimmed.startsWith("blob:")) {
       return trimmed;
     }
-    const host = new URL(trimmed, typeof window !== "undefined" ? window.location.origin : "http://localhost").hostname;
-    if (DEAD_PHOTO_HOSTS.includes(host)) return "";
+
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      try {
+        const host = new URL(trimmed).hostname;
+        if (DEAD_PHOTO_HOSTS.includes(host)) {
+          return "";
+        }
+      } catch (_) {}
+    }
+
+    const storagePatterns = [
+      "child profile pictures/",
+      "child_profile_pictures/",
+      "profiles/",
+      "student-photos/",
+      "student_photos/",
+      "teacher_photos/",
+      "teacher-photos/",
+      "muhaffezat atfal/",
+      "muhaffezat_atfal/",
+    ];
+    if (storagePatterns.some((pattern) => trimmed.startsWith(pattern))) {
+      const encodedPath = encodeURIComponent(trimmed);
+      return `https://firebasestorage.googleapis.com/v0/b/mawaid-b929a.firebasestorage.app/o/${encodedPath}?alt=media`;
+    }
+
+    if (trimmed.startsWith("/") || trimmed.startsWith("./")) {
+      return trimmed;
+    }
+
+    if (trimmed.includes("/storage/v1/object/public/")) {
+      const match = trimmed.match(/\/storage\/v1\/object\/public\/(.+)$/);
+      if (match && match[1]) {
+        const decodedPath = decodeURIComponent(match[1]);
+        const encodedPath = encodeURIComponent(decodedPath);
+        return `https://firebasestorage.googleapis.com/v0/b/mawaid-b929a.firebasestorage.app/o/${encodedPath}?alt=media`;
+      }
+    }
+
     return trimmed;
   } catch (_) {
     return url;
@@ -5208,7 +5249,26 @@ function buildStudents(
       badal_teacher_id: profile.badal_teacher_id || null,
       user_id: profile.parent_user_id || null,
       parent_email: profile.parent_email || null,
-      photoUrl: cleanPhotoUrl(profile.photo_url || ""),
+      photoUrl: cleanPhotoUrl(
+        profile.photo_url ||
+        profile.photoUrl ||
+        profile.avatar_url ||
+        profile.photo ||
+        profile.image ||
+        (typeof localStorage !== "undefined" && (numericId || profile.student_id || profile.id || profile.its)
+          ? localStorage.getItem(`mauze_student_photo_${numericId || profile.student_id || profile.id || profile.its}`) ||
+            localStorage.getItem(`mauze_photo_${numericId || profile.student_id || profile.id || profile.its}`) ||
+            (profile.its ? localStorage.getItem(`mauze_photo_${profile.its}`) : "")
+          : "") ||
+        ""
+      ),
+      photo_url: cleanPhotoUrl(
+        profile.photo_url ||
+        profile.photoUrl ||
+        profile.avatar_url ||
+        profile.photo ||
+        ""
+      ),
       whatsapp_number: profile.whatsapp_number || "",
       hifz: {
         juz: profile.juz || "N-A",
@@ -5275,6 +5335,12 @@ function buildStudents(
     }
     globalPrevRank = currentRank;
     s.latestResult.computedRank = currentRank;
+  });
+
+  builtStudents.sort((a, b) => {
+    const nameA = String(a.name || a.full_name || "").trim().toLowerCase();
+    const nameB = String(b.name || b.full_name || "").trim().toLowerCase();
+    return nameA.localeCompare(nameB);
   });
 
   return builtStudents;
@@ -5506,11 +5572,55 @@ function LoadingScreen({ message, onComplete }) {
 
 function StudentAvatar({ student, size = "regular" }) {
   const [imgFailed, setImgFailed] = useState(false);
-  if (student?.photoUrl && !imgFailed) {
+  const sId = String(student?.student_id || student?.id || "").trim();
+  const sIts = String(student?.its || "").trim();
+  const sName = String(student?.name || student?.full_name || student?.student_name || "").trim();
+
+  const cachedPhoto =
+    typeof localStorage !== "undefined"
+      ? (sId ? localStorage.getItem(`mauze_student_photo_${sId}`) || localStorage.getItem(`mauze_photo_${sId}`) || localStorage.getItem(`student_photo_${sId}`) : "") ||
+        (sIts ? localStorage.getItem(`mauze_student_photo_${sIts}`) || localStorage.getItem(`mauze_photo_${sIts}`) : "") ||
+        (sName ? localStorage.getItem(`mauze_photo_${sName.toLowerCase()}`) : "") ||
+        ""
+      : "";
+
+  const rawPhoto =
+    cachedPhoto ||
+    student?.photoUrl ||
+    student?.photo_url ||
+    student?.avatar_url ||
+    student?.photo ||
+    "";
+
+  const photo = cleanPhotoUrl(rawPhoto);
+
+  useEffect(() => {
+    setImgFailed(false);
+  }, [photo, sId]);
+
+  const cleanDisplayName =
+    sName.replace(/^(shaikh|mulla|janab|bhai|bai)\s+/i, "").trim() ||
+    sName ||
+    "Student";
+  const initial = cleanDisplayName.charAt(0).toUpperCase() || "S";
+
+  // Deterministic palette based on student name for visually distinct, premium initials
+  const nameHash = Array.from(sName || "Student").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const colorSchemes = [
+    { bg: "linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)", border: "#93c5fd", text: "#ffffff" },
+    { bg: "linear-gradient(135deg, #065f46 0%, #10b981 100%)", border: "#6ee7b7", text: "#ffffff" },
+    { bg: "linear-gradient(135deg, #7c2d12 0%, #ea580c 100%)", border: "#fdba74", text: "#ffffff" },
+    { bg: "linear-gradient(135deg, #581c87 0%, #8b5cf6 100%)", border: "#c4b5fd", text: "#ffffff" },
+    { bg: "linear-gradient(135deg, #831843 0%, #ec4899 100%)", border: "#fbcfe8", text: "#ffffff" },
+    { bg: "linear-gradient(135deg, #78350f 0%, #d97706 100%)", border: "#fde68a", text: "#ffffff" },
+  ];
+  const scheme = colorSchemes[nameHash % colorSchemes.length];
+
+  if (photo && !imgFailed) {
     return (
       <img
-        src={student.photoUrl}
-        alt={student.name || "Student"}
+        src={photo}
+        alt={sName || "Student"}
         className={`student-avatar ${size}`}
         onError={() => setImgFailed(true)}
       />
@@ -5518,8 +5628,25 @@ function StudentAvatar({ student, size = "regular" }) {
   }
 
   return (
-    <div className={`avatar-placeholder ${size === "small" ? "small" : ""}`}>
-      <User size={size === "small" ? 20 : 28} />
+    <div
+      className={`student-avatar ${size} avatar-monogram-badge`}
+      style={{
+        background: scheme.bg,
+        border: `2.5px solid ${scheme.border}`,
+        color: scheme.text,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontWeight: 800,
+        fontSize: size === "small" ? "1.1rem" : "1.75rem",
+        boxShadow: "0 6px 16px rgba(0, 0, 0, 0.12)",
+        userSelect: "none",
+        textShadow: "0 1px 3px rgba(0, 0, 0, 0.35)",
+        fontFamily: "'Segoe UI', Roboto, sans-serif",
+      }}
+      title={sName}
+    >
+      {initial}
     </div>
   );
 }
@@ -5912,32 +6039,62 @@ function TahfeezReportCard({
                   background: "#f5f0e8",
                 }}
               >
-                {student?.photoUrl || student?.photo_url ? (
-                  <img
-                    src={student.photoUrl || student.photo_url}
-                    alt=""
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.style.display = "none";
-                      if (e.currentTarget.nextSibling) e.currentTarget.nextSibling.style.display = "flex";
-                    }}
-                  />
-                ) : (
-                  <span
-                    style={{
-                      fontSize: "32px",
-                      lineHeight: "70px",
-                      color: "var(--soft-brown)",
-                    }}
-                  >
-                    👤
-                  </span>
-                )}
+                {(() => {
+                  const sPhoto = cleanPhotoUrl(
+                    student?.photoUrl ||
+                      student?.photo_url ||
+                      student?.avatar_url ||
+                      student?.photo ||
+                      (typeof localStorage !== "undefined" &&
+                      (student?.student_id || student?.id || student?.its)
+                        ? localStorage.getItem(
+                            `mauze_student_photo_${student.student_id || student.id || student.its}`,
+                          ) ||
+                          localStorage.getItem(
+                            `mauze_photo_${student.student_id || student.id || student.its}`,
+                          )
+                        : "") ||
+                      "",
+                  );
+                  return sPhoto ? (
+                    <img
+                      src={sPhoto}
+                      alt={student?.name || student?.full_name || ""}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                        if (e.currentTarget.nextSibling)
+                          e.currentTarget.nextSibling.style.display = "flex";
+                      }}
+                    />
+                  ) : null;
+                })()}
+                <span
+                  style={{
+                    display: cleanPhotoUrl(
+                      student?.photoUrl ||
+                        student?.photo_url ||
+                        student?.avatar_url ||
+                        student?.photo ||
+                        "",
+                    )
+                      ? "none"
+                      : "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "100%",
+                    height: "100%",
+                    fontSize: "32px",
+                    lineHeight: "70px",
+                    color: "var(--soft-brown)",
+                  }}
+                >
+                  <User size={36} />
+                </span>
               </div>
               <div
                 style={{ display: "flex", alignItems: "center", gap: "8px" }}
@@ -6678,9 +6835,9 @@ function RankPreview({ students }) {
                           flexShrink: 0,
                         }}
                       >
-                        {s.photoUrl ? (
+                        {cleanPhotoUrl(s.photoUrl || s.photo_url || s.avatar_url || s.photo || "") ? (
                           <img
-                            src={s.photoUrl}
+                            src={cleanPhotoUrl(s.photoUrl || s.photo_url || s.avatar_url || s.photo || "")}
                             alt=""
                             style={{
                               width: "100%",
@@ -14838,10 +14995,27 @@ function ParentPortal({
                           studentProfile?.teacher_phone ||
                           rawWa ||
                           "";
-                        const photo =
+                        const photo = cleanPhotoUrl(
                           t.photo_url ||
-                          matchedProfile?.photo_url ||
-                          "";
+                            t.photoUrl ||
+                            t.avatar_url ||
+                            matchedProfile?.photo_url ||
+                            matchedProfile?.photoUrl ||
+                            matchedProfile?.avatar_url ||
+                            (typeof localStorage !== "undefined" &&
+                            (t.user_id ||
+                              t.id ||
+                              matchedProfile?.id ||
+                              matchedProfile?.user_id)
+                              ? localStorage.getItem(
+                                  `mauze_teacher_photo_${t.user_id || t.id || matchedProfile?.id || matchedProfile?.user_id}`,
+                                ) ||
+                                localStorage.getItem(
+                                  `mauze_photo_${t.user_id || t.id || matchedProfile?.id || matchedProfile?.user_id}`,
+                                )
+                              : "") ||
+                            "",
+                        );
                         const tagText = getTeacherTag(t);
                         const female = isFemaleTeacher(t);
                         return (
@@ -14955,8 +15129,22 @@ function ParentPortal({
                             .split("")
                             .filter((c) => "0123456789".includes(c))
                             .join("");
-                          const phone = t.phone_number || rawWa || "";
-                          const photo = t.photo_url || "";
+                          const photo = cleanPhotoUrl(
+                            t.photo_url ||
+                              t.photoUrl ||
+                              t.avatar_url ||
+                              t.photo ||
+                              (typeof localStorage !== "undefined" &&
+                              (t.user_id || t.id)
+                                ? localStorage.getItem(
+                                    `mauze_teacher_photo_${t.user_id || t.id}`,
+                                  ) ||
+                                  localStorage.getItem(
+                                    `mauze_photo_${t.user_id || t.id}`,
+                                  )
+                                : "") ||
+                              "",
+                          );
                           return (
                             <article
                               key={t.id || t.full_name}
@@ -38975,16 +39163,47 @@ function TeacherPortal({
                                         : "linear-gradient(135deg, #e67e22, #d35400)",
                                     }}
                                   >
-                                    {child.photoUrl ? (
-                                      <img
-                                        src={child.photoUrl}
-                                        alt={child.name}
-                                      />
-                                    ) : (
-                                      (child.name || "?")
+                                    {(() => {
+                                      const cPhoto = cleanPhotoUrl(
+                                        child.photoUrl ||
+                                          child.photo_url ||
+                                          child.avatar_url ||
+                                          child.photo ||
+                                          "",
+                                      );
+                                      return cPhoto ? (
+                                        <img
+                                          src={cPhoto}
+                                          alt={child.name || "Student"}
+                                          onError={(e) => {
+                                            e.currentTarget.style.display = "none";
+                                            if (e.currentTarget.nextSibling)
+                                              e.currentTarget.nextSibling.style.display = "flex";
+                                          }}
+                                        />
+                                      ) : null;
+                                    })()}
+                                    <span
+                                      style={{
+                                        display: cleanPhotoUrl(
+                                          child.photoUrl ||
+                                            child.photo_url ||
+                                            child.avatar_url ||
+                                            child.photo ||
+                                            "",
+                                        )
+                                          ? "none"
+                                          : "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        width: "100%",
+                                        height: "100%",
+                                      }}
+                                    >
+                                      {(child.name || "?")
                                         .charAt(0)
-                                        .toUpperCase()
-                                    )}
+                                        .toUpperCase()}
+                                    </span>
                                   </div>
                                   <div className="badal-modal-card-info">
                                     <span className="badal-modal-name">
@@ -48631,16 +48850,11 @@ export default function App() {
     const filteredStudents = [...matchedStudents].sort((a, b) => {
       const cA = isStudentCleared(a.student_id);
       const cB = isStudentCleared(b.student_id);
-      if (cA && cB)
-        return String(a.name || "").localeCompare(String(b.name || ""));
-      if (cA) return 1;
-      if (cB) return -1;
-      const rA = a.latestResult?.computedRank;
-      const rB = b.latestResult?.computedRank;
-      if (rA && rB) return rA - rB;
-      if (rA) return -1;
-      if (rB) return 1;
-      return 0;
+      if (cA && !cB) return 1;
+      if (!cA && cB) return -1;
+      const nameA = String(a.name || a.full_name || "").trim().toLowerCase();
+      const nameB = String(b.name || b.full_name || "").trim().toLowerCase();
+      return nameA.localeCompare(nameB);
     });
 
     return {

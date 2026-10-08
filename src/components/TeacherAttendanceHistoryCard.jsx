@@ -6,15 +6,23 @@ import "./AsbaaqAttendanceHistoryCard.css";
 /**
  * Extracts and formats time string (e.g. "@ 4:26 PM")
  */
-function extractAttendanceTime(record, teacherId, dateKey) {
+function extractAttendanceTime(record, teacherId, dateKey, normTeacherName, teacherEmail) {
   if (!record) {
     // Check localStorage cache
-    if (typeof window !== "undefined" && window.localStorage && dateKey && teacherId) {
+    if (typeof window !== "undefined" && window.localStorage && dateKey) {
       try {
-        const cachedTime = localStorage.getItem(`mauze_att_time_${teacherId}_${dateKey}`);
-        if (cachedTime) {
-          const clean = cachedTime.trim();
-          return clean.startsWith("@") ? clean : `@ ${clean}`;
+        const keysToCheck = [
+          teacherId ? `mauze_att_time_${teacherId}_${dateKey}` : null,
+          normTeacherName ? `mauze_att_time_${normTeacherName}_${dateKey}` : null,
+          teacherEmail ? `mauze_att_time_${teacherEmail}_${dateKey}` : null,
+        ].filter(Boolean);
+
+        for (const k of keysToCheck) {
+          const cachedTime = localStorage.getItem(k);
+          if (cachedTime) {
+            const clean = cachedTime.trim();
+            return clean.startsWith("@") ? clean : `@ ${clean}`;
+          }
         }
       } catch (_) {}
     }
@@ -42,12 +50,20 @@ function extractAttendanceTime(record, teacherId, dateKey) {
   }
 
   // 3. Fallback localStorage
-  if (typeof window !== "undefined" && window.localStorage && dateKey && teacherId) {
+  if (typeof window !== "undefined" && window.localStorage && dateKey) {
     try {
-      const cachedTime = localStorage.getItem(`mauze_att_time_${teacherId}_${dateKey}`);
-      if (cachedTime) {
-        const clean = cachedTime.trim();
-        return clean.startsWith("@") ? clean : `@ ${clean}`;
+      const keysToCheck = [
+        teacherId ? `mauze_att_time_${teacherId}_${dateKey}` : null,
+        normTeacherName ? `mauze_att_time_${normTeacherName}_${dateKey}` : null,
+        teacherEmail ? `mauze_att_time_${teacherEmail}_${dateKey}` : null,
+      ].filter(Boolean);
+
+      for (const k of keysToCheck) {
+        const cachedTime = localStorage.getItem(k);
+        if (cachedTime) {
+          const clean = cachedTime.trim();
+          return clean.startsWith("@") ? clean : `@ ${clean}`;
+        }
       }
     } catch (_) {}
   }
@@ -137,6 +153,32 @@ export default function TeacherAttendanceHistoryCard({
   }, [now, weekOffset]);
 
   // Fetch weekly attendance records
+  const teacherName = useMemo(() => {
+    return (
+      portalAccess?.full_name ||
+      portalAccess?.name ||
+      user?.user_metadata?.full_name ||
+      user?.full_name ||
+      user?.name ||
+      teacherIdentity ||
+      ""
+    );
+  }, [portalAccess, user, teacherIdentity]);
+
+  const teacherEmail = useMemo(() => {
+    return (
+      user?.email ||
+      portalAccess?.email ||
+      ""
+    );
+  }, [user, portalAccess]);
+
+  const normTeacherName = useMemo(() => {
+    if (!teacherName) return "";
+    return String(teacherName).toLowerCase().trim().replace(/\s+/g, " ");
+  }, [teacherName]);
+
+  // Fetch weekly attendance records
   const fetchWeekHistory = useCallback(async () => {
     if (!teacherId || weekDays.length === 0) return;
     setLoading(true);
@@ -147,25 +189,33 @@ export default function TeacherAttendanceHistoryCard({
       const { data, error } = await supabase
         .from(tableName)
         .select("*")
-        .eq("teacher_id", teacherId)
         .gte("attendance_date", startDate)
         .lte("attendance_date", endDate);
 
       if (!error && Array.isArray(data)) {
-        setWeekRecords(data);
+        // Filter records matching this teacher by ID, Name, or Email
+        const matched = data.filter((rec) => {
+          const rId = String(rec.teacher_id || "").trim();
+          const rName = String(rec.teacher_name || "").toLowerCase().trim().replace(/\s+/g, " ");
+          const matchId = rId && rId === teacherId;
+          const matchName = normTeacherName && rName === normTeacherName;
+          const matchEmail = teacherEmail && (rId === teacherEmail || rName === teacherEmail.toLowerCase());
+          return matchId || matchName || matchEmail;
+        });
+        setWeekRecords(matched);
       }
     } catch (e) {
       console.warn("Error fetching teacher weekly attendance history:", e);
     } finally {
       setLoading(false);
     }
-  }, [teacherId, tableName, weekDays]);
+  }, [teacherId, tableName, weekDays, normTeacherName, teacherEmail]);
 
   useEffect(() => {
     fetchWeekHistory();
   }, [fetchWeekHistory]);
 
-  // Real-time listener for attendance updates
+  // Real-time listener for attendance updates from Supabase and Local Broadcast
   useEffect(() => {
     if (!teacherId) return;
     const channel = supabase
@@ -179,8 +229,17 @@ export default function TeacherAttendanceHistoryCard({
       )
       .subscribe();
 
+    const handleLocalUpdate = () => {
+      fetchWeekHistory();
+    };
+
+    window.addEventListener("teacher_attendance_updated", handleLocalUpdate);
+    window.addEventListener("teacher_attendance_saved", handleLocalUpdate);
+
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener("teacher_attendance_updated", handleLocalUpdate);
+      window.removeEventListener("teacher_attendance_saved", handleLocalUpdate);
     };
   }, [teacherId, tableName, fetchWeekHistory]);
 
@@ -194,15 +253,22 @@ export default function TeacherAttendanceHistoryCard({
     });
 
     // Check localStorage fallback for dates in current week
-    if (typeof window !== "undefined" && window.localStorage && teacherId) {
+    if (typeof window !== "undefined" && window.localStorage) {
       weekDays.forEach((day) => {
         if (!map[day.dateKey]) {
           try {
-            const cached = localStorage.getItem(
-              `mauze_teacher_self_att_${teacherId}_${day.dateKey}`
-            );
-            if (cached) {
-              map[day.dateKey] = JSON.parse(cached);
+            const keysToCheck = [
+              teacherId ? `mauze_teacher_self_att_${teacherId}_${day.dateKey}` : null,
+              normTeacherName ? `mauze_teacher_self_att_${normTeacherName}_${day.dateKey}` : null,
+              teacherEmail ? `mauze_teacher_self_att_${teacherEmail}_${day.dateKey}` : null,
+            ].filter(Boolean);
+
+            for (const k of keysToCheck) {
+              const cached = localStorage.getItem(k);
+              if (cached) {
+                map[day.dateKey] = JSON.parse(cached);
+                break;
+              }
             }
           } catch (_) {}
         }
@@ -210,7 +276,7 @@ export default function TeacherAttendanceHistoryCard({
     }
 
     return map;
-  }, [weekRecords, weekDays, teacherId]);
+  }, [weekRecords, weekDays, teacherId, normTeacherName, teacherEmail]);
 
   // Compute Weekly Summary for Slot 8
   const { presentCount, lateCount, totalWorkingDays, attendancePct } = useMemo(() => {
@@ -333,7 +399,7 @@ export default function TeacherAttendanceHistoryCard({
 
             if (rec) {
               const s = String(rec.status || "").trim().toLowerCase();
-              timeText = extractAttendanceTime(rec, teacherId, day.dateKey);
+              timeText = extractAttendanceTime(rec, teacherId, day.dateKey, normTeacherName, teacherEmail);
 
               if (s === "present") {
                 statusType = "present";

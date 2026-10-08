@@ -39,7 +39,15 @@ import {
 function resolveTeacherPhoto(url) {
   if (!url || typeof url !== "string") return "";
   const trimmed = url.trim();
-  if (!trimmed) return "";
+  if (
+    !trimmed ||
+    trimmed === "null" ||
+    trimmed === "undefined" ||
+    trimmed === "/logo.png" ||
+    trimmed === "LOGO.png"
+  ) {
+    return "";
+  }
   if (
     trimmed.startsWith("data:") ||
     trimmed.startsWith("blob:") ||
@@ -56,10 +64,20 @@ function resolveTeacherPhoto(url) {
     "student_photos/",
     "teacher_photos/",
     "teacher-photos/",
+    "muhaffezat atfal/",
+    "muhaffezat_atfal/",
   ];
   if (storagePatterns.some((pattern) => trimmed.startsWith(pattern))) {
     const encodedPath = encodeURIComponent(trimmed);
     return `https://firebasestorage.googleapis.com/v0/b/mawaid-b929a.firebasestorage.app/o/${encodedPath}?alt=media`;
+  }
+  if (trimmed.includes("/storage/v1/object/public/")) {
+    const match = trimmed.match(/\/storage\/v1\/object\/public\/(.+)$/);
+    if (match && match[1]) {
+      const decodedPath = decodeURIComponent(match[1]);
+      const encodedPath = encodeURIComponent(decodedPath);
+      return `https://firebasestorage.googleapis.com/v0/b/mawaid-b929a.firebasestorage.app/o/${encodedPath}?alt=media`;
+    }
   }
   return trimmed;
 }
@@ -955,31 +973,38 @@ export default function TeacherProfileView({
                   key={student.student_id || student.id}
                   className="teacher-pv-student-card"
                 >
-                  {student.photoUrl || student.photo_url ? (
-                    <img
-                      src={student.photoUrl || student.photo_url}
-                      alt={student.name || student.full_name}
-                      className="teacher-pv-student-avatar"
-                      onError={(e) => {
-                        e.currentTarget.onerror = null;
-                        e.currentTarget.style.display = "none";
-                        const fb = e.currentTarget.parentElement?.querySelector(".teacher-pv-student-fallback");
-                        if (fb) fb.style.display = "flex";
-                      }}
-                    />
-                  ) : null}
-                  <div
-                    className="teacher-pv-student-avatar teacher-pv-student-fallback"
-                    style={{
-                      display: student.photoUrl || student.photo_url ? "none" : "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: "rgba(197, 160, 89, 0.15)",
-                      color: "var(--primary-gold, #c5a059)",
-                    }}
-                  >
-                    <User size={18} />
-                  </div>
+                  {(() => {
+                    const stPhoto = resolveTeacherPhoto(student.photoUrl || student.photo_url || student.avatar_url || student.photo || "");
+                    return (
+                      <>
+                        {stPhoto ? (
+                          <img
+                            src={stPhoto}
+                            alt={student.name || student.full_name}
+                            className="teacher-pv-student-avatar"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.style.display = "none";
+                              const fb = e.currentTarget.parentElement?.querySelector(".teacher-pv-student-fallback");
+                              if (fb) fb.style.display = "flex";
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className="teacher-pv-student-avatar teacher-pv-student-fallback"
+                          style={{
+                            display: stPhoto ? "none" : "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: "rgba(197, 160, 89, 0.15)",
+                            color: "var(--primary-gold, #c5a059)",
+                          }}
+                        >
+                          <User size={18} />
+                        </div>
+                      </>
+                    );
+                  })()}
                   <div className="teacher-pv-student-info">
                     <h5 className="teacher-pv-student-name">
                       {student.name || student.full_name}

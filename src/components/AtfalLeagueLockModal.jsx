@@ -111,7 +111,9 @@ export default function AtfalLeagueLockModal({
         { id: "all_teachers", name: "All Muhaffizeen / Teachers", its: "" },
       ];
     }
-    return arr;
+    return arr.sort((a, b) =>
+      String(a.name || "").trim().localeCompare(String(b.name || "").trim(), undefined, { sensitivity: "base" })
+    );
   }, [teacherProfiles, portalAccessList]);
 
   // Set default selected teacher for individual mode

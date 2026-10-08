@@ -256,16 +256,18 @@ img:not([src*=".svg"]) {
   contain-intrinsic-size: 200px;
 }
 
-/* Smooth image loading for profile photos */
+/* Profile photos and avatars rendering */
 .student-avatar,
 .nav-logo,
 .drawer-avatar,
 .teacher-photo-square,
 .p-faculty-img,
-.topbar-logo {
-  content-visibility: auto;
-  contain: layout style paint;
-  background: var(--light-gold);
+.topbar-logo,
+.sidebar-avatar-img,
+.its-sidebar-avatar-img {
+  object-fit: cover;
+  image-rendering: auto;
+  image-rendering: -webkit-optimize-contrast;
 }
 
 .topbar-brand {
@@ -3117,20 +3119,29 @@ input[type="password"]::-webkit-credentials-auto-fill-button,
 }
 
 .student-avatar {
+  width: 68px;
+  height: 68px;
+  min-width: 68px;
+  min-height: 68px;
   object-fit: cover;
   border-radius: 50%;
   border: 3px solid rgba(255, 255, 255, 0.9);
   box-shadow: 0 6px 18px rgba(183, 137, 31, 0.16);
+  flex-shrink: 0;
 }
 
 .student-avatar.regular {
   width: 68px;
   height: 68px;
+  min-width: 68px;
+  min-height: 68px;
 }
 
 .student-avatar.small {
   width: 42px;
   height: 42px;
+  min-width: 42px;
+  min-height: 42px;
 }
 
 .avatar-placeholder.small {

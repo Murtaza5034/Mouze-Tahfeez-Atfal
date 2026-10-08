@@ -27,7 +27,8 @@ import {
   Copy,
   ExternalLink,
   UserCheck,
-  UserX,
+  Trash2,
+  RotateCcw,
   AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -35,7 +36,12 @@ import {
   fetchAdmissionApplications,
   updateAdmissionStatus,
   exitAdmissionUser,
-  resumeAdmissionUser
+  resumeAdmissionUser,
+  moveToTrash,
+  restoreFromTrash,
+  permanentlyDeleteAdmission,
+  emptyTrash,
+  TRASH_RETENTION_DAYS
 } from "../../services/admissionService";
 import AdmissionCmsSettings from "./AdmissionCmsSettings";
 import "./AdmissionStyles.css";
@@ -97,6 +103,19 @@ export default function AdmissionAdminDashboard({
   // Filtered Applications according to active role, subtab, statusFilter and search
   const filteredApplications = useMemo(() => {
     return applications.filter((app) => {
+      const isTrash = app.status === "trash" || app.is_trash;
+
+      // Trash tab logic
+      if (activeTab === "trash") {
+        if (!isTrash) return false;
+        if (activeRole === "kibar") return app.program === "Al-Kibar (Adults)" || app.program?.toLowerCase().includes("kibar");
+        if (activeRole === "atfal") return app.program?.toLowerCase().includes("atfal") || app.program?.toLowerCase().includes("sigar");
+        return true;
+      }
+
+      // Hide trashed items from all normal views
+      if (isTrash) return false;
+
       // Exit list tab
       if (activeTab === "exit_list") {
         if (app.status !== "exited") return false;
@@ -156,13 +175,16 @@ export default function AdmissionAdminDashboard({
       );
     }
 
+    const activeScoped = scoped.filter(a => a.status !== "trash" && !a.is_trash);
+
     return {
-      total: scoped.filter((a) => a.status !== "exited").length,
-      pending: scoped.filter((a) => a.status === "pending").length,
-      approved: scoped.filter((a) => a.status === "approved").length,
-      waiting: scoped.filter((a) => a.status === "waiting").length,
-      rejected: scoped.filter((a) => a.status === "rejected").length,
-      exited: scoped.filter((a) => a.status === "exited").length
+      total: activeScoped.filter((a) => a.status !== "exited").length,
+      pending: activeScoped.filter((a) => a.status === "pending").length,
+      approved: activeScoped.filter((a) => a.status === "approved").length,
+      waiting: activeScoped.filter((a) => a.status === "waiting").length,
+      rejected: activeScoped.filter((a) => a.status === "rejected").length,
+      exited: activeScoped.filter((a) => a.status === "exited").length,
+      trash: scoped.filter((a) => a.status === "trash" || a.is_trash).length
     };
   }, [applications, activeRole]);
 
@@ -338,6 +360,115 @@ export default function AdmissionAdminDashboard({
     }
   };
 
+  // Move to Trash Handler
+  const handleMoveToTrash = async (appId) => {
+    setActionLoadingId(appId);
+    const target = applications.find(a => a.application_id === appId || a.id === appId);
+    const name = target?.full_name || "Application";
+    const prevStatus = target?.status && target.status !== "trash" ? target.status : "pending";
+
+    // 1. Optimistic UI update
+    setApplications((prev) =>
+      prev.map((item) =>
+        (item.application_id === appId || item.id === appId)
+          ? {
+              ...item,
+              status: "trash",
+              is_trash: true,
+              trashed_at: new Date().toISOString(),
+              trashed_from_status: prevStatus
+            }
+          : item
+      )
+    );
+
+    showToast(`Moved "${name}" to Trash (auto-deletes in 15 days).`);
+
+    try {
+      await moveToTrash({ applicationId: appId, adminUser: currentUser });
+    } catch (err) {
+      console.error("Error moving to trash:", err);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Restore from Trash Handler
+  const handleRestoreFromTrash = async (appId) => {
+    setActionLoadingId(appId);
+    const target = applications.find(a => a.application_id === appId || a.id === appId);
+    const restoreStatus = target?.trashed_from_status || "pending";
+
+    // 1. Optimistic UI update
+    setApplications((prev) =>
+      prev.map((item) =>
+        (item.application_id === appId || item.id === appId)
+          ? {
+              ...item,
+              status: restoreStatus,
+              is_trash: false,
+              trashed_at: null
+            }
+          : item
+      )
+    );
+
+    showToast(`Restored "${target?.full_name || 'Application'}" back to ${restoreStatus.toUpperCase()}.`);
+
+    try {
+      await restoreFromTrash({ applicationId: appId, adminUser: currentUser });
+    } catch (err) {
+      console.error("Error restoring from trash:", err);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Permanent Delete Handler (Immediate Complete Scrub)
+  const handlePermanentDelete = async (appId, appName) => {
+    const confirmed = window.confirm(
+      `⚠️ PERMANENT DELETION WARNING:\n\nAre you sure you want to permanently delete the admission response for "${appName || 'this applicant'}"?\n\nThis will completely scrub and erase all data from the database, cache, and servers with NO recovery possible.`
+    );
+    if (!confirmed) return;
+
+    setActionLoadingId(appId);
+
+    // 1. Optimistic removal
+    setApplications((prev) => prev.filter((item) => item.application_id !== appId && item.id !== appId));
+    showToast(`Permanently scrubbed and deleted "${appName || 'application'}".`);
+
+    try {
+      await permanentlyDeleteAdmission({ applicationId: appId });
+    } catch (err) {
+      console.error("Error permanently deleting application:", err);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Empty Trash Handler
+  const handleEmptyTrash = async () => {
+    const count = stats.trash;
+    if (count === 0) {
+      showToast("Trash is already empty.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `⚠️ EMPTY TRASH WARNING:\n\nAre you sure you want to permanently delete ALL ${count} items in the Trash?\n\nAll records will be completely erased from the database and storage with NO recovery possible.`
+    );
+    if (!confirmed) return;
+
+    setApplications((prev) => prev.filter((item) => item.status !== "trash" && !item.is_trash));
+    showToast(`Trash emptied: All ${count} applications permanently erased.`);
+
+    try {
+      await emptyTrash();
+    } catch (err) {
+      console.error("Error emptying trash:", err);
+    }
+  };
+
   const handleCopyRefId = (e, refId) => {
     e.stopPropagation();
     if (navigator?.clipboard) {
@@ -490,6 +621,31 @@ export default function AdmissionAdminDashboard({
 
             <button
               type="button"
+              onClick={() => {
+                const url = window.location.origin + "/admission";
+                navigator.clipboard?.writeText(url);
+                showToast("Secure Admission Form link copied to clipboard!");
+              }}
+              className="adm-btn-secondary"
+              style={{ color: "var(--adm-gold-dark)", borderColor: "var(--adm-gold-border)", fontWeight: 700 }}
+              title="Copy Public Admission Form Link"
+            >
+              <Copy size={15} /> Copy Form Link
+            </button>
+
+            <a
+              href="/admission"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="adm-btn-secondary"
+              style={{ textDecoration: "none", color: "var(--adm-espresso-main)", display: "inline-flex", alignItems: "center", gap: "6px" }}
+              title="Open Public Admission Form in New Tab"
+            >
+              <ExternalLink size={15} /> Open Form
+            </a>
+
+            <button
+              type="button"
               onClick={() => setShowBotModal(true)}
               className="adm-btn-secondary"
               style={{ color: "var(--adm-emerald-primary)", borderColor: "var(--adm-emerald-border)" }}
@@ -601,6 +757,20 @@ export default function AdmissionAdminDashboard({
           </div>
           <span className="adm-kpi-num" style={{ color: "var(--adm-espresso-muted)" }}>{stats.exited}</span>
         </div>
+
+        {/* Trash (15d Auto-Purge) Card */}
+        <div
+          onClick={() => { setActiveTab("trash"); setStatusFilter("all"); }}
+          className={`adm-kpi-card ${activeTab === "trash" ? "active active-trash" : ""}`}
+          style={{ background: "linear-gradient(135deg, #fff5f5 0%, #ffe4e6 100%)", borderColor: "#fecdd3" }}
+          title="Click to view Trash (Auto-deletes in 15 days)"
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "#e11d48" }}>Trash (15d)</span>
+            {activeTab === "trash" && <span className="adm-active-indicator" style={{ background: "#e11d48" }} />}
+          </div>
+          <span className="adm-kpi-num" style={{ color: "#e11d48" }}>{stats.trash}</span>
+        </div>
       </div>
 
       {/* Tabs Ribbon */}
@@ -613,28 +783,28 @@ export default function AdmissionAdminDashboard({
                 onClick={() => { setActiveTab("all"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeTab === "all" ? "active" : ""}`}
               >
-                All Responses ({applications.filter(a => a.status !== 'exited').length})
+                All Responses ({applications.filter(a => a.status !== 'exited' && a.status !== 'trash' && !a.is_trash).length})
               </button>
               <button
                 type="button"
                 onClick={() => { setActiveTab("kibar"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeTab === "kibar" ? "active" : ""}`}
               >
-                Al-Kibar ({applications.filter(a => (a.program === "Al-Kibar (Adults)" || a.program?.toLowerCase().includes("kibar")) && a.status !== 'exited').length})
+                Al-Kibar ({applications.filter(a => (a.program === "Al-Kibar (Adults)" || a.program?.toLowerCase().includes("kibar")) && a.status !== 'exited' && a.status !== 'trash' && !a.is_trash).length})
               </button>
               <button
                 type="button"
                 onClick={() => { setActiveTab("atfal"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeTab === "atfal" ? "active" : ""}`}
               >
-                Al-Atfal ({applications.filter(a => a.program === "Al-Atfal (7 to 15 yrs old)" && a.status !== 'exited').length})
+                Al-Atfal ({applications.filter(a => a.program === "Al-Atfal (7 to 15 yrs old)" && a.status !== 'exited' && a.status !== 'trash' && !a.is_trash).length})
               </button>
               <button
                 type="button"
                 onClick={() => { setActiveTab("sigar"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeTab === "sigar" ? "active" : ""}`}
               >
-                Al-Sigar ({applications.filter(a => a.program === "Al-Sigar (4 to 6 yrs old)" && a.status !== 'exited').length})
+                Al-Sigar ({applications.filter(a => a.program === "Al-Sigar (4 to 6 yrs old)" && a.status !== 'exited' && a.status !== 'trash' && !a.is_trash).length})
               </button>
             </>
           )}
@@ -645,7 +815,7 @@ export default function AdmissionAdminDashboard({
               onClick={() => { setActiveTab("kibar"); setStatusFilter("all"); }}
               className={`adm-tab-pill ${activeTab === "kibar" ? "active" : ""}`}
             >
-              Kibar Responses ({applications.filter(a => (a.program === "Al-Kibar (Adults)" || a.program?.toLowerCase().includes("kibar")) && a.status !== 'exited').length})
+              Kibar Responses ({applications.filter(a => (a.program === "Al-Kibar (Adults)" || a.program?.toLowerCase().includes("kibar")) && a.status !== 'exited' && a.status !== 'trash' && !a.is_trash).length})
             </button>
           )}
 
@@ -656,21 +826,21 @@ export default function AdmissionAdminDashboard({
                 onClick={() => { setActiveTab("all"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeTab === "all" ? "active" : ""}`}
               >
-                All Responses ({applications.filter(a => (a.program?.includes("Atfal") || a.program?.includes("Sigar")) && a.status !== 'exited').length})
+                All Responses ({applications.filter(a => (a.program?.includes("Atfal") || a.program?.includes("Sigar")) && a.status !== 'exited' && a.status !== 'trash' && !a.is_trash).length})
               </button>
               <button
                 type="button"
                 onClick={() => { setActiveTab("atfal"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeTab === "atfal" ? "active" : ""}`}
               >
-                Atfal Program ({applications.filter(a => a.program === "Al-Atfal (7 to 15 yrs old)" && a.status !== 'exited').length})
+                Atfal Program ({applications.filter(a => a.program === "Al-Atfal (7 to 15 yrs old)" && a.status !== 'exited' && a.status !== 'trash' && !a.is_trash).length})
               </button>
               <button
                 type="button"
                 onClick={() => { setActiveTab("general_sigar"); setStatusFilter("all"); }}
                 className={`adm-tab-pill ${activeTab === "general_sigar" ? "active-emerald" : ""}`}
               >
-                <Layers size={14} /> General Tab (Al-Sigar) ({applications.filter(a => a.program === "Al-Sigar (4 to 6 yrs old)" && a.status !== 'exited').length})
+                <Layers size={14} /> General Tab (Al-Sigar) ({applications.filter(a => a.program === "Al-Sigar (4 to 6 yrs old)" && a.status !== 'exited' && a.status !== 'trash' && !a.is_trash).length})
               </button>
             </>
           )}
@@ -682,6 +852,16 @@ export default function AdmissionAdminDashboard({
             className={`adm-tab-pill ${activeTab === "exit_list" ? "active-rose" : ""}`}
           >
             <LogOut size={14} /> Exit Bar / List ({stats.exited})
+          </button>
+
+          {/* Trash Tab */}
+          <button
+            type="button"
+            onClick={() => { setActiveTab("trash"); setStatusFilter("all"); }}
+            className={`adm-tab-pill ${activeTab === "trash" ? "active-rose" : ""}`}
+            style={activeTab === "trash" ? { background: "#ffe4e6", color: "#e11d48", borderColor: "#fca5a5" } : { color: "#e11d48" }}
+          >
+            <Trash2 size={14} /> Trash ({stats.trash})
           </button>
 
           {/* CMS Settings Tab */}
@@ -735,6 +915,69 @@ export default function AdmissionAdminDashboard({
       {/* Applications List with Animated Dynamic Card Shifting */}
       {activeTab !== "cms_settings" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          {/* Premium Trash Bin Top Banner when activeTab === "trash" */}
+          {activeTab === "trash" && (
+            <div
+              style={{
+                background: "linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)",
+                border: "1.5px solid #fecdd3",
+                borderRadius: "18px",
+                padding: "16px 20px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "14px",
+                boxShadow: "0 4px 14px rgba(225, 29, 72, 0.08)"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div
+                  style={{
+                    width: "38px",
+                    height: "38px",
+                    borderRadius: "12px",
+                    background: "#f43f5e",
+                    color: "#ffffff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: "0 4px 10px rgba(244, 63, 94, 0.3)"
+                  }}
+                >
+                  <Trash2 size={18} />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: "#881337" }}>
+                    Admission Trash Bin ({filteredApplications.length} items)
+                  </h4>
+                  <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#9f1239" }}>
+                    Items in Trash are automatically deleted permanently after <strong>15 days</strong>. You can restore or permanently delete them below.
+                  </p>
+                </div>
+              </div>
+
+              {filteredApplications.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleEmptyTrash}
+                  className="adm-btn-quick-action"
+                  style={{
+                    background: "#e11d48",
+                    color: "#ffffff",
+                    borderColor: "#be123c",
+                    fontWeight: 800,
+                    padding: "8px 16px",
+                    fontSize: "12.5px"
+                  }}
+                  title="Permanently erase all items in trash"
+                >
+                  <Trash2 size={14} /> Empty Trash
+                </button>
+              )}
+            </div>
+          )}
+
           {loading ? (
             <div style={{ textAlign: "center", padding: "48px 20px", color: "var(--adm-text-muted)" }}>
               <RotateCw size={32} className="animate-spin" style={{ margin: "0 auto 12px auto", color: "var(--adm-gold-primary)" }} />
@@ -743,9 +986,17 @@ export default function AdmissionAdminDashboard({
           ) : filteredApplications.length === 0 ? (
             <div style={{ textAlign: "center", padding: "54px 20px", background: "#ffffff", borderRadius: "24px", border: "1.5px solid var(--adm-gold-border)", boxShadow: "var(--adm-shadow-sm)" }}>
               <Users size={36} style={{ margin: "0 auto 12px auto", color: "var(--adm-gold-primary)" }} />
-              <h3 style={{ margin: 0, fontSize: "17px", fontWeight: 800, color: "var(--adm-espresso-main)" }}>No Submissions Found</h3>
+              <h3 style={{ margin: 0, fontSize: "17px", fontWeight: 800, color: "var(--adm-espresso-main)" }}>
+                {activeTab === "trash" ? "Trash is Empty" : "No Submissions Found"}
+              </h3>
               <p style={{ margin: "6px 0 0 0", fontSize: "13px", color: "var(--adm-text-muted)" }}>
-                {activeTab === "exit_list" ? "The Exit List is currently empty." : statusFilter !== "all" ? `No applications found with status "${statusFilter}". Click another status above.` : "No applications match the active filters."}
+                {activeTab === "trash"
+                  ? "No deleted admission responses in Trash. Any responses you delete will appear here for 15 days before auto-deletion."
+                  : activeTab === "exit_list"
+                  ? "The Exit List is currently empty."
+                  : statusFilter !== "all"
+                  ? `No applications found with status "${statusFilter}". Click another status above.`
+                  : "No applications match the active filters."}
               </p>
             </div>
           ) : (
@@ -754,6 +1005,12 @@ export default function AdmissionAdminDashboard({
                 const isExpanded = expandedCardId === app.application_id;
                 const logs = Array.isArray(app.timeline_audit_log) ? app.timeline_audit_log : [];
                 const isItemLoading = actionLoadingId === app.application_id;
+                const isItemTrash = app.status === "trash" || app.is_trash;
+
+                // Remaining days calculation for trash
+                const trashedTime = new Date(app.trashed_at || app.updated_at || Date.now()).getTime();
+                const daysPassed = Math.floor((Date.now() - trashedTime) / (24 * 3600 * 1000));
+                const daysLeft = Math.max(1, TRASH_RETENTION_DAYS - daysPassed);
 
                 return (
                   <motion.div
@@ -764,8 +1021,8 @@ export default function AdmissionAdminDashboard({
                     exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.18 } }}
                     transition={{ duration: 0.24, ease: "easeOut" }}
                     style={{
-                      background: "#ffffff",
-                      border: isExpanded ? "2px solid var(--adm-gold-primary)" : "1.5px solid var(--adm-gold-border)",
+                      background: isItemTrash ? "#fffcfc" : "#ffffff",
+                      border: isExpanded ? "2px solid var(--adm-gold-primary)" : isItemTrash ? "1.5px solid #fecdd3" : "1.5px solid var(--adm-gold-border)",
                       borderRadius: "20px",
                       overflow: "hidden",
                       boxShadow: isExpanded ? "var(--adm-shadow-md)" : "var(--adm-shadow-sm)",
@@ -783,7 +1040,7 @@ export default function AdmissionAdminDashboard({
                         gap: "14px",
                         cursor: "pointer",
                         flexWrap: "wrap",
-                        background: isExpanded ? "var(--adm-cream-soft)" : "#ffffff"
+                        background: isExpanded ? "var(--adm-cream-soft)" : isItemTrash ? "#fffcfc" : "#ffffff"
                       }}
                     >
                       {/* Left: Avatar & Identity */}
@@ -793,14 +1050,14 @@ export default function AdmissionAdminDashboard({
                             width: "44px",
                             height: "44px",
                             borderRadius: "14px",
-                            background: "var(--adm-gold-gradient)",
+                            background: isItemTrash ? "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)" : "var(--adm-gold-gradient)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             fontWeight: 900,
                             color: "#ffffff",
                             fontSize: "18px",
-                            boxShadow: "var(--adm-shadow-gold)",
+                            boxShadow: isItemTrash ? "0 4px 12px rgba(244, 63, 94, 0.25)" : "var(--adm-shadow-gold)",
                             fontFamily: "'Amiri', serif",
                             flexShrink: 0
                           }}
@@ -832,144 +1089,202 @@ export default function AdmissionAdminDashboard({
                         style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {/* Quick Shift Status Buttons directly on card */}
-                        {app.status === "pending" && (
+                        {/* TRASH TAB CONTROLS: RESTORE & PERMANENT DELETE */}
+                        {isItemTrash ? (
                           <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                             <button
                               type="button"
-                              onClick={() => handleStatusChange(app.application_id, "approved")}
+                              onClick={() => handleRestoreFromTrash(app.application_id)}
                               disabled={isItemLoading}
                               className="adm-btn-quick-action"
                               style={{ background: "var(--adm-emerald-bg)", color: "var(--adm-emerald-primary)", borderColor: "var(--adm-emerald-border)" }}
-                              title="Quick Approve"
+                              title="Restore application to active list"
                             >
-                              <CheckCircle2 size={13} /> Approve
+                              <RotateCcw size={13} /> Restore
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleStatusChange(app.application_id, "waiting")}
+                              onClick={() => handlePermanentDelete(app.application_id, app.full_name)}
                               disabled={isItemLoading}
                               className="adm-btn-quick-action"
-                              style={{ background: "var(--adm-amber-bg)", color: "var(--adm-amber-primary)", borderColor: "var(--adm-amber-border)" }}
-                              title="Move to Waiting List"
+                              style={{ background: "#e11d48", color: "#ffffff", borderColor: "#be123c", fontWeight: 800 }}
+                              title="Permanently wipe and delete this response forever"
                             >
-                              <Clock size={13} /> Waiting
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(app.application_id, "rejected")}
-                              disabled={isItemLoading}
-                              className="adm-btn-quick-action"
-                              style={{ background: "var(--adm-rose-bg)", color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)" }}
-                              title="Reject Application"
-                            >
-                              <XCircle size={13} /> Reject
+                              <Trash2 size={13} /> Permanent Delete
                             </button>
                           </div>
-                        )}
+                        ) : (
+                          <>
+                            {/* Quick Shift Status Buttons directly on card */}
+                            {app.status === "pending" && (
+                              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusChange(app.application_id, "approved")}
+                                  disabled={isItemLoading}
+                                  className="adm-btn-quick-action"
+                                  style={{ background: "var(--adm-emerald-bg)", color: "var(--adm-emerald-primary)", borderColor: "var(--adm-emerald-border)" }}
+                                  title="Quick Approve"
+                                >
+                                  <CheckCircle2 size={13} /> Approve
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusChange(app.application_id, "waiting")}
+                                  disabled={isItemLoading}
+                                  className="adm-btn-quick-action"
+                                  style={{ background: "var(--adm-amber-bg)", color: "var(--adm-amber-primary)", borderColor: "var(--adm-amber-border)" }}
+                                  title="Move to Waiting List"
+                                >
+                                  <Clock size={13} /> Waiting
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusChange(app.application_id, "rejected")}
+                                  disabled={isItemLoading}
+                                  className="adm-btn-quick-action"
+                                  style={{ background: "var(--adm-rose-bg)", color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)" }}
+                                  title="Reject Application"
+                                >
+                                  <XCircle size={13} /> Reject
+                                </button>
+                              </div>
+                            )}
 
-                        {app.status === "waiting" && (
-                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                            {app.status === "waiting" && (
+                              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusChange(app.application_id, "approved")}
+                                  disabled={isItemLoading}
+                                  className="adm-btn-quick-action"
+                                  style={{ background: "var(--adm-emerald-bg)", color: "var(--adm-emerald-primary)", borderColor: "var(--adm-emerald-border)" }}
+                                  title="Approve from Waiting List"
+                                >
+                                  <CheckCircle2 size={13} /> Approve
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusChange(app.application_id, "rejected")}
+                                  disabled={isItemLoading}
+                                  className="adm-btn-quick-action"
+                                  style={{ background: "var(--adm-rose-bg)", color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)" }}
+                                  title="Reject Application"
+                                >
+                                  <XCircle size={13} /> Reject
+                                </button>
+                              </div>
+                            )}
+
+                            {app.status === "approved" && (
+                              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusChange(app.application_id, "waiting")}
+                                  disabled={isItemLoading}
+                                  className="adm-btn-quick-action"
+                                  style={{ background: "var(--adm-amber-bg)", color: "var(--adm-amber-primary)", borderColor: "var(--adm-amber-border)" }}
+                                  title="Shift to Waiting List"
+                                >
+                                  <Clock size={13} /> Move to Waiting
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleExitUser(app.application_id)}
+                                  disabled={isItemLoading}
+                                  className="adm-btn-quick-action"
+                                  style={{ background: "var(--adm-rose-bg)", color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)" }}
+                                  title="Move to Exit List"
+                                >
+                                  <LogOut size={13} /> Exit
+                                </button>
+                              </div>
+                            )}
+
+                            {app.status === "rejected" && (
+                              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusChange(app.application_id, "approved")}
+                                  disabled={isItemLoading}
+                                  className="adm-btn-quick-action"
+                                  style={{ background: "var(--adm-emerald-bg)", color: "var(--adm-emerald-primary)", borderColor: "var(--adm-emerald-border)" }}
+                                  title="Reconsider & Approve"
+                                >
+                                  <CheckCircle2 size={13} /> Reconsider
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusChange(app.application_id, "waiting")}
+                                  disabled={isItemLoading}
+                                  className="adm-btn-quick-action"
+                                  style={{ background: "var(--adm-amber-bg)", color: "var(--adm-amber-primary)", borderColor: "var(--adm-amber-border)" }}
+                                  title="Move to Waiting"
+                                >
+                                  <Clock size={13} /> Waiting
+                                </button>
+                              </div>
+                            )}
+
+                            {app.status === "exited" && (
+                              <button
+                                type="button"
+                                onClick={() => handleResumeUser(app.application_id)}
+                                disabled={isItemLoading}
+                                className="adm-btn-quick-action"
+                                style={{ background: "var(--adm-emerald-bg)", color: "var(--adm-emerald-primary)", borderColor: "var(--adm-emerald-border)" }}
+                                title="Resume to active Approved"
+                              >
+                                <RotateCw size={13} /> Resume
+                              </button>
+                            )}
+
+                            {/* Direct WhatsApp Chat Action */}
                             <button
                               type="button"
-                              onClick={() => handleStatusChange(app.application_id, "approved")}
-                              disabled={isItemLoading}
+                              onClick={(e) => handleOpenWhatsAppDirect(e, app.whatsapp_number, app.full_name, app.program)}
                               className="adm-btn-quick-action"
                               style={{ background: "var(--adm-emerald-bg)", color: "var(--adm-emerald-primary)", borderColor: "var(--adm-emerald-border)" }}
-                              title="Approve from Waiting List"
+                              title="Open WhatsApp Chat"
                             >
-                              <CheckCircle2 size={13} /> Approve
+                              <MessageCircle size={13} />
                             </button>
+
+                            {/* Delete Button (Moves to Trash with 15-day auto-purge) */}
                             <button
                               type="button"
-                              onClick={() => handleStatusChange(app.application_id, "rejected")}
-                              disabled={isItemLoading}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMoveToTrash(app.application_id);
+                              }}
                               className="adm-btn-quick-action"
-                              style={{ background: "var(--adm-rose-bg)", color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)" }}
-                              title="Reject Application"
+                              style={{ background: "#fff1f2", color: "#e11d48", borderColor: "#fecdd3" }}
+                              title="Delete Response (Moves to Trash, auto-purges in 15 days)"
                             >
-                              <XCircle size={13} /> Reject
+                              <Trash2 size={13} />
                             </button>
-                          </div>
+                          </>
                         )}
 
-                        {app.status === "approved" && (
-                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(app.application_id, "waiting")}
-                              disabled={isItemLoading}
-                              className="adm-btn-quick-action"
-                              style={{ background: "var(--adm-amber-bg)", color: "var(--adm-amber-primary)", borderColor: "var(--adm-amber-border)" }}
-                              title="Shift to Waiting List"
-                            >
-                              <Clock size={13} /> Move to Waiting
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleExitUser(app.application_id)}
-                              disabled={isItemLoading}
-                              className="adm-btn-quick-action"
-                              style={{ background: "var(--adm-rose-bg)", color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)" }}
-                              title="Move to Exit List"
-                            >
-                              <LogOut size={13} /> Exit
-                            </button>
-                          </div>
-                        )}
-
-                        {app.status === "rejected" && (
-                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(app.application_id, "approved")}
-                              disabled={isItemLoading}
-                              className="adm-btn-quick-action"
-                              style={{ background: "var(--adm-emerald-bg)", color: "var(--adm-emerald-primary)", borderColor: "var(--adm-emerald-border)" }}
-                              title="Reconsider & Approve"
-                            >
-                              <CheckCircle2 size={13} /> Reconsider
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(app.application_id, "waiting")}
-                              disabled={isItemLoading}
-                              className="adm-btn-quick-action"
-                              style={{ background: "var(--adm-amber-bg)", color: "var(--adm-amber-primary)", borderColor: "var(--adm-amber-border)" }}
-                              title="Move to Waiting"
-                            >
-                              <Clock size={13} /> Waiting
-                            </button>
-                          </div>
-                        )}
-
-                        {app.status === "exited" && (
-                          <button
-                            type="button"
-                            onClick={() => handleResumeUser(app.application_id)}
-                            disabled={isItemLoading}
-                            className="adm-btn-quick-action"
-                            style={{ background: "var(--adm-emerald-bg)", color: "var(--adm-emerald-primary)", borderColor: "var(--adm-emerald-border)" }}
-                            title="Resume to active Approved"
+                        {/* Status Pill */}
+                        {isItemTrash ? (
+                          <span
+                            className="status-pill"
+                            style={{
+                              background: "#fee2e2",
+                              color: "#b91c1c",
+                              border: "1px solid #fca5a5",
+                              fontSize: "11px",
+                              fontWeight: 800
+                            }}
                           >
-                            <RotateCw size={13} /> Resume
-                          </button>
+                            TRASH • {daysLeft}d left
+                          </span>
+                        ) : (
+                          <span className={`status-pill status-${app.status}`}>
+                            {app.status}
+                          </span>
                         )}
-
-                        {/* Direct WhatsApp Chat Action */}
-                        <button
-                          type="button"
-                          onClick={(e) => handleOpenWhatsAppDirect(e, app.whatsapp_number, app.full_name, app.program)}
-                          className="adm-btn-quick-action"
-                          style={{ background: "var(--adm-emerald-bg)", color: "var(--adm-emerald-primary)", borderColor: "var(--adm-emerald-border)" }}
-                          title="Open WhatsApp Chat"
-                        >
-                          <MessageCircle size={13} />
-                        </button>
-
-                        <span className={`status-pill status-${app.status}`}>
-                          {app.status}
-                        </span>
 
                         <div style={{ marginLeft: "4px", color: isExpanded ? "var(--adm-gold-primary)" : "var(--adm-text-muted)" }}>
                           {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -1077,71 +1392,108 @@ export default function AdmissionAdminDashboard({
                           <div style={{ background: "linear-gradient(135deg, #fffdf8 0%, #fff7e6 100%)", border: "1.5px solid var(--adm-gold-border)", borderRadius: "18px", padding: "16px", display: "flex", flexDirection: "column", gap: "12px", boxShadow: "var(--adm-shadow-sm)" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                               <span style={{ fontSize: "12px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-gold-dark)", display: "flex", alignItems: "center", gap: "6px" }}>
-                                <Sparkles size={15} /> Status Actions & Automated WhatsApp Dispatch
+                                <Sparkles size={15} /> Status Actions & Controls
                               </span>
                               <span style={{ fontSize: "11px", color: "var(--adm-text-muted)" }}>
-                                Current: <strong style={{ textTransform: "uppercase", color: "var(--adm-espresso-main)" }}>{app.status}</strong>
+                                Current: <strong style={{ textTransform: "uppercase", color: isItemTrash ? "#e11d48" : "var(--adm-espresso-main)" }}>{app.status}</strong>
                               </span>
                             </div>
 
                             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-                              {/* Approved Button */}
-                              <button
-                                type="button"
-                                onClick={() => handleStatusChange(app.application_id, "approved")}
-                                disabled={isItemLoading || app.status === "approved"}
-                                className={`adm-btn-primary adm-btn-emerald ${app.status === "approved" ? "opacity-50" : ""}`}
-                                style={{ padding: "9px 20px", fontSize: "13px" }}
-                              >
-                                <CheckCircle2 size={16} /> Approved
-                              </button>
+                              {isItemTrash ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRestoreFromTrash(app.application_id)}
+                                    disabled={isItemLoading}
+                                    className="adm-btn-primary adm-btn-emerald"
+                                    style={{ padding: "9px 20px", fontSize: "13px" }}
+                                  >
+                                    <RotateCcw size={16} /> Restore to Active
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePermanentDelete(app.application_id, app.full_name)}
+                                    disabled={isItemLoading}
+                                    className="adm-btn-secondary"
+                                    style={{ background: "#fee2e2", color: "#b91c1c", borderColor: "#fca5a5", padding: "9px 20px", fontSize: "13px", fontWeight: 800 }}
+                                  >
+                                    <Trash2 size={16} /> Permanently Delete Forever
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  {/* Approved Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStatusChange(app.application_id, "approved")}
+                                    disabled={isItemLoading || app.status === "approved"}
+                                    className={`adm-btn-primary adm-btn-emerald ${app.status === "approved" ? "opacity-50" : ""}`}
+                                    style={{ padding: "9px 20px", fontSize: "13px" }}
+                                  >
+                                    <CheckCircle2 size={16} /> Approved
+                                  </button>
 
-                              {/* Waiting Button */}
-                              <button
-                                type="button"
-                                onClick={() => handleStatusChange(app.application_id, "waiting")}
-                                disabled={isItemLoading || app.status === "waiting"}
-                                className="adm-btn-secondary"
-                                style={{ padding: "9px 20px", fontSize: "13px", color: "var(--adm-amber-primary)", borderColor: "var(--adm-amber-border)", background: app.status === "waiting" ? "var(--adm-amber-bg)" : "" }}
-                              >
-                                <Clock size={16} /> Waiting
-                              </button>
+                                  {/* Waiting Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStatusChange(app.application_id, "waiting")}
+                                    disabled={isItemLoading || app.status === "waiting"}
+                                    className="adm-btn-secondary"
+                                    style={{ padding: "9px 20px", fontSize: "13px", color: "var(--adm-amber-primary)", borderColor: "var(--adm-amber-border)", background: app.status === "waiting" ? "var(--adm-amber-bg)" : "" }}
+                                  >
+                                    <Clock size={16} /> Waiting
+                                  </button>
 
-                              {/* Reject Button */}
-                              <button
-                                type="button"
-                                onClick={() => handleStatusChange(app.application_id, "rejected")}
-                                disabled={isItemLoading || app.status === "rejected"}
-                                className="adm-btn-secondary"
-                                style={{ padding: "9px 20px", fontSize: "13px", color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)", background: app.status === "rejected" ? "var(--adm-rose-bg)" : "" }}
-                              >
-                                <XCircle size={16} /> Reject
-                              </button>
+                                  {/* Reject Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStatusChange(app.application_id, "rejected")}
+                                    disabled={isItemLoading || app.status === "rejected"}
+                                    className="adm-btn-secondary"
+                                    style={{ padding: "9px 20px", fontSize: "13px", color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)", background: app.status === "rejected" ? "var(--adm-rose-bg)" : "" }}
+                                  >
+                                    <XCircle size={16} /> Reject
+                                  </button>
 
-                              {/* Exit Button (for Approved students) */}
-                              {app.status === "approved" && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleExitUser(app.application_id)}
-                                  disabled={isItemLoading}
-                                  className="adm-btn-secondary"
-                                  style={{ marginLeft: "auto", color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)" }}
-                                >
-                                  <LogOut size={16} /> Move to Exit List
-                                </button>
-                              )}
+                                  {/* Exit Button (for Approved students) */}
+                                  {app.status === "approved" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleExitUser(app.application_id)}
+                                      disabled={isItemLoading}
+                                      className="adm-btn-secondary"
+                                      style={{ color: "var(--adm-rose-primary)", borderColor: "var(--adm-rose-border)" }}
+                                    >
+                                      <LogOut size={16} /> Move to Exit List
+                                    </button>
+                                  )}
 
-                              {/* Resume Button (for Exited students) */}
-                              {app.status === "exited" && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleResumeUser(app.application_id)}
-                                  disabled={isItemLoading}
-                                  className="adm-btn-primary adm-btn-emerald"
-                                  style={{ marginLeft: "auto", padding: "9px 22px", fontSize: "13px" }}
-                                >
-                                  <RotateCw size={16} /> Resume to Active Approved
-                                </button>
+                                  {/* Resume Button (for Exited students) */}
+                                  {app.status === "exited" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleResumeUser(app.application_id)}
+                                      disabled={isItemLoading}
+                                      className="adm-btn-primary adm-btn-emerald"
+                                      style={{ padding: "9px 22px", fontSize: "13px" }}
+                                    >
+                                      <RotateCw size={16} /> Resume to Active Approved
+                                    </button>
+                                  )}
+
+                                  {/* Move to Trash Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoveToTrash(app.application_id)}
+                                    disabled={isItemLoading}
+                                    className="adm-btn-secondary"
+                                    style={{ marginLeft: "auto", color: "#e11d48", borderColor: "#fecdd3", background: "#fff1f2" }}
+                                    title="Move to Trash (auto-purges in 15 days)"
+                                  >
+                                    <Trash2 size={16} /> Move to Trash
+                                  </button>
+                                </>
                               )}
                             </div>
                           </div>

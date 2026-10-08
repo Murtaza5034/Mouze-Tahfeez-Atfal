@@ -9,6 +9,7 @@ import {
 import { db } from '../firebase/db';
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import storageApi from '../firebase/storage.js';
+import { cleanPhotoUrl } from '../utils/imageUtils';
 
 export default function TahfeezChatUI({
   studentsList = [],
@@ -1303,17 +1304,36 @@ export default function TahfeezChatUI({
                     }}>
                       {chat.isGroup ? (
                         <Users size={20} />
-                      ) : chat.photoUrl || chat.photo_url || chat.avatar_url || chat.photo ? (
-                        <img 
-                          src={chat.photoUrl || chat.photo_url || chat.avatar_url || chat.photo} 
-                          alt={chat.name || "User"} 
-                          referrerPolicy="no-referrer"
-                          style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
-                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                        />
-                      ) : (
-                        (chat.name || chat.full_name || chat.teacherName || "S")[0].toUpperCase()
-                      )}
+                      ) : (() => {
+                        const avatarPhoto = cleanPhotoUrl(chat.photoUrl || chat.photo_url || chat.avatar_url || chat.photo || "");
+                        const initial = (chat.name || chat.full_name || chat.teacherName || "S")[0].toUpperCase();
+                        return (
+                          <>
+                            {avatarPhoto ? (
+                              <img 
+                                src={avatarPhoto} 
+                                alt={chat.name || "User"} 
+                                referrerPolicy="no-referrer"
+                                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const parent = e.currentTarget.parentElement;
+                                  if (parent) {
+                                    const fb = parent.querySelector('.chat-avatar-letter-fb');
+                                    if (fb) fb.style.display = 'block';
+                                  }
+                                }}
+                              />
+                            ) : null}
+                            <span
+                              className="chat-avatar-letter-fb"
+                              style={{ display: avatarPhoto ? 'none' : 'block' }}
+                            >
+                              {initial}
+                            </span>
+                          </>
+                        );
+                      })()}
                     </div>
                     {(isRoomLive || isPeerOnline(chat)) && (
                       <span style={{
@@ -1460,17 +1480,36 @@ export default function TahfeezChatUI({
                   }}>
                     {activeChat.isGroup ? (
                       <Users size={19} />
-                    ) : activeChat.photoUrl || activeChat.photo_url || activeChat.avatar_url || activeChat.photo ? (
-                      <img 
-                        src={activeChat.photoUrl || activeChat.photo_url || activeChat.avatar_url || activeChat.photo} 
-                        alt={activeChat.name || "User"} 
-                        referrerPolicy="no-referrer"
-                        style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
-                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                      />
-                    ) : (
-                      (activeChat.name || activeChat.full_name || activeChat.teacherName || "S")[0].toUpperCase()
-                    )}
+                    ) : (() => {
+                      const activeAvatarPhoto = cleanPhotoUrl(activeChat.photoUrl || activeChat.photo_url || activeChat.avatar_url || activeChat.photo || "");
+                      const activeInitial = (activeChat.name || activeChat.full_name || activeChat.teacherName || "S")[0].toUpperCase();
+                      return (
+                        <>
+                          {activeAvatarPhoto ? (
+                            <img 
+                              src={activeAvatarPhoto} 
+                              alt={activeChat.name || "User"} 
+                              referrerPolicy="no-referrer"
+                              style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const parent = e.currentTarget.parentElement;
+                                if (parent) {
+                                  const fb = parent.querySelector('.active-chat-avatar-letter-fb');
+                                  if (fb) fb.style.display = 'block';
+                                }
+                              }}
+                            />
+                          ) : null}
+                          <span
+                            className="active-chat-avatar-letter-fb"
+                            style={{ display: activeAvatarPhoto ? 'none' : 'block' }}
+                          >
+                            {activeInitial}
+                          </span>
+                        </>
+                      );
+                    })()}
                   </div>
                   {(isOwnRoomLive || isPeerOnline(activeChat)) && (
                     <span style={{
@@ -2407,16 +2446,35 @@ export default function TahfeezChatUI({
                           flexShrink: 0,
                           overflow: "hidden"
                         }}>
-                          {s.photo_url || s.photoUrl || s.avatar_url ? (
-                            <img
-                              src={s.photo_url || s.photoUrl || s.avatar_url}
-                              alt={sName}
-                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                              onError={(e) => { e.currentTarget.style.display = "none"; }}
-                            />
-                          ) : (
-                            (sName[0] || "S").toUpperCase()
-                          )}
+                          {(() => {
+                            const sPhoto = cleanPhotoUrl(s.photo_url || s.photoUrl || s.avatar_url || s.photo || "");
+                            const sInitial = (sName[0] || "S").toUpperCase();
+                            return (
+                              <>
+                                {sPhoto ? (
+                                  <img
+                                    src={sPhoto}
+                                    alt={sName}
+                                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = "none";
+                                      const parent = e.currentTarget.parentElement;
+                                      if (parent) {
+                                        const fb = parent.querySelector('.modal-student-avatar-letter-fb');
+                                        if (fb) fb.style.display = 'block';
+                                      }
+                                    }}
+                                  />
+                                ) : null}
+                                <span
+                                  className="modal-student-avatar-letter-fb"
+                                  style={{ display: sPhoto ? 'none' : 'block' }}
+                                >
+                                  {sInitial}
+                                </span>
+                              </>
+                            );
+                          })()}
                         </div>
 
                         <div style={{ minWidth: 0, flex: 1 }}>

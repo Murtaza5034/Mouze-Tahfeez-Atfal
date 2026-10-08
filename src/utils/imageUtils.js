@@ -83,3 +83,76 @@ export async function compressImageToDataUrl(fileOrBlob, maxDim = 380, quality =
     }
   });
 }
+
+const DEAD_PHOTO_HOSTS = [
+  "xmlmfijikkptvwbkkoil.supabase.co",
+  "medypnbcsjytbxiwenob.supabase.co",
+];
+
+/**
+ * Standardized profile photo URL resolver for Mauze Tahfeez.
+ * Automatically resolves relative storage paths, Supabase storage URLs, and local data URLs
+ * to working Firebase Storage URLs or valid paths.
+ */
+export function cleanPhotoUrl(url) {
+  if (!url) return "";
+  try {
+    if (typeof url !== "string") return "";
+    const trimmed = url.trim();
+    if (
+      !trimmed ||
+      trimmed === "null" ||
+      trimmed === "undefined" ||
+      trimmed === "/logo.png" ||
+      trimmed === "LOGO.png"
+    ) {
+      return "";
+    }
+    if (trimmed.startsWith("data:") || trimmed.startsWith("blob:")) {
+      return trimmed;
+    }
+
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      try {
+        const host = new URL(trimmed).hostname;
+        if (DEAD_PHOTO_HOSTS.includes(host)) {
+          return "";
+        }
+      } catch (_) {}
+    }
+
+    const storagePatterns = [
+      "child profile pictures/",
+      "child_profile_pictures/",
+      "profiles/",
+      "student-photos/",
+      "student_photos/",
+      "teacher_photos/",
+      "teacher-photos/",
+      "muhaffezat atfal/",
+      "muhaffezat_atfal/",
+    ];
+    if (storagePatterns.some((pattern) => trimmed.startsWith(pattern))) {
+      const encodedPath = encodeURIComponent(trimmed);
+      return `https://firebasestorage.googleapis.com/v0/b/mawaid-b929a.firebasestorage.app/o/${encodedPath}?alt=media`;
+    }
+
+    if (trimmed.startsWith("/") || trimmed.startsWith("./")) {
+      return trimmed;
+    }
+
+    if (trimmed.includes("/storage/v1/object/public/")) {
+      const match = trimmed.match(/\/storage\/v1\/object\/public\/(.+)$/);
+      if (match && match[1]) {
+        const decodedPath = decodeURIComponent(match[1]);
+        const encodedPath = encodeURIComponent(decodedPath);
+        return `https://firebasestorage.googleapis.com/v0/b/mawaid-b929a.firebasestorage.app/o/${encodedPath}?alt=media`;
+      }
+    }
+
+    return trimmed;
+  } catch (_) {
+    return url;
+  }
+}
+
