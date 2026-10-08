@@ -132,7 +132,7 @@ export default async function handler(req, res) {
       // BOT LOGIC: Branch based on user reply
       // ----------------------------------------------------------------------
       if (normalizedText === "yes" || normalizedText === "y" || normalizedText.includes("yes")) {
-        replyMessage = `Salaam ${applicantName}!\n\nWelcome to Tahfeez Galiakot Portal! 🌟\n\nHere are your login credentials:\n\n🌐 *Portal Link:* ${portalUrl}\n📧 *User ID:* ${applicantEmail}\n🔑 *Password:* 123456\n\nPlease log in to access your daily schedule, progress cards, and Muhaffiz announcements.`;
+        replyMessage = `🌹 *Afzalus Salaam ${applicantName}*\n\nWelcome to Mauze Tahfeez Galiakot! 🌟\nYour enrollment is confirmed.\n\n📧 *User ID:* ${applicantEmail}\n🔑 *Password:* 123456\n\nShukran.\n\n💬 *Type 2 to ask something to bot*`;
 
         // Update Firebase Firestore document if found
         if (matchedApplicant?.docName) {
@@ -154,13 +154,13 @@ export default async function handler(req, res) {
         }
       } 
       else if (normalizedText === "no" || normalizedText === "n" || normalizedText.includes("no")) {
-        replyMessage = `Salaam ${applicantName},\n\nWe have recorded your response. If you change your mind or have queries, feel free to contact our helpline at +918107925353.`;
+        replyMessage = `🌹 *Afzalus Salaam ${applicantName}*\n\nYour response has been recorded.\nFor any queries, please call +918107925353.\n\nShukran.\n\n💬 *Type 2 to ask something to bot*`;
       } 
       else if (normalizedText.includes("talk") || normalizedText.includes("call") || normalizedText.includes("contact")) {
-        replyMessage = `Salaam ${applicantName},\n\nAn admin / Muhaffiz has been notified and will connect with you on this WhatsApp number shortly. You can also call us directly at +918107925353.`;
+        replyMessage = `🌹 *Afzalus Salaam ${applicantName}*\n\nOur team will connect with you shortly on this number.\nHelpline: +918107925353.\n\nShukran.\n\n💬 *Type 2 to ask something to bot*`;
       } 
       else {
-        replyMessage = `Salaam ${applicantName},\n\nThank you for reaching out to Tahfeez Galiakot. If you are confirming your admission, please reply with *Yes*, *No*, or *Want to talk*.`;
+        replyMessage = `🌹 *Afzalus Salaam ${applicantName}*\n\nTo confirm admission, please reply *Yes*, *No*, or *Want to talk*.\n\nShukran.\n\n💬 *Type 2 to ask something to bot*`;
       }
 
       // ----------------------------------------------------------------------

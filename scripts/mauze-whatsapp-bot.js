@@ -846,7 +846,7 @@ export function buildTeacherAttendanceHistory(teacher) {
     text += `${idx + 1}. *${s.name}* (\`${s.its || '—'}\`): ${st}\n`;
   });
 
-  text += `\n🌐 *Full Detailed Register on Portal:* ${BOT_CONFIG.PORTAL_URL}`;
+  text += `\n💬 *Type 2 to ask something to bot*`;
   return text;
 }
 
@@ -884,14 +884,11 @@ export function getISTDateParts(date = new Date()) {
  */
 export async function sendTeacherSelfAttendanceReminder(teacher, targetJid, senderPhone = '') {
   const ist = getISTDateParts();
-  const text = `🔔 *REMINDER: TEACHER SELF-ATTENDANCE* ⏱\n\n` +
-    `Salam Jameel Ustad *${teacher.name}*,\n\n` +
-    `This is your scheduled daily reminder to kindly mark your *Self-Attendance* for today on the Mauze Tahfeez app / portal.\n\n` +
-    `📅 Date: *${ist.dateDisplay}*\n` +
+  const text = `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n\n` +
+    `Kindly mark your *Self-Attendance* for today (*${ist.dateDisplay}*).\n` +
     `⏰ Scheduled Time: *4:25 PM*\n\n` +
-    `📲 *Mark Self-Attendance:*\n` +
-    `${BOT_CONFIG.PORTAL_URL}\n\n` +
-    `Shukran jazeelan!`;
+    `Shukran jazeelan.\n\n` +
+    `💬 *Type 2 to ask something to bot*`;
 
   return await sendWhatsAppMessage(targetJid, { text }, senderPhone);
 }
@@ -908,22 +905,14 @@ export async function sendTeacherElearningAttendanceReminder(teacher, targetJid,
 
   const absentStr = summary.absentNames.length > 0 ? `\n   ↳ _${summary.absentNames.join(', ')}_` : '';
   const leaveStr = summary.leaveNames.length > 0 ? `\n   ↳ _${summary.leaveNames.join(', ')}_` : '';
-  const pendingStr = summary.pendingNames.length > 0 ? `\n   ↳ _${summary.pendingNames.join(', ')}_` : '';
 
-  const text = `🌙 *DAILY E-LEARNING & ATTENDANCE SUMMARY* 📊\n\n` +
-    `Salam Jameel Ustad *${teacher.name}*,\n\n` +
-    `Here is the end-of-day summary for your class for *${ist.dateDisplay}*:\n\n` +
-    `💻 *eLearning Entry Reminder:*\n` +
-    `Please ensure all daily Sabaq, Murajah, and eLearning progress entries for your students are submitted on the Mauze Tahfeez app before closing.\n\n` +
-    `📋 *Today's Class Attendance:*\n` +
-    `• Total Students: *${summary.totalStudents}*\n` +
-    `• ✅ Present: *${summary.presentCount}*\n` +
-    `• ❌ Absent: *${summary.absentCount}*${absentStr}\n` +
-    `• 📝 On Leave: *${summary.leaveCount}*${leaveStr}\n` +
-    `• ⏳ Pending/Unmarked: *${summary.pendingCount}*${pendingStr}\n\n` +
-    `📲 *Portal Link:*\n` +
-    `${BOT_CONFIG.PORTAL_URL}\n\n` +
-    `Shukran jazeelan!`;
+  const text = `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n\n` +
+    `*Class Attendance Summary (${ist.dateDisplay}):*\n` +
+    `• Total: *${summary.totalStudents}* | ✅ Present: *${summary.presentCount}* | ❌ Absent: *${summary.absentCount}*${absentStr}\n` +
+    `• 📝 Leave: *${summary.leaveCount}*${leaveStr}\n\n` +
+    `Kindly ensure daily Sabaq & Murajah entries are submitted.\n` +
+    `Shukran.\n\n` +
+    `💬 *Type 2 to ask something to bot*`;
 
   return await sendWhatsAppMessage(targetJid, { text }, senderPhone);
 }
@@ -1128,16 +1117,12 @@ export async function checkAndSendFatemiFeeReminders(options = {}) {
       continue;
     }
 
-    const messageText = `💰 *HUB RAQAM - MONTHLY FEE REMINDER*\n\n` +
-      `Salam Jameel,\n` +
+    const messageText = `🌹 *Afzalus Salaam*\n` +
       `Respected Parent,\n\n` +
-      `This is a gentle reminder regarding the monthly Mauze Tahfeez Hub Raqam (Tuition Fee) for the month of *${hijri.nameEn} ${hijri.year}* for your child:\n` +
-      `👤 Student: *${studentName}*\n` +
-      (its ? `🆔 ITS: \`${its}\`\n` : '') +
-      `\nKindly complete the payment online via the official Mahad al Zahra portal:\n` +
-      `💳 *Pay Now:* ${payUrl}\n\n` +
-      `After payment, please preserve your transaction receipt for your records.\n\n` +
-      `🌐 Student Portal: ${BOT_CONFIG.PORTAL_URL}`;
+      `Kindly pay the Mauze Tahfeez Hub Raqam for *${hijri.nameEn} ${hijri.year}* for *${studentName}*${its ? ` (ITS: \`${its}\`)` : ''}.\n\n` +
+      `💳 *Pay Online:* ${payUrl}\n\n` +
+      `Shukran.\n\n` +
+      `💬 *Type 2 to ask something to bot*`;
 
     const jid = formatTargetJid(phoneOrLid);
     if (jid && sock && baileysStatus === 'CONNECTED') {
@@ -1169,16 +1154,12 @@ export async function checkAndSendFatemiFeeReminders(options = {}) {
       continue;
     }
 
-    const messageText = `💰 *HUB RAQAM - MONTHLY FEE REMINDER*\n\n` +
-      `Salam Jameel,\n` +
+    const messageText = `🌹 *Afzalus Salaam*\n` +
       `Respected Parent,\n\n` +
-      `This is a gentle reminder regarding the monthly Mauze Tahfeez Hub Raqam (Tuition Fee) for the month of *${hijri.nameEn} ${hijri.year}* for your child:\n` +
-      `👤 Student: *${studentName}*\n` +
-      (its ? `🆔 ITS: \`${its}\`\n` : '') +
-      `\nKindly complete the payment online via the official Mahad al Zahra portal:\n` +
-      `💳 *Pay Now:* ${payUrl}\n\n` +
-      `After payment, please preserve your transaction receipt for your records.\n\n` +
-      `🌐 Student Portal: ${BOT_CONFIG.PORTAL_URL}`;
+      `Kindly pay the Mauze Tahfeez Hub Raqam for *${hijri.nameEn} ${hijri.year}* for *${studentName}*${its ? ` (ITS: \`${its}\`)` : ''}.\n\n` +
+      `💳 *Pay Online:* ${payUrl}\n\n` +
+      `Shukran.\n\n` +
+      `💬 *Type 2 to ask something to bot*`;
 
     const jid = formatTargetJid(sPhone);
     if (jid && sock && baileysStatus === 'CONNECTED') {
@@ -2252,10 +2233,10 @@ export function buildResultCaption(data) {
   const name = data.name || data.studentName || 'Student';
   const tillDate = data.tillDate || data.weekDate || '';
 
-  return `🌹 *Salam Jameel!*\n\n` +
-    `Here is the latest weekly performance result for *${name}*${tillDate && tillDate !== '—' ? ` (${tillDate})` : ''}.\n\n` +
-    `Official Result Card attached above 👆\n\n` +
-    `🌐 *Student Portal:* ${BOT_CONFIG.PORTAL_URL}`;
+  return `🌹 *Afzalus Salaam*\n\n` +
+    `Weekly result card for *${name}*${tillDate && tillDate !== '—' ? ` (${tillDate})` : ''} is attached above 👆\n\n` +
+    `Mubarak & Shukran.\n\n` +
+    `💬 *Type 2 to ask something to bot*`;
 }
 
 /**
@@ -2557,7 +2538,7 @@ export async function sendStudentResultImageWhatsApp(remoteJid, student, senderP
   } catch (err) {
     console.error('[sendStudentResultImageWhatsApp Error]:', err);
     await sendWhatsAppMessage(remoteJid, {
-      text: `❌ Could not generate result card at this moment. Please view your report on our portal: ${BOT_CONFIG.PORTAL_URL}`
+      text: `🌹 *Afzalus Salaam*\n\nResult card is currently being updated. Please try again shortly.\n\nShukran.\n\n💬 *Type 2 to ask something to bot*`
     }, senderPhone);
   }
 }
@@ -2591,11 +2572,11 @@ export async function sendStudentAttendanceWhatsApp(remoteJid, student, senderPh
   const date = ist.dateDisplay; // Strictly today's present day date e.g. 06/10/2026
 
   await sendWhatsAppMessage(remoteJid, {
-    text: `📋 *DAILY ATTENDANCE STATUS*\n\n` +
-      `Student: *${student.name}*\n` +
-      `📅 Date: *${date}* (Today)\n` +
-      `Attendance: *${statusEmoji} ${status}*\n\n` +
-      `🌐 *Student Portal:* ${BOT_CONFIG.PORTAL_URL}`
+    text: `🌹 *Afzalus Salaam*\n\n` +
+      `👤 *${student.name}* (${date})\n` +
+      `📌 Hazri: *${statusEmoji} ${status}*\n\n` +
+      `Shukran.\n\n` +
+      `💬 *Type 2 to ask something to bot*`
   }, senderPhone);
 }
 
@@ -2603,12 +2584,13 @@ export async function sendStudentAttendanceWhatsApp(remoteJid, student, senderPh
  * Sends official Helpline info.
  */
 export async function sendWhatsAppHelpline(remoteJid, student = null, senderPhone = '') {
-  const stuInfo = student ? `\nLinked Student: *${student.name}* (ITS: \`${student.its || '—'}\`)` : '';
+  const stuInfo = student ? `\nStudent: *${student.name}* (\`${student.its || '—'}\`)` : '';
   await sendWhatsAppMessage(remoteJid, {
-    text: `📞 *HELPLINE CONTACT:*\n` +
-      `*${BOT_CONFIG.HELPLINE_NUMBER}*${stuInfo}\n\n` +
-      `Available on Phone Call and WhatsApp for all queries and support.\n\n` +
-      `🌐 *Online Portal:* ${BOT_CONFIG.PORTAL_URL}`
+    text: `🌹 *Afzalus Salaam*\n\n` +
+      `📞 *Mauze Tahfeez Helpline:* *${BOT_CONFIG.HELPLINE_NUMBER}*${stuInfo}\n` +
+      `Available for all inquiries.\n\n` +
+      `Shukran.\n\n` +
+      `💬 *Type 2 to ask something to bot*`
   }, senderPhone);
 }
 
@@ -2706,26 +2688,22 @@ export async function handleWhatsAppVerification(remoteJid, senderPhone, rawText
       : '30-Day Verified Access (Alternative Number)';
 
     await sock.sendMessage(remoteJid, {
-      text: `✅ *Verification Successful!*\n\n` +
-        `Your WhatsApp is now verified and connected to:\n` +
-        `👤 Student: *${matched.name}*\n` +
-        `🆔 ITS: *${matched.its}*\n` +
-        `🔐 Status: *${termStr}*\n\n` +
-        `Dispatching latest weekly result card below... 👇`
+      text: `🌹 *Afzalus Salaam*\n\n` +
+        `✅ Connected to *${matched.name}* (ITS: \`${matched.its}\`).\n` +
+        `Dispatching result card below... 👇\n\n` +
+        `💬 *Type 2 to ask something to bot*`
     });
 
     await sendStudentResultImageWhatsApp(remoteJid, matched);
     return true;
   } else {
     await sock.sendMessage(remoteJid, {
-      text: `❌ *Verification Unsuccessful*\n\n` +
-        `Could not find a student matching the details provided.\n\n` +
-        `👉 *Verification Format:*\n` +
-        `\`/verify [Profile Contact], [Child Name], [ITS]\`\n\n` +
-        `*Example:*\n` +
-        `\`/verify 9930852533, Demo Student, 515253\`\n\n` +
-        `Or reply with your child's 8-digit ITS number.\n\n` +
-        `🌐 *Student Portal:* ${BOT_CONFIG.PORTAL_URL}`
+      text: `🌹 *Afzalus Salaam*\n\n` +
+        `❌ No matching student found.\n` +
+        `Please send child's *8-digit ITS* or format:\n` +
+        `👉 \`/verify Contact, Name, ITS\`\n\n` +
+        `Shukran.\n\n` +
+        `💬 *Type 2 to ask something to bot*`
     });
     return false;
   }
@@ -2744,45 +2722,17 @@ export function formatTeacherVerifiedWelcomeMenu(teacher, allocatedStudents = []
   const studentCount = allocatedStudents.length;
   const sampleStudent = allocatedStudents.length > 0 ? allocatedStudents[0] : null;
   const sampleName = sampleStudent ? (sampleStudent.name.split(' ')[0] || 'Child') : 'Child';
-  const sampleIts = sampleStudent && sampleStudent.its ? sampleStudent.its : '40172347';
 
-  return `✅ *Teacher Verification Successful!*\n\n` +
-    `🌹 *Salam Jameel Ustad ${teacher.name}!*\n` +
-    `Your WhatsApp is now verified & securely linked to your Mauze Tahfeez Staff Profile.\n\n` +
-    `📊 *Class Overview:*\n` +
-    `👨‍🏫 *Staff Role:* ${(teacher.role || 'Muhaffiz').toUpperCase()}\n` +
-    `📚 *Allocated Students:* *${studentCount} Children*\n` +
-    `🔔 *Active Daily Schedulers (Mon–Sat):*\n` +
-    `   ⏱ *4:25 PM* — Teacher Self-Attendance Reminder\n` +
-    `   🌙 *10:00 PM* — eLearning Entry & Class Attendance Summary\n\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `🔍 *HOW TO ASK FOR AN INDIVIDUAL CHILD:*\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `You can check any child's specific details anytime on demand:\n\n` +
-    `📌 *Child Result Card & Marks:*\n` +
-    `  👉 Reply: *result [Child Name or ITS]*\n` +
-    `  _Example: result ${sampleName}  OR  result ${sampleIts}_\n\n` +
-    `📌 *Child Attendance & Hazri Status:*\n` +
-    `  👉 Reply: *attendance [Child Name or ITS]*\n` +
-    `  _Example: attendance ${sampleName}_\n\n` +
-    `📌 *Child Leave History:*\n` +
-    `  👉 Reply: *leave [Child Name or ITS]*\n` +
-    `  _Example: leave ${sampleName}_\n\n` +
-    `📌 *Child Quran Jadwal & Sabaq Progress:*\n` +
-    `  👉 Reply: *jadwal [Child Name or ITS]*\n` +
-    `  _Example: jadwal ${sampleName}_\n\n` +
-    `💡 *Quick Search:* You can also simply type the student's *Name* or *ITS Number* directly to view full child details!\n\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `📋 *CLASS REPORTS & ACTIONS:*\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `Reply with any number or keyword:\n` +
-    `1️⃣ *1* or *Students* — View all ${studentCount} allocated students 📋\n` +
-    `2️⃣ *2* or *Summary* — Today's class attendance summary 📊\n` +
-    `3️⃣ *3* or *History* — Weekly & monthly class attendance history 📅\n` +
-    `4️⃣ *4* or *Results* — Full class weekly exam results 🏆\n` +
-    `5️⃣ *5* or *Self* — Teacher Self-Attendance Portal link ⏱\n` +
-    `6️⃣ *6* or *Helpline* — Contact Administration 📞\n\n` +
-    `_Just reply with any command or student name above to get started!_`;
+  return `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n\n` +
+    `Your WhatsApp is verified for *${studentCount} Students*.\n\n` +
+    `*Commands:*\n` +
+    `1️⃣ *1* — Students List 📋\n` +
+    `2️⃣ *2* — Today's Hazri Summary 📊\n` +
+    `3️⃣ *3* — Results & Scores 🏆\n` +
+    `4️⃣ *4* — Helpline 📞\n\n` +
+    `💡 Or reply: \`result ${sampleName}\`, \`attendance ${sampleName}\`, \`jadwal ${sampleName}\`\n\n` +
+    `Shukran.\n\n` +
+    `💬 *Type 2 to ask something to bot*`;
 }
 
 /**
@@ -2790,31 +2740,18 @@ export function formatTeacherVerifiedWelcomeMenu(teacher, allocatedStudents = []
  */
 export function formatTeacherDashboardMenu(teacher, studentCount, sampleStudent = null) {
   const sampleName = sampleStudent ? (sampleStudent.name.split(' ')[0] || 'Child') : 'Child';
-  const sampleIts = sampleStudent && sampleStudent.its ? sampleStudent.its : '40172347';
 
-  return `🌹 *Salam Jameel Ustad ${teacher.name}!*\n` +
-    `*Mauze Tahfeez Atfal — Teacher Portal*\n\n` +
-    `👨‍🏫 *Staff Role:* ${(teacher.role || 'Muhaffiz').toUpperCase()}\n` +
-    `📚 *Allocated Students:* *${studentCount} Children*\n` +
-    `🔐 *Status:* ✔ Verified Staff Profile\n\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `🔍 *HOW TO ASK FOR AN INDIVIDUAL CHILD:*\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `📌 *Result Card:* \`result [Name or ITS]\` (e.g. \`result ${sampleName}\`)\n` +
-    `📌 *Attendance:* \`attendance [Name or ITS]\` (e.g. \`attendance ${sampleName}\`)\n` +
-    `📌 *Leave Record:* \`leave [Name or ITS]\` (e.g. \`leave ${sampleName}\`)\n` +
-    `📌 *Quran Jadwal:* \`jadwal [Name or ITS]\` (e.g. \`jadwal ${sampleName}\`)\n` +
-    `💡 Or simply type the student's *Name* or *ITS Number* directly.\n\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `📋 *CLASS REPORTS & ACTIONS:*\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `1️⃣ *1* or *Students* — Allocated Students List (${studentCount}) 📋\n` +
-    `2️⃣ *2* or *Summary* — Today's Class Hazri Summary 📊\n` +
-    `3️⃣ *3* or *History* — Weekly & Monthly Attendance History 📅\n` +
-    `4️⃣ *4* or *Results* — Full Class Exam Scores & Ranks 🏆\n` +
-    `5️⃣ *5* or *Self* — Teacher Self-Attendance Portal ⏱\n` +
-    `6️⃣ *6* or *Helpline* — Contact Administration 📞\n\n` +
-    `🌐 *Staff Portal:* ${BOT_CONFIG.PORTAL_URL}`;
+  return `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n` +
+    `*Mauze Tahfeez — Teacher Portal*\n\n` +
+    `📚 *Allocated Students:* *${studentCount} Children*\n\n` +
+    `*Commands:*\n` +
+    `1️⃣ *1* — Students List 📋\n` +
+    `2️⃣ *2* — Today's Hazri Summary 📊\n` +
+    `3️⃣ *3* — Results & Scores 🏆\n` +
+    `4️⃣ *4* — Helpline 📞\n\n` +
+    `💡 Or reply: \`result ${sampleName}\`, \`attendance ${sampleName}\`, \`jadwal ${sampleName}\`\n\n` +
+    `Shukran.\n\n` +
+    `💬 *Type 2 to ask something to bot*`;
 }
 
 /**
@@ -2822,19 +2759,16 @@ export function formatTeacherDashboardMenu(teacher, studentCount, sampleStudent 
  */
 export function formatTeacherStudentsList(teacher, students) {
   if (!students || !students.length) {
-    return `ℹ️ *No allocated students found under your teacher profile at this time.*`;
+    return `🌹 *Afzalus Salaam*\n\nNo allocated students found under your profile.\n\nShukran.\n\n💬 *Type 2 to ask something to bot*`;
   }
-  let text = `📋 *ALLOCATED STUDENTS LIST*\n` +
-    `👨‍🏫 Ustad: *${teacher.name}*\n` +
-    `👥 Total Students: *${students.length} Children*\n\n`;
+  let text = `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n` +
+    `📋 *Allocated Students (${students.length}):*\n\n`;
 
   students.forEach((s, idx) => {
-    text += `${idx + 1}. *${s.name}*\n` +
-      `   🆔 ITS: \`${s.its || '—'}\` | Grp: *${s.group || '—'}*\n` +
-      `   📖 Current Juz: *Juz ${s.juz || '—'}* (${s.surat || '—'}) | Score: *${s.weeklyScore ?? '—'} / 100*\n\n`;
+    text += `${idx + 1}. *${s.name}* (\`${s.its || '—'}\`) — Juz ${s.juz || '—'} (${s.surat || '—'})\n`;
   });
 
-  text += `💡 *Tip:* Reply with any student's ITS or Name for full details or result card!`;
+  text += `\nShukran.\n\n💬 *Type 2 to ask something to bot*`;
   return text;
 }
 
@@ -2847,15 +2781,14 @@ export function formatTeacherAttendanceSummaryText(teacher, summary) {
   const leaveStr = summary.leaveNames.length > 0 ? `\n   ↳ _${summary.leaveNames.join(', ')}_` : '';
   const pendingStr = summary.pendingNames.length > 0 ? `\n   ↳ _${summary.pendingNames.join(', ')}_` : '';
 
-  return `📊 *TODAY'S CLASS ATTENDANCE SUMMARY*\n` +
-    `👨‍🏫 Ustad: *${teacher.name}*\n` +
-    `📅 Date: *${summary.dateDisplay}*\n` +
-    `👥 Total Allocated: *${summary.totalStudents} Students*\n\n` +
-    `• ✅ *Present:* ${summary.presentCount} students\n` +
-    `• ❌ *Absent:* ${summary.absentCount} students${absentStr}\n` +
-    `• 📝 *On Leave:* ${summary.leaveCount} students${leaveStr}\n` +
-    `• ⏳ *Pending Marking:* ${summary.pendingCount} students${pendingStr}\n\n` +
-    `📱 *Mark/Update on App:*\n${BOT_CONFIG.PORTAL_URL}`;
+  return `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n\n` +
+    `*Attendance Summary (${summary.dateDisplay}):*\n` +
+    `• Total: *${summary.totalStudents}* | ✅ Present: *${summary.presentCount}*\n` +
+    `• ❌ Absent: *${summary.absentCount}*${absentStr}\n` +
+    `• 📝 Leave: *${summary.leaveCount}*${leaveStr}\n` +
+    `• ⏳ Pending: *${summary.pendingCount}*${pendingStr}\n\n` +
+    `Shukran.\n\n` +
+    `💬 *Type 2 to ask something to bot*`;
 }
 
 /**
@@ -2993,16 +2926,13 @@ export async function handleIncomingWhatsAppMessage(msg) {
     // If teacher command has no payload, show verification instructions
     if (!cleanTeacherCmd) {
       await sendWhatsAppMessage(remoteJid, {
-        text: `👨‍🏫 *ATFAL TEACHER VERIFICATION*\n\n` +
-          `Salam Jameel Ustad,\n` +
-          `Your WhatsApp number (+${senderPhone}) is not directly linked to a Staff Profile.\n\n` +
-          `To verify and link your teacher account, please reply with your *Full Name* and *Email Address* exactly as registered in your Mauze Tahfeez Staff Profile:\n\n` +
-          `👉 *Format:*\n` +
-          `\`/teacher [Full Name], [Email]\`\n\n` +
+        text: `🌹 *Afzalus Salaam*\n\n` +
+          `To link your Ustad profile, reply:\n` +
+          `👉 \`/teacher [Full Name], [Email]\`\n\n` +
           `*Example:*\n` +
           `\`/teacher Janab Mustafa bhai Manpurwala, mustafamanpur1@gmail.com\`\n\n` +
-          `Shukran jazeelan!\n` +
-          `🌐 *Staff Portal:* ${BOT_CONFIG.PORTAL_URL}`
+          `Shukran.\n\n` +
+          `💬 *Type 2 to ask something to bot*`
       }, senderPhone);
       return;
     }
@@ -3029,16 +2959,15 @@ export async function handleIncomingWhatsAppMessage(msg) {
       return;
     } else {
       await sendWhatsAppMessage(remoteJid, {
-        text: `❌ *Teacher Verification Unsuccessful*\n\n` +
-          `Could not find a staff profile matching:\n` +
+        text: `🌹 *Afzalus Salaam*\n\n` +
+          `❌ Staff profile not found for:\n` +
           `• Name: *${reqName || '—'}*\n` +
           `• Email: *${reqEmail || '—'}*\n\n` +
-          `Please ensure your Name and Email match exactly what is registered in your Mauze Tahfeez Staff Profile.\n\n` +
-          `👉 *Format:*\n` +
-          `\`/teacher [Full Name], [Email]\`\n\n` +
-          `*Example:*\n` +
-          `\`/teacher Janab Mustafa bhai Manpurwala, mustafamanpur1@gmail.com\`\n\n` +
-          `📞 Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}`
+          `Please check details or reply:\n` +
+          `👉 \`/teacher [Full Name], [Email]\`\n\n` +
+          `📞 Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}\n\n` +
+          `Shukran.\n\n` +
+          `💬 *Type 2 to ask something to bot*`
       }, senderPhone);
       return;
     }
@@ -3054,10 +2983,11 @@ export async function handleIncomingWhatsAppMessage(msg) {
       removeLinkedTeacher(senderPhone);
       if (rawJidId) removeLinkedTeacher(rawJidId);
       await sendWhatsAppMessage(remoteJid, {
-        text: `🔓 *Teacher Profile Disconnected*\n\n` +
-          `Your WhatsApp (+${senderPhone}) has been unlinked from Ustad *${teacher.name}*.\n` +
-          `To reconnect anytime, send \`/teacher [Full Name], [Email]\`.\n\n` +
-          `🌐 *Staff Portal:* ${BOT_CONFIG.PORTAL_URL}`
+        text: `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n\n` +
+          `Your WhatsApp (+${senderPhone}) has been unlinked.\n` +
+          `To reconnect, reply \`/teacher [Name], [Email]\`.\n\n` +
+          `Shukran.\n\n` +
+          `💬 *Type 2 to ask something to bot*`
       }, senderPhone);
       return;
     }
@@ -3150,15 +3080,11 @@ export async function handleIncomingWhatsAppMessage(msg) {
     ) {
       const ist = getISTDateParts();
       await sendWhatsAppMessage(remoteJid, {
-        text: `⏱ *TEACHER SELF-ATTENDANCE PORTAL*\n\n` +
-          `Salam Jameel Ustad *${teacher.name}*,\n\n` +
-          `Daily Teacher Self-Attendance should be marked at *4:25 PM* on the Mauze Tahfeez app / portal.\n\n` +
-          `📅 Today: *${ist.dateDisplay}*\n` +
-          `⏰ Target Punch Time: *4:25 PM*\n\n` +
-          `📲 *Mark Self-Attendance Now:*\n` +
-          `${BOT_CONFIG.PORTAL_URL}\n\n` +
-          `✔ Scheduled reminder message will arrive at 4:25 PM Monday to Saturday.\n\n` +
-          `Shukran jazeelan!`
+        text: `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n\n` +
+          `Daily Self-Attendance punch time is *4:25 PM*.\n` +
+          `📅 Today: *${ist.dateDisplay}*\n\n` +
+          `Shukran.\n\n` +
+          `💬 *Type 2 to ask something to bot*`
       }, senderPhone);
       return;
     }
@@ -3175,11 +3101,11 @@ export async function handleIncomingWhatsAppMessage(msg) {
       cleanCmd.includes('admin')
     ) {
       await sendWhatsAppMessage(remoteJid, {
-        text: `📞 *ATFAL ADMINISTRATION & HELPLINE*\n\n` +
-          `Ustad: *${teacher.name}*\n` +
-          `Helpline Number: *${BOT_CONFIG.HELPLINE_NUMBER}*\n\n` +
-          `Available for administrative coordination, schedule changes, and technical assistance.\n\n` +
-          `🌐 *Portal:* ${BOT_CONFIG.PORTAL_URL}`
+        text: `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n\n` +
+          `📞 *Helpline:* *${BOT_CONFIG.HELPLINE_NUMBER}*\n` +
+          `Available for administrative and technical support.\n\n` +
+          `Shukran.\n\n` +
+          `💬 *Type 2 to ask something to bot*`
       }, senderPhone);
       return;
     }
@@ -3203,14 +3129,13 @@ export async function handleIncomingWhatsAppMessage(msg) {
         const lvRec = findStudentLeave(indStudent, indStudent.phone);
         const stEmoji = lvRec && /approved/i.test(lvRec.status) ? '✅' : (lvRec && /rejected/i.test(lvRec.status) ? '❌' : '⏳');
         await sendWhatsAppMessage(remoteJid, {
-          text: `📝 *STUDENT LEAVE RECORD*\n\n` +
-            `• Student: *${indStudent.name}*\n` +
-            `• ITS: \`${indStudent.its || '—'}\`\n` +
-            `• Status: *${stEmoji} ${lvRec ? lvRec.status : 'No pending leave (Present)'}*\n` +
+          text: `🌹 *Afzalus Salaam*\n\n` +
+            `📝 *Leave Record: ${indStudent.name}*\n` +
+            `• Status: *${stEmoji} ${lvRec ? lvRec.status : 'Active (No Leave)'}*\n` +
             (lvRec?.periodStr ? `• Period: *${lvRec.periodStr}*\n` : '') +
             (lvRec?.reason ? `• Reason: _${lvRec.reason}_\n` : '') +
-            (lvRec?.comment ? `• Remark: _${lvRec.comment}_\n` : '') +
-            `\n🌐 *Portal:* ${BOT_CONFIG.PORTAL_URL}`
+            `\nShukran.\n\n` +
+            `💬 *Type 2 to ask something to bot*`
         }, senderPhone);
         return;
       }
@@ -3227,16 +3152,13 @@ export async function handleIncomingWhatsAppMessage(msg) {
 
       if (cleanCmd.includes('jadwal') || cleanCmd.includes('hifz') || cleanCmd.includes('sabaq') || cleanCmd.includes('surah')) {
         await sendWhatsAppMessage(remoteJid, {
-          text: `📖 *QURAN HIFZ JADWAL*\n\n` +
-            `• Student: *${indStudent.name}*\n` +
-            `• Arabic: ${indStudent.arabic_name || '—'}\n` +
-            `• ITS: \`${indStudent.its || '—'}\`\n` +
-            `• Current Juz: *Juz ${indStudent.juz || '—'}*\n` +
-            `• Surat: *${indStudent.surat || '—'}*\n` +
-            (indStudent.totalJadeed ? `• Sabaq (Jadeed): *${indStudent.totalJadeed}*\n` : '') +
-            (indStudent.fromDate && indStudent.tillDate ? `• Period: *${indStudent.fromDate} to ${indStudent.tillDate}*\n` : '') +
-            `• Group: *${indStudent.group || '—'}* | Ustad: *${indStudent.teacher || teacher.name}*\n\n` +
-            `🌐 *Staff Portal:* ${BOT_CONFIG.PORTAL_URL}`
+          text: `🌹 *Afzalus Salaam*\n\n` +
+            `📖 *Hifz Jadwal: ${indStudent.name}*\n` +
+            `• Juz: *Juz ${indStudent.juz || '—'}* (${indStudent.surat || '—'})\n` +
+            (indStudent.totalJadeed ? `• Sabaq: *${indStudent.totalJadeed}*\n` : '') +
+            `• Teacher: *${indStudent.teacher || teacher.name}*\n\n` +
+            `Shukran.\n\n` +
+            `💬 *Type 2 to ask something to bot*`
         }, senderPhone);
         return;
       }
@@ -3249,20 +3171,13 @@ export async function handleIncomingWhatsAppMessage(msg) {
       const attEmoji = /absent/i.test(attSt) ? '❌' : (/leave/i.test(attSt) ? '📝' : (/present/i.test(attSt) ? '✅' : '⏳'));
 
       await sendWhatsAppMessage(remoteJid, {
-        text: `👤 *STUDENT PROFILE & STATUS*\n\n` +
-          `• Name: *${enriched.name}*\n` +
-          `• Arabic: ${enriched.arabic_name || '—'}\n` +
-          `• ITS: \`${enriched.its || '—'}\`\n` +
-          `• Group: *${enriched.group || '—'}* | Ustad: *${enriched.teacher || teacher.name}*\n` +
-          `• Current Juz: *Juz ${enriched.juz || '—'}* (${enriched.surat || '—'})\n` +
-          `• Weekly Score: *${enriched.weeklyScore ?? '—'} / 100* (Rank: #${enriched.marhalaRank || '—'})\n` +
-          `• Today's Hazri: *${attEmoji} ${attSt}*\n` +
-          `• Leave Status: *${lvRec ? lvRec.status : 'Active'}*\n\n` +
-          `💡 *Ask for this Child:*\n` +
-          `  👉 \`result ${enriched.its || enriched.name}\` — Result Card 🏆\n` +
-          `  👉 \`attendance ${enriched.its || enriched.name}\` — Attendance 📊\n` +
-          `  👉 \`leave ${enriched.its || enriched.name}\` — Leave History 📝\n` +
-          `  👉 \`jadwal ${enriched.its || enriched.name}\` — Hifz Progress 📖`
+        text: `🌹 *Afzalus Salaam*\n\n` +
+          `👤 *${enriched.name}* (\`${enriched.its || '—'}\`)\n` +
+          `• Juz: *Juz ${enriched.juz || '—'}* (${enriched.surat || '—'})\n` +
+          `• Weekly Score: *${enriched.weeklyScore ?? '—'} / 100*\n` +
+          `• Hazri: *${attEmoji} ${attSt}*\n\n` +
+          `Shukran.\n\n` +
+          `💬 *Type 2 to ask something to bot*`
       }, senderPhone);
       return;
     }
@@ -3295,11 +3210,11 @@ export async function handleIncomingWhatsAppMessage(msg) {
       removeLinkedSubscriber(senderPhone);
       if (rawJidId) removeLinkedSubscriber(rawJidId);
       await sendWhatsAppMessage(remoteJid, {
-        text: `⏳ *30-Day Access Period Expired*\n\n` +
-          `Your 30-day verification for *${subRec.student?.name || 'Student'}* using this alternative number has ended.\n\n` +
-          `To renew access for another 30 days, please re-verify your child's profile details:\n` +
-          `👉 *Format:* \`/verify [Profile Contact], [Child Name], [ITS]\`\n\n` +
-          `🌐 *Portal:* ${BOT_CONFIG.PORTAL_URL}`
+        text: `🌹 *Afzalus Salaam*\n\n` +
+          `Access expired for *${subRec.student?.name || 'Student'}*.\n` +
+          `To renew access, reply: \`/verify [Contact], [Name], [ITS]\`\n\n` +
+          `Shukran.\n\n` +
+          `💬 *Type 2 to ask something to bot*`
       }, senderPhone);
       return;
     }
@@ -3345,10 +3260,11 @@ export async function handleIncomingWhatsAppMessage(msg) {
     removeLinkedSubscriber(senderPhone);
     if (rawJidId) removeLinkedSubscriber(rawJidId);
     await sendWhatsAppMessage(remoteJid, {
-      text: `🔓 *Account Disconnected*\n\n` +
-        `Your WhatsApp has been unlinked from student updates.\n` +
-        `To link again, type *1* or *start* from your registered phone, or use \`/verify\` if using an alternative number.\n\n` +
-        `🌐 *Portal:* ${BOT_CONFIG.PORTAL_URL}`
+      text: `🌹 *Afzalus Salaam*\n\n` +
+        `Your WhatsApp has been unlinked.\n` +
+        `To link again, reply with child's ITS.\n\n` +
+        `Shukran.\n\n` +
+        `💬 *Type 2 to ask something to bot*`
     }, senderPhone);
     return;
   }
@@ -3373,20 +3289,13 @@ export async function handleIncomingWhatsAppMessage(msg) {
 
     // Welcoming response for ALL messages from unregistered users
     await sendWhatsAppMessage(remoteJid, {
-      text: `🌹 *Salam Jameel!*\n` +
-        `Welcome to *Rawdat Tahfeez al Atfal - Galiakot* Official WhatsApp Helpline.\n\n` +
-        `Your WhatsApp number (+${senderPhone}) is not yet registered in our student directory.\n\n` +
-        `👨‍👩‍👧 *PARENTS — Connect Your Child:*\n` +
-        `Reply in this format:\n` +
-        `👉 \`/verify [Profile Contact], [Child Name], [ITS]\`\n` +
-        `*Example:* \`/verify 9930852533, Demo Student, 515253\`\n` +
-        `Or simply enter your child's *8-digit ITS number* directly!\n\n` +
-        `👨‍🏫 *ATFAL TEACHERS & STAFF — Connect Teacher Portal:*\n` +
-        `Reply in this format:\n` +
-        `👉 \`/teacher [Full Name], [Email]\`\n` +
-        `*Example:* \`/teacher Janab Mustafa bhai Manpurwala, mustafamanpur1@gmail.com\`\n\n` +
-        `📞 *Helpline Number:* ${BOT_CONFIG.HELPLINE_NUMBER}\n` +
-        `🌐 *Online Portal:* ${BOT_CONFIG.PORTAL_URL}`
+      text: `🌹 *Afzalus Salaam*\n` +
+        `Welcome to *Mauze Tahfeez Galiakot* Helpline.\n\n` +
+        `To connect your child's updates, reply with your child's *8-digit ITS number* or:\n` +
+        `👉 \`/verify [Contact], [Name], [ITS]\`\n\n` +
+        `📞 Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}\n\n` +
+        `Shukran.\n\n` +
+        `💬 *Type 2 to ask something to bot*`
     }, senderPhone);
     return;
   }
@@ -3445,13 +3354,13 @@ export async function handleIncomingWhatsAppMessage(msg) {
     cleanCmd.includes('hifz')
   ) {
     await sendWhatsAppMessage(remoteJid, {
-      text: `📅 *JADWAL / HIFZ TIMETABLE*\n\n` +
-        `👤 Student: *${student.name}*\n` +
-        `🆔 ITS: \`${student.its || '—'}\`\n` +
-        `📖 Current Juz: *${student.juz || '—'}* | Surat: *${student.surat || '—'}*\n` +
-        `🎯 Murajah & Daily Hifz target is active.\n` +
-        `👨‍🏫 Ustad: *${student.teacher || 'Assigned Teacher'}*\n\n` +
-        `🌐 *Full Timetable on Portal:* ${BOT_CONFIG.PORTAL_URL}`
+      text: `🌹 *Afzalus Salaam*\n\n` +
+        `📅 *JADWAL / HIFZ TIMETABLE*\n` +
+        `👤 *${student.name}* (\`${student.its || '—'}\`)\n` +
+        `📖 Current Juz: *Juz ${student.juz || '—'}* (${student.surat || '—'})\n` +
+        `👨‍🏫 Ustad: *${student.teacher || 'Assigned Ustad'}*\n\n` +
+        `Shukran.\n\n` +
+        `💬 *Type 2 to ask something to bot*`
     }, senderPhone);
     return;
   }
@@ -3489,16 +3398,14 @@ export async function handleIncomingWhatsAppMessage(msg) {
     if (student.student_id || student.id) saveLeaveRecord(`id:${student.student_id || student.id}`, lvRecord);
 
     await sendWhatsAppMessage(remoteJid, {
-      text: `✅ *LEAVE APPLICATION SUBMITTED*\n\n` +
-        `Salam Jameel,\n` +
+      text: `🌹 *Afzalus Salaam*\n` +
         `Respected Parent,\n\n` +
-        `Your leave application for *${student.name}* has been received:\n` +
-        `👤 Student: *${student.name}*\n` +
-        (student.its ? `🆔 ITS: \`${student.its}\`\n` : '') +
+        `Leave application for *${student.name}* has been submitted:\n` +
         `📝 Details: *${leaveDetails || 'Leave Requested'}*\n` +
-        `⏳ Status: *Pending Admin Approval*\n\n` +
-        `The administration has been notified. You will receive an instant WhatsApp alert as soon as it is approved.\n\n` +
-        `🌐 Student Portal: ${BOT_CONFIG.PORTAL_URL}`
+        `⏳ Status: *Pending Approval*\n\n` +
+        `You will receive an update once reviewed.\n\n` +
+        `Shukran.\n\n` +
+        `💬 *Type 2 to ask something to bot*`
     }, senderPhone);
     return;
   }
@@ -3519,28 +3426,25 @@ export async function handleIncomingWhatsAppMessage(msg) {
         : (/rejected/i.test(lvRec.status) ? '❌' : '⏳');
 
       await sendWhatsAppMessage(remoteJid, {
-        text: `📝 *LEAVE APPLICATION STATUS*\n\n` +
-          `👤 Student: *${student.name}*\n` +
-          (student.its ? `🆔 ITS: \`${student.its}\`\n` : '') +
+        text: `🌹 *Afzalus Salaam*\n\n` +
+          `📝 *Leave Status: ${student.name}*\n` +
           (lvRec.periodStr ? `📅 Period: *${lvRec.periodStr}*\n` : '') +
           `📌 Status: *${statusEmoji} ${lvRec.status}*\n` +
           (lvRec.reason ? `📝 Reason: _${lvRec.reason}_\n` : '') +
-          (lvRec.comment ? `💬 Admin Remark: _${lvRec.comment}_\n\n` : '\n') +
-          `To submit a new leave application, reply:\n` +
-          `👉 \`apply leave [dates] [reason]\`\n\n` +
-          `🌐 Portal: ${BOT_CONFIG.PORTAL_URL}`
+          (lvRec.comment ? `💬 Remark: _${lvRec.comment}_\n\n` : '\n') +
+          `Shukran.\n\n` +
+          `💬 *Type 2 to ask something to bot*`
       }, senderPhone);
       return;
     }
 
     await sendWhatsAppMessage(remoteJid, {
-      text: `📝 *LEAVE APPLICATION STATUS*\n\n` +
-        `👤 Student: *${student.name}*\n` +
-        (student.its ? `🆔 ITS: \`${student.its}\`\n` : '') +
-        `📌 Status: Active in regular class attendance (No active leave pending).\n\n` +
-        `To submit a new leave application, reply:\n` +
-        `👉 \`apply leave [dates] [reason]\`\n\n` +
-        `🌐 Online Portal: ${BOT_CONFIG.PORTAL_URL}`
+      text: `🌹 *Afzalus Salaam*\n\n` +
+        `👤 *${student.name}*\n` +
+        `📌 Status: Active in class (No active leave pending).\n` +
+        `To apply, reply: \`apply leave [dates] [reason]\`\n\n` +
+        `Shukran.\n\n` +
+        `💬 *Type 2 to ask something to bot*`
     }, senderPhone);
     return;
   }
@@ -3565,17 +3469,12 @@ export async function handleIncomingWhatsAppMessage(msg) {
   ) {
     const hijriNow = getFatemiHijriMonth();
     await sendWhatsAppMessage(remoteJid, {
-      text: `💰 *HUB RAQAM - MONTHLY TUITION FEE*\n\n` +
-        `Salam Jameel,\n` +
+      text: `🌹 *Afzalus Salaam*\n` +
         `Respected Parent,\n\n` +
-        `This is regarding the monthly Mauze Tahfeez Hub Raqam for *${hijriNow.nameEn} ${hijriNow.year}*:\n` +
-        `👤 Student: *${student.name}*\n` +
-        `🆔 ITS: \`${student.its || '—'}\`\n\n` +
-        `Kindly complete the payment online via the official Mahad al Zahra portal:\n` +
-        `👉 *PAY NOW:*\n` +
-        `💳 https://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT\n\n` +
-        `After payment, please preserve your transaction receipt for your records.\n\n` +
-        `🌐 *Online Portal:* ${BOT_CONFIG.PORTAL_URL}`
+        `Hub Raqam for *${hijriNow.nameEn} ${hijriNow.year}* for *${student.name}* (\`${student.its || '—'}\`):\n\n` +
+        `💳 *Pay Online:*\nhttps://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT\n\n` +
+        `Shukran.\n\n` +
+        `💬 *Type 2 to ask something to bot*`
     }, senderPhone);
     return;
   }
@@ -3593,49 +3492,34 @@ export async function handleIncomingWhatsAppMessage(msg) {
     cleanCmd.includes('child') ||
     cleanCmd.includes('student')
   ) {
-    const validityStatus = isPermanent
-      ? `✔ *Permanent Connection* (Phone matches profile registered contact)`
-      : `🗓 *30-Day Verified Access* (Valid for ${daysLeft || 30} more days)`;
-
     await sendWhatsAppMessage(remoteJid, {
-      text: `👤 *LINKED CHILD PROFILE*\n\n` +
-        `• Student: *${student.name}*\n` +
-        `• Arabic Name: ${student.arabic_name || '—'}\n` +
-        `• ITS Number: \`${student.its || '—'}\`\n` +
-        `• Registered Phone: \`${student.phone || '—'}\`\n` +
+      text: `🌹 *Afzalus Salaam*\n\n` +
+        `👤 *${student.name}* (\`${student.its || '—'}\`)\n` +
         `• Teacher: *${student.teacher || 'Assigned Ustad'}*\n` +
         `• Group: *${student.group || '—'}*\n` +
-        `• Connection: ${validityStatus}\n\n` +
-        `✔ You receive real-time alerts for Attendance, Results, and Jadwal.\n` +
-        `To disconnect, reply with \`/unlink\`.\n\n` +
-        `🌐 *Online Portal:* ${BOT_CONFIG.PORTAL_URL}`
+        `• Current Juz: *Juz ${student.juz || '—'}* (${student.surat || '—'})\n\n` +
+        `Shukran.\n\n` +
+        `💬 *Type 2 to ask something to bot*`
     }, senderPhone);
     return;
   }
 
   // ── DEFAULT INTERACTIVE MENU FOR ALL GREETINGS & OTHER TEXT ──
   // (Salam, Hi, Hello, Menu, Options, Start, or any query)
-  const validityStatus = isPermanent
-    ? `✔ *Permanent Connection*`
-    : `🗓 *30-Day Verified Access* (${daysLeft || 30} days left)`;
-
   await sendWhatsAppMessage(remoteJid, {
-    text: `🌹 *Salam Jameel!*\n` +
-      `Welcome to *Rawdat Tahfeez al Atfal - Galiakot* Helpline Bot.\n\n` +
-      `👤 Linked Child: *${student.name}*\n` +
-      `🆔 ITS: \`${student.its || 'Verified'}\`\n` +
-      `🔐 Status: ${validityStatus}\n\n` +
-      `*How can we assist you today?*\n` +
-      `Reply with any number or keyword:\n\n` +
-      `1️⃣ *1* or *Result* — Latest Weekly Result Card 📊\n` +
-      `2️⃣ *2* or *Attendance* — Today's Hazri Status 📋\n` +
-      `3️⃣ *3* or *Jadwal* — Hifz Timetable & Target 📅\n` +
-      `4️⃣ *4* or *Leave* — Leave Application & Status 📝\n` +
-      `5️⃣ *5* or *Fee* — Hub Raqam Payment Link 💳\n` +
-      `6️⃣ *6* or *Profile* — Student & Teacher Details 👤\n` +
-      `7️⃣ *7* or *Helpline* — Contact Administration 📞\n\n` +
-      `💡 *Quick Tip:* You can simply type *1*, *2*, *3*, *4*, *5*, *6*, or *7* anytime for instant response!\n\n` +
-      `🌐 *Student Portal:* ${BOT_CONFIG.PORTAL_URL}`
+    text: `🌹 *Afzalus Salaam*\n` +
+      `Welcome to *Mauze Tahfeez Galiakot*.\n\n` +
+      `👤 Student: *${student.name}* (\`${student.its || 'Verified'}\`)\n\n` +
+      `*Options:*\n` +
+      `1️⃣ *1* — Result Card 📊\n` +
+      `2️⃣ *2* — Today's Hazri 📋\n` +
+      `3️⃣ *3* — Hifz Jadwal 📅\n` +
+      `4️⃣ *4* — Leave Status 📝\n` +
+      `5️⃣ *5* — Hub Raqam 💳\n` +
+      `6️⃣ *6* — Profile 👤\n` +
+      `7️⃣ *7* — Helpline 📞\n\n` +
+      `Shukran.\n\n` +
+      `💬 *Type 2 to ask something to bot*`
   }, senderPhone);
 }
 
@@ -3862,32 +3746,27 @@ export async function dispatchStudentNotification(payload) {
     if (targetName) saveAttendanceRecord(`name:${targetName.toLowerCase()}`, record);
     if (targetStudentId) saveAttendanceRecord(`id:${targetStudentId}`, record);
 
-    messageText = `📋 *DAILY ATTENDANCE UPDATE*\n\n` +
-      `Salam Jameel,\n` +
+    messageText = `🌹 *Afzalus Salaam*\n` +
       `Respected Parent,\n\n` +
-      `Attendance has been marked for your child:\n` +
-      `👤 Student: *${studentDisplayName}*\n` +
-      (targetIts ? `🆔 ITS: \`${targetIts}\`\n` : '') +
+      `Attendance marked for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n` +
       `📅 Date: *${attDate}*\n` +
-      `📌 Status: *${statusEmoji} ${attStatus}*\n\n` +
-      `🌐 Student Portal: ${BOT_CONFIG.PORTAL_URL}`;
+      `📌 Hazri: *${statusEmoji} ${attStatus}*\n\n` +
+      `Shukran.\n\n` +
+      `💬 *Type 2 to ask something to bot*`;
   } else if (type === 'leave_applied') {
     const fromD = details?.fromDate || details?.from_date || '';
     const tillD = details?.toDate || details?.to_date || '';
     const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || 'Requested Dates');
     const reasonStr = details?.reason || details?.note || 'Personal Leave';
 
-    messageText = `📝 *LEAVE APPLICATION SUBMITTED*\n\n` +
-      `Salam Jameel,\n` +
+    messageText = `🌹 *Afzalus Salaam*\n` +
       `Respected Parent,\n\n` +
-      `Your leave application for *${studentDisplayName}* has been submitted:\n` +
-      `👤 Student: *${studentDisplayName}*\n` +
-      (targetIts ? `🆔 ITS: \`${targetIts}\`\n` : '') +
+      `Leave application submitted for *${studentDisplayName}*:\n` +
       `📅 Period: *${periodStr}*\n` +
       `📝 Reason: *${reasonStr}*\n` +
-      `⏳ Status: *Pending Admin Approval*\n\n` +
-      `You will receive an instant notification as soon as the administration reviews and acts on the application.\n\n` +
-      `🌐 Student Portal: ${BOT_CONFIG.PORTAL_URL}`;
+      `⏳ Status: *Pending Approval*\n\n` +
+      `Shukran.\n\n` +
+      `💬 *Type 2 to ask something to bot*`;
   } else if (type === 'leave' || type === 'leave_action') {
     const lvStatus = details?.status || 'Update';
     const statusEmoji = /approved/i.test(lvStatus) ? '✅' : (/rejected/i.test(lvStatus) ? '❌' : '⏳');
@@ -3896,27 +3775,23 @@ export async function dispatchStudentNotification(payload) {
     const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || '');
     const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || '';
 
-    messageText = `📝 *LEAVE APPLICATION STATUS UPDATE*\n\n` +
-      `Salam Jameel,\n` +
+    messageText = `🌹 *Afzalus Salaam*\n` +
       `Respected Parent,\n\n` +
-      `The administration has taken action on the leave request for your child:\n` +
-      `👤 Student: *${studentDisplayName}*\n` +
-      (targetIts ? `🆔 ITS: \`${targetIts}\`\n` : '') +
+      `Leave update for *${studentDisplayName}*:\n` +
       (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
-      `📌 Action / Status: *${statusEmoji} ${lvStatus}*\n` +
-      (comment ? `💬 Admin Remark: _${comment}_\n\n` : '\n') +
-      `🌐 Student Portal: ${BOT_CONFIG.PORTAL_URL}`;
+      `📌 Status: *${statusEmoji} ${lvStatus}*\n` +
+      (comment ? `💬 Remark: _${comment}_\n\n` : '\n') +
+      `Shukran.\n\n` +
+      `💬 *Type 2 to ask something to bot*`;
   } else if (type === 'leave_chat_message') {
     const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || details?.body || '';
 
-    messageText = `💬 *ADMIN LEAVE MESSAGE*\n\n` +
-      `Salam Jameel,\n` +
+    messageText = `🌹 *Afzalus Salaam*\n` +
       `Respected Parent,\n\n` +
-      `Message from administration regarding *${studentDisplayName}*'s leave:\n` +
-      `👤 Student: *${studentDisplayName}*\n` +
-      (targetIts ? `🆔 ITS: \`${targetIts}\`\n` : '') +
-      `💬 Message: _${comment}_\n\n` +
-      `🌐 Student Portal: ${BOT_CONFIG.PORTAL_URL}`;
+      `Message regarding *${studentDisplayName}*:\n` +
+      `💬 _${comment}_\n\n` +
+      `Shukran.\n\n` +
+      `💬 *Type 2 to ask something to bot*`;
   } else if (type === 'event_leave') {
     const evName = details?.eventName || details?.title || 'Event Leave';
     const fromD = details?.fromDate || details?.from_date || '';
@@ -3924,41 +3799,35 @@ export async function dispatchStudentNotification(payload) {
     const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || '');
     const reasonStr = details?.reason || details?.body || '';
 
-    messageText = `🎉 *EVENT LEAVE ANNOUNCEMENT*\n\n` +
-      `Salam Jameel,\n` +
+    messageText = `🌹 *Afzalus Salaam*\n` +
       `Respected Parent,\n\n` +
-      `An event leave has been announced for Mauze Tahfeez:\n` +
-      `📌 Event: *${evName}*\n` +
+      `*${evName}*\n` +
       (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
       (reasonStr ? `📝 Note: _${reasonStr}_\n` : '') +
-      `\nHoliday leave has been automatically marked for your child (*${studentDisplayName}*).\n\n` +
-      `🌐 Student Portal: ${BOT_CONFIG.PORTAL_URL}`;
+      `Holiday marked for *${studentDisplayName}*.\n\n` +
+      `Shukran.\n\n` +
+      `💬 *Type 2 to ask something to bot*`;
   } else if (type === 'fee_reminder') {
     const hijriNow = getFatemiHijriMonth();
     const monthName = details?.monthName || hijriNow.nameEn;
     const payUrl = 'https://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT';
 
-    messageText = `💰 *HUB RAQAM - MONTHLY FEE REMINDER*\n\n` +
-      `Salam Jameel,\n` +
+    messageText = `🌹 *Afzalus Salaam*\n` +
       `Respected Parent,\n\n` +
-      `This is a gentle reminder regarding the monthly Mauze Tahfeez Hub Raqam (Tuition Fee) for the month of *${monthName}* for your child:\n` +
-      `👤 Student: *${studentDisplayName}*\n` +
-      (targetIts ? `🆔 ITS: \`${targetIts}\`\n` : '') +
-      `\nKindly complete the payment online via the official Mahad al Zahra portal:\n` +
-      `👉 *PAY NOW:*\n` +
-      `💳 ${payUrl}\n\n` +
-      `After payment, please preserve your transaction receipt for your records.\n\n` +
-      `🌐 Student Portal: ${BOT_CONFIG.PORTAL_URL}`;
+      `Hub Raqam reminder for *${monthName}* for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n\n` +
+      `💳 *Pay Online:*\n${payUrl}\n\n` +
+      `Shukran.\n\n` +
+      `💬 *Type 2 to ask something to bot*`;
   } else if (type === 'jadwal') {
-    messageText = `📅 *JADWAL / TIMETABLE SCHEDULE*\n\n` +
-      `Student: *${studentDisplayName}*\n` +
-      `Your child's personalized hifz timetable and murajah plan has been updated.\n\n` +
-      `🌐 View Online: ${BOT_CONFIG.PORTAL_URL}`;
+    messageText = `🌹 *Afzalus Salaam*\n\n` +
+      `Hifz timetable and target updated for *${studentDisplayName}*.\n\n` +
+      `Shukran.\n\n` +
+      `💬 *Type 2 to ask something to bot*`;
   } else {
-    messageText = `📢 *STUDENT NOTIFICATION UPDATE*\n\n` +
-      `Student: *${studentDisplayName}*\n` +
-      `${details?.body || details?.title || 'A new update is available on your student portal.'}\n\n` +
-      `🌐 Online Portal: ${BOT_CONFIG.PORTAL_URL}`;
+    messageText = `🌹 *Afzalus Salaam*\n\n` +
+      `*${studentDisplayName}:* ${details?.body || details?.title || 'New update recorded.'}\n\n` +
+      `Shukran.\n\n` +
+      `💬 *Type 2 to ask something to bot*`;
   }
 
   let delivered = 0;
@@ -5179,15 +5048,13 @@ export function startWhatsAppBotEngine() {
             if (targetName) saveAttendanceRecord(`name:${targetName.toLowerCase()}`, record);
             if (targetStudentId) saveAttendanceRecord(`id:${targetStudentId}`, record);
 
-            messageText = `📋 *DAILY ATTENDANCE UPDATE*\n\n` +
-              `Salam Jameel,\n` +
+            messageText = `🌹 *Afzalus Salaam*\n` +
               `Respected Parent,\n\n` +
-              `Attendance has been marked for your child:\n` +
-              `👤 Student: *${studentDisplayName}*\n` +
-              (targetIts ? `🆔 ITS: \`${targetIts}\`\n` : '') +
+              `Attendance marked for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n` +
               `📅 Date: *${attDate}*\n` +
-              `📌 Status: *${statusEmoji} ${attStatus}*\n\n` +
-              `🌐 Student Portal: ${BOT_CONFIG.PORTAL_URL}`;
+              `📌 Hazri: *${statusEmoji} ${attStatus}*\n\n` +
+              `Shukran.\n\n` +
+              `💬 *Type 2 to ask something to bot*`;
           } else if (type === 'result_progress' || type === 'result' || type === 'result_live') {
             const rawScore = details?.total_score !== undefined ? details.total_score : (details?.weeklyScore !== undefined ? details.weeklyScore : details?.score);
             const numScore = parseFloat(rawScore) || 0;
@@ -5229,12 +5096,11 @@ export function startWhatsAppBotEngine() {
               }
             }
 
-            messageText = `🏆 *RESULT UPDATE RECORDED*\n\n` +
-              `Student: *${studentDisplayName}*\n` +
-              `Score: *${numScore} / 100*\n` +
-              (wJuz ? `Current Juz: *Juz ${wJuz}* (${wSurah})\n` : '') +
-              `Updated at backend.\n\n` +
-              `🌐 ${BOT_CONFIG.PORTAL_URL}`;
+            messageText = `🌹 *Afzalus Salaam*\n\n` +
+              `🏆 *Result Update: ${studentDisplayName}*\n` +
+              `Score: *${numScore} / 100*` + (wJuz ? ` | Juz ${wJuz} (${wSurah})` : '') + `\n\n` +
+              `Shukran.\n\n` +
+              `💬 *Type 2 to ask something to bot*`;
           } else if (type === 'leave_applied') {
             const fromD = details?.fromDate || details?.from_date || '';
             const tillD = details?.toDate || details?.to_date || '';
@@ -5260,17 +5126,14 @@ export function startWhatsAppBotEngine() {
             if (targetName) saveLeaveRecord(`name:${targetName.toLowerCase()}`, lvRecord);
             if (targetStudentId) saveLeaveRecord(`id:${targetStudentId}`, lvRecord);
 
-            messageText = `📝 *LEAVE APPLICATION SUBMITTED*\n\n` +
-              `Salam Jameel,\n` +
+            messageText = `🌹 *Afzalus Salaam*\n` +
               `Respected Parent,\n\n` +
-              `Your leave application for *${studentDisplayName}* has been submitted:\n` +
-              `👤 Student: *${studentDisplayName}*\n` +
-              (targetIts ? `🆔 ITS: \`${targetIts}\`\n` : '') +
+              `Leave application submitted for *${studentDisplayName}*:\n` +
               `📅 Period: *${periodStr}*\n` +
               `📝 Reason: *${reasonStr}*\n` +
-              `⏳ Status: *Pending Admin Approval*\n\n` +
-              `You will receive an instant notification as soon as the administration reviews and acts on the application.\n\n` +
-              `🌐 Student Portal: ${BOT_CONFIG.PORTAL_URL}`;
+              `⏳ Status: *Pending Approval*\n\n` +
+              `Shukran.\n\n` +
+              `💬 *Type 2 to ask something to bot*`;
           } else if (type === 'leave' || type === 'leave_action') {
             const lvStatus = details?.status || 'Approved';
             const statusEmoji = /approved/i.test(lvStatus) ? '✅' : (/rejected/i.test(lvStatus) ? '❌' : '⏳');
@@ -5298,27 +5161,23 @@ export function startWhatsAppBotEngine() {
             if (targetName) saveLeaveRecord(`name:${targetName.toLowerCase()}`, lvRecord);
             if (targetStudentId) saveLeaveRecord(`id:${targetStudentId}`, lvRecord);
 
-            messageText = `📝 *LEAVE APPLICATION STATUS UPDATE*\n\n` +
-              `Salam Jameel,\n` +
+            messageText = `🌹 *Afzalus Salaam*\n` +
               `Respected Parent,\n\n` +
-              `The administration has taken action on the leave request for your child:\n` +
-              `👤 Student: *${studentDisplayName}*\n` +
-              (targetIts ? `🆔 ITS: \`${targetIts}\`\n` : '') +
+              `Leave update for *${studentDisplayName}*:\n` +
               (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
-              `📌 Action / Status: *${statusEmoji} ${lvStatus}*\n` +
-              (comment ? `💬 Admin Remark: _${comment}_\n\n` : '\n') +
-              `🌐 Student Portal: ${BOT_CONFIG.PORTAL_URL}`;
+              `📌 Status: *${statusEmoji} ${lvStatus}*\n` +
+              (comment ? `💬 Remark: _${comment}_\n\n` : '\n') +
+              `Shukran.\n\n` +
+              `💬 *Type 2 to ask something to bot*`;
           } else if (type === 'leave_chat_message') {
             const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || details?.body || '';
 
-            messageText = `💬 *ADMIN LEAVE MESSAGE*\n\n` +
-              `Salam Jameel,\n` +
+            messageText = `🌹 *Afzalus Salaam*\n` +
               `Respected Parent,\n\n` +
-              `Message from administration regarding *${studentDisplayName}*'s leave:\n` +
-              `👤 Student: *${studentDisplayName}*\n` +
-              (targetIts ? `🆔 ITS: \`${targetIts}\`\n` : '') +
-              `💬 Message: _${comment}_\n\n` +
-              `🌐 Student Portal: ${BOT_CONFIG.PORTAL_URL}`;
+              `Message regarding *${studentDisplayName}*:\n` +
+              `💬 _${comment}_\n\n` +
+              `Shukran.\n\n` +
+              `💬 *Type 2 to ask something to bot*`;
           } else if (type === 'event_leave') {
             const evName = details?.eventName || details?.title || 'Event Leave';
             const fromD = details?.fromDate || details?.from_date || '';
@@ -5326,41 +5185,35 @@ export function startWhatsAppBotEngine() {
             const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || '');
             const reasonStr = details?.reason || details?.body || '';
 
-            messageText = `🎉 *EVENT LEAVE ANNOUNCEMENT*\n\n` +
-              `Salam Jameel,\n` +
+            messageText = `🌹 *Afzalus Salaam*\n` +
               `Respected Parent,\n\n` +
-              `An event leave has been announced for Mauze Tahfeez:\n` +
-              `📌 Event: *${evName}*\n` +
+              `*${evName}*\n` +
               (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
               (reasonStr ? `📝 Note: _${reasonStr}_\n` : '') +
-              `\nHoliday leave has been automatically marked for your child (*${studentDisplayName}*).\n\n` +
-              `🌐 Student Portal: ${BOT_CONFIG.PORTAL_URL}`;
+              `Holiday marked for *${studentDisplayName}*.\n\n` +
+              `Shukran.\n\n` +
+              `💬 *Type 2 to ask something to bot*`;
           } else if (type === 'fee_reminder') {
             const hijriNow = getFatemiHijriMonth();
             const monthName = details?.monthName || hijriNow.nameEn;
             const payUrl = 'https://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT';
 
-            messageText = `💰 *HUB RAQAM - MONTHLY FEE REMINDER*\n\n` +
-              `Salam Jameel,\n` +
+            messageText = `🌹 *Afzalus Salaam*\n` +
               `Respected Parent,\n\n` +
-              `This is a gentle reminder regarding the monthly Mauze Tahfeez Hub Raqam (Tuition Fee) for the month of *${monthName}* for your child:\n` +
-              `👤 Student: *${studentDisplayName}*\n` +
-              (targetIts ? `🆔 ITS: \`${targetIts}\`\n` : '') +
-              `\nKindly complete the payment online via the official Mahad al Zahra portal:\n` +
-              `👉 *PAY NOW:*\n` +
-              `💳 ${payUrl}\n\n` +
-              `After payment, please preserve your transaction receipt for your records.\n\n` +
-              `🌐 Student Portal: ${BOT_CONFIG.PORTAL_URL}`;
+              `Hub Raqam reminder for *${monthName}* for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n\n` +
+              `💳 *Pay Online:*\n${payUrl}\n\n` +
+              `Shukran.\n\n` +
+              `💬 *Type 2 to ask something to bot*`;
           } else if (type === 'jadwal') {
-            messageText = `📅 *JADWAL / TIMETABLE SCHEDULE*\n\n` +
-              `Student: *${studentDisplayName}*\n` +
-              `Your child's personalized hifz timetable and murajah plan has been updated.\n\n` +
-              `🌐 View Online: ${BOT_CONFIG.PORTAL_URL}`;
+            messageText = `🌹 *Afzalus Salaam*\n\n` +
+              `Hifz timetable and target updated for *${studentDisplayName}*.\n\n` +
+              `Shukran.\n\n` +
+              `💬 *Type 2 to ask something to bot*`;
           } else {
-            messageText = `📢 *STUDENT NOTIFICATION UPDATE*\n\n` +
-              `Student: *${studentDisplayName}*\n` +
-              `${details?.body || details?.title || 'A new update is available on your student portal.'}\n\n` +
-              `🌐 Online Portal: ${BOT_CONFIG.PORTAL_URL}`;
+            messageText = `🌹 *Afzalus Salaam*\n\n` +
+              `*${studentDisplayName}:* ${details?.body || details?.title || 'New update recorded.'}\n\n` +
+              `Shukran.\n\n` +
+              `💬 *Type 2 to ask something to bot*`;
           }
 
           let delivered = 0;

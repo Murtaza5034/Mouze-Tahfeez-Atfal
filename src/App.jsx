@@ -20647,7 +20647,7 @@ function AdminPortal({
   const parseTemplate = (template, student) => {
     let msg =
       template ||
-      "Salam! The weekly Tahfeez result for {{child_name}} is now live. View it here: https://mouze-tahfeez-atfal.vercel.app/";
+      "🌹 *Afzalus Salaam*\n\nWeekly result for *{{child_name}}* is now live.\n\nMubarak & Shukran.\n\n💬 *Type 2 to ask something to bot*";
     msg = msg.replace(
       /\{\{child_name\}\}/g,
       student.name || student.full_name || "",
@@ -20660,10 +20660,6 @@ function AdminPortal({
     msg = msg.replace(
       /\{\{surat\}\}/g,
       student.hifz?.surat || student.surat || "",
-    );
-    msg = msg.replace(
-      /\{\{portal_url\}\}/g,
-      "https://mouze-tahfeez-atfal.vercel.app/",
     );
     return msg;
   };
@@ -33370,7 +33366,7 @@ function AdminPortal({
                       rows={3}
                       defaultValue={
                         whatsappConfig?.message_template ||
-                        "Salam! The weekly Tahfeez result for {{child_name}} is now live. View it here: https://mouze-tahfeez-atfal.vercel.app/"
+                        "🌹 *Afzalus Salaam*\n\nWeekly result for *{{child_name}}* is now live.\n\nMubarak & Shukran.\n\n💬 *Type 2 to ask something to bot*"
                       }
                       className="premium-input"
                       style={{ resize: "vertical" }}
