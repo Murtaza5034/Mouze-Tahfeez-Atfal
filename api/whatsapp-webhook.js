@@ -132,7 +132,7 @@ export default async function handler(req, res) {
       // BOT LOGIC: Branch based on user reply
       // ----------------------------------------------------------------------
       if (normalizedText === "yes" || normalizedText === "y" || normalizedText.includes("yes")) {
-        replyMessage = `🌹 *Afzalus Salaam ${applicantName}*\n\nWelcome to Mauze Tahfeez Galiakot! 🌟\nYour enrollment is confirmed.\n\n📧 *User ID:* ${applicantEmail}\n🔑 *Password:* 123456\n\nRegards,\n*Mauze Tahfeez - Galiakot*\n\n💬 *Type 2 to ask something to bot*`;
+        replyMessage = `🌹 *Afzalus Salaam ${applicantName}*\n\nWelcome to Mauze Tahfeez Galiakot! 🌟\nYour enrollment is confirmed.\n\n📧 *User ID:* ${applicantEmail}\n🔑 *Password:* 123456\n\nRegards,\n*Mauze Tahfeez - Galiakot*\n\n💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
 
         // Update Firebase Firestore document if found
         if (matchedApplicant?.docName) {
@@ -154,13 +154,13 @@ export default async function handler(req, res) {
         }
       } 
       else if (normalizedText === "no" || normalizedText === "n" || normalizedText.includes("no")) {
-        replyMessage = `🌹 *Afzalus Salaam ${applicantName}*\n\nYour response has been recorded.\nFor any queries, please call +918107925353.\n\nRegards,\n*Mauze Tahfeez - Galiakot*\n\n💬 *Type 2 to ask something to bot*`;
+        replyMessage = `🌹 *Afzalus Salaam ${applicantName}*\n\nYour response has been recorded.\nFor any queries, please call +918107925353.\n\nRegards,\n*Mauze Tahfeez - Galiakot*\n\n💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
       } 
       else if (normalizedText.includes("talk") || normalizedText.includes("call") || normalizedText.includes("contact")) {
-        replyMessage = `🌹 *Afzalus Salaam ${applicantName}*\n\nOur team will connect with you shortly on this number.\nHelpline: +918107925353.\n\nRegards,\n*Mauze Tahfeez - Galiakot*\n\n💬 *Type 2 to ask something to bot*`;
+        replyMessage = `🌹 *Afzalus Salaam ${applicantName}*\n\nOur team will connect with you shortly on this number.\nHelpline: +918107925353.\n\nRegards,\n*Mauze Tahfeez - Galiakot*\n\n💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
       } 
       else {
-        replyMessage = `🌹 *Afzalus Salaam ${applicantName}*\n\nTo confirm admission, please reply *Yes*, *No*, or *Want to talk*.\n\nRegards,\n*Mauze Tahfeez - Galiakot*\n\n💬 *Type 2 to ask something to bot*`;
+        replyMessage = `🌹 *Afzalus Salaam ${applicantName}*\n\nTo confirm admission, please reply *Yes*, *No*, or *Want to talk*.\n\nRegards,\n*Mauze Tahfeez - Galiakot*\n\n💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
       }
 
       // ----------------------------------------------------------------------

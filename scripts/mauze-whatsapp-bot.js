@@ -2338,7 +2338,7 @@ export function buildResultCaption(data) {
     `Weekly result card for *${name}*${tillDate && tillDate !== '—' ? ` (${tillDate})` : ''} is attached above 👆\n\n` +
     `Regards,\n` +
     `*Mauze Tahfeez - Galiakot*\n\n` +
-    `💬 *Type 2 to ask something to bot*`;
+    `💬 *Type 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
 }
 
 /**
@@ -2693,7 +2693,7 @@ export async function sendStudentAttendanceWhatsApp(remoteJid, student, senderPh
       `👤 *${student.name}* (${date})\n` +
       `📌 Hazri: *${statusEmoji} ${status}*\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 2 to ask something to bot*`
+      `💬 *Type 1 (Result Card) • 3 (Leave) • 4 (League Points)*`
   }, senderPhone);
 }
 
@@ -2707,7 +2707,7 @@ export async function sendWhatsAppHelpline(remoteJid, student = null, senderPhon
       `📞 *Mauze Tahfeez Helpline:* *${BOT_CONFIG.HELPLINE_NUMBER}*${stuInfo}\n` +
       `Available for all inquiries.\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 2 to ask something to bot*`
+      `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League)*`
   }, senderPhone);
 }
 
@@ -3511,7 +3511,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
         `📝 Details: *${leaveDetails || 'Leave Requested'}*\n` +
         `⏳ Status: *Pending Approval*\n\n` +
         `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Type 2 to ask something to bot*`
+        `💬 *Type 1 (Result Card) • 2 (Hazri) • 4 (League Points)*`
     }, senderPhone);
 
     // Alert Assigned Teacher immediately
@@ -3526,7 +3526,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
             `📅 Details: *${leaveDetails || 'Leave Requested'}*\n` +
             `⏳ Status: *Pending Admin Approval*\n\n` +
             `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-            `💬 *Type 2 to ask something to bot*`
+            `💬 *Type 1 (Class List) • 2 (Summary) • 4 (Scores)*`
         }, teacherPhone).catch(() => {});
       }
     }
@@ -3557,7 +3557,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
           (lvRec.reason ? `📝 Reason: _${lvRec.reason}_\n` : '') +
           (lvRec.comment ? `💬 Remark: _${lvRec.comment}_\n\n` : '\n') +
           `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-          `💬 *Type 2 to ask something to bot*`
+          `💬 *Type 1 (Result Card) • 2 (Hazri) • 4 (League Points)*`
       }, senderPhone);
       return;
     }
@@ -3569,7 +3569,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
         `To apply for leave, reply:\n` +
         `👉 \`apply leave [dates] [reason]\`\n\n` +
         `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Type 2 to ask something to bot*`
+        `💬 *Type 1 (Result Card) • 2 (Hazri) • 4 (League Points)*`
     }, senderPhone);
     return;
   }
@@ -3595,7 +3595,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
         `📅 Month: *${leagueData.monthName}*\n` +
         `✨ Total League Points: *${leagueData.totalGems} / 480 Gems*\n\n` +
         `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Type 2 to ask something to bot*`
+        `💬 *Type 1 (Result Card) • 2 (Hazri) • 3 (Leave)*`
     }, senderPhone);
     return;
   }
@@ -3623,7 +3623,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
         `📖 Current Juz: *Juz ${student.juz || '—'}* (${student.surat || '—'})\n` +
         `👨‍🏫 Ustad: *${student.teacher || 'Assigned Ustad'}*\n\n` +
         `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Type 2 to ask something to bot*`
+        `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`
     }, senderPhone);
     return;
   }
@@ -3635,7 +3635,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
         `Hub Raqam for *${hijriNow.nameEn} ${hijriNow.year}* for *${student.name}* (\`${student.its || '—'}\`):\n\n` +
         `💳 *Pay Online:*\nhttps://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT\n\n` +
         `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Type 2 to ask something to bot*`
+        `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave)*`
     }, senderPhone);
     return;
   }
@@ -3652,7 +3652,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
       `4️⃣ *4* — Atfal Gem League Points 💎\n` +
       `5️⃣ *5* — Helpline 📞\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 2 to ask something to bot*`
+      `💬 *Type 1, 2, 3, 4 or 5 for instant updates*`
   }, senderPhone);
 }
 
@@ -3892,7 +3892,7 @@ export async function dispatchStudentNotification(payload) {
       `📅 Date: *${attDate}*\n` +
       `📌 Hazri: *${statusEmoji} ${attStatus}*\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 2 to ask something to bot*`;
+      `💬 *Type 1 (Result Card) • 3 (Leave) • 4 (League Points)*`;
   } else if (type === 'leave_applied') {
     const fromD = details?.fromDate || details?.from_date || '';
     const tillD = details?.toDate || details?.to_date || '';
@@ -3905,7 +3905,7 @@ export async function dispatchStudentNotification(payload) {
       `📝 Reason: *${reasonStr}*\n` +
       `⏳ Status: *Pending Approval*\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 2 to ask something to bot*`;
+      `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`;
   } else if (type === 'leave' || type === 'leave_action') {
     const lvStatus = details?.status || 'Update';
     const statusEmoji = /approved/i.test(lvStatus) ? '✅' : (/rejected/i.test(lvStatus) ? '❌' : '⏳');
@@ -3920,7 +3920,7 @@ export async function dispatchStudentNotification(payload) {
       `📌 Status: *${statusEmoji} ${lvStatus}*\n` +
       (comment ? `💬 Remark: _${comment}_\n\n` : '\n') +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 2 to ask something to bot*`;
+      `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`;
   } else if (type === 'leave_chat_message') {
     const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || details?.body || '';
 
@@ -3928,7 +3928,7 @@ export async function dispatchStudentNotification(payload) {
       `💬 *Leave Chat: ${studentDisplayName}*\n` +
       `_${comment}_\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 2 to ask something to bot*`;
+      `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`;
   } else if (type === 'event_leave') {
     const evName = details?.eventName || details?.title || 'Event Leave';
     const fromD = details?.fromDate || details?.from_date || '';
@@ -3942,7 +3942,7 @@ export async function dispatchStudentNotification(payload) {
       (reasonStr ? `📝 Note: _${reasonStr}_\n` : '') +
       `Holiday marked for *${studentDisplayName}*.\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 2 to ask something to bot*`;
+      `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`;
   } else if (type === 'fee_reminder') {
     const hijriNow = getFatemiHijriMonth();
     const monthName = details?.monthName || hijriNow.nameEn;
@@ -3953,17 +3953,17 @@ export async function dispatchStudentNotification(payload) {
       `Hub Raqam reminder for *${monthName}* for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n\n` +
       `💳 *Pay Online:*\n${payUrl}\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 2 to ask something to bot*`;
+      `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave)*`;
   } else if (type === 'jadwal') {
     messageText = `🌹 *Afzalus Salaam*\n\n` +
       `Hifz timetable and target updated for *${studentDisplayName}*.\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 2 to ask something to bot*`;
+      `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`;
   } else {
     messageText = `🌹 *Afzalus Salaam*\n\n` +
       `*${studentDisplayName}:* ${details?.body || details?.title || 'New update recorded.'}\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 2 to ask something to bot*`;
+      `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League)*`;
   }
 
   let delivered = 0;
@@ -5197,7 +5197,7 @@ export function startWhatsAppBotEngine() {
               `📅 Date: *${attDate}*\n` +
               `📌 Hazri: *${statusEmoji} ${attStatus}*\n\n` +
               `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 2 to ask something to bot*`;
+              `💬 *Type 1 (Result) • 3 (Leave) • 4 (League Points)*`;
           } else if (type === 'result_progress' || type === 'result' || type === 'result_live') {
             const rawScore = details?.total_score !== undefined ? details.total_score : (details?.weeklyScore !== undefined ? details.weeklyScore : details?.score);
             const numScore = parseFloat(rawScore) || 0;
@@ -5243,7 +5243,7 @@ export function startWhatsAppBotEngine() {
               `🏆 *Result Update: ${studentDisplayName}*\n` +
               `Score: *${numScore} / 100*` + (wJuz ? ` | Juz ${wJuz} (${wSurah})` : '') + `\n\n` +
               `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 2 to ask something to bot*`;
+              `💬 *Type 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
           } else if (type === 'leave_applied') {
             const fromD = details?.fromDate || details?.from_date || '';
             const tillD = details?.toDate || details?.to_date || '';
@@ -5275,7 +5275,7 @@ export function startWhatsAppBotEngine() {
               `📝 Reason: *${reasonStr}*\n` +
               `⏳ Status: *Pending Approval*\n\n` +
               `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 2 to ask something to bot*`;
+              `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`;
           } else if (type === 'leave' || type === 'leave_action') {
             const lvStatus = details?.status || 'Approved';
             const statusEmoji = /approved/i.test(lvStatus) ? '✅' : (/rejected/i.test(lvStatus) ? '❌' : '⏳');
@@ -5309,7 +5309,7 @@ export function startWhatsAppBotEngine() {
               `📌 Status: *${statusEmoji} ${lvStatus}*\n` +
               (comment ? `💬 Remark: _${comment}_\n\n` : '\n') +
               `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 2 to ask something to bot*`;
+              `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`;
           } else if (type === 'leave_chat_message') {
             const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || details?.body || '';
 
@@ -5317,7 +5317,7 @@ export function startWhatsAppBotEngine() {
               `💬 *Leave Chat: ${studentDisplayName}*\n` +
               `_${comment}_\n\n` +
               `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 2 to ask something to bot*`;
+              `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave Status)*`;
           } else if (type === 'event_leave') {
             const evName = details?.eventName || details?.title || 'Event Leave';
             const fromD = details?.fromDate || details?.from_date || '';
@@ -5331,7 +5331,7 @@ export function startWhatsAppBotEngine() {
               (reasonStr ? `📝 Note: _${reasonStr}_\n` : '') +
               `Holiday marked for *${studentDisplayName}*.\n\n` +
               `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 2 to ask something to bot*`;
+              `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave Status)*`;
           } else if (type === 'fee_reminder') {
             const hijriNow = getFatemiHijriMonth();
             const monthName = details?.monthName || hijriNow.nameEn;
@@ -5342,17 +5342,17 @@ export function startWhatsAppBotEngine() {
               `Hub Raqam reminder for *${monthName}* for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n\n` +
               `💳 *Pay Online:*\n${payUrl}\n\n` +
               `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 2 to ask something to bot*`;
+              `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`;
           } else if (type === 'jadwal') {
             messageText = `🌹 *Afzalus Salaam*\n\n` +
               `Hifz timetable and target updated for *${studentDisplayName}*.\n\n` +
               `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 2 to ask something to bot*`;
+              `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
           } else {
             messageText = `🌹 *Afzalus Salaam*\n\n` +
               `*${studentDisplayName}:* ${details?.body || details?.title || 'New update recorded.'}\n\n` +
               `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 2 to ask something to bot*`;
+              `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
           }
 
           let delivered = 0;
