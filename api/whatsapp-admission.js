@@ -56,23 +56,23 @@ export default async function handler(req, res) {
 
     switch (trigger) {
       case "submission":
-        messageText = `🌹 *Afzalus Salaam ${full_name || "Mumin"}*\n\nThank you for registering for *${program || "Hifz Classes"}* (1447-48H).\nYour admission status is *Pending*.\nRef ID: \`${application_id || "N/A"}\`\n\nShukran.\n\n💬 *Type 2 to ask something to bot*`;
+        messageText = `🌹 *Afzalus Salaam ${full_name || "Mumin"}*\n\nThank you for registering for *${program || "Hifz Classes"}* (1447-48H).\nYour admission status is *Pending*.\nRef ID: \`${application_id || "N/A"}\`\n\nRegards,\n*Mauze Tahfeez - Galiakot*\n\n💬 *Type 2 to ask something to bot*`;
         break;
 
       case "waiting":
-        messageText = `🌹 *Afzalus Salaam ${full_name || "Mumin"}*\n\nYour application for *${program || "Tahfeez"}* is on the *Waiting List*.\nWe will notify you once a slot opens up.\nRef ID: \`${application_id || "N/A"}\`\n\nShukran.\n\n💬 *Type 2 to ask something to bot*`;
+        messageText = `🌹 *Afzalus Salaam ${full_name || "Mumin"}*\n\nYour application for *${program || "Tahfeez"}* is on the *Waiting List*.\nWe will notify you once a slot opens up.\nRef ID: \`${application_id || "N/A"}\`\n\nRegards,\n*Mauze Tahfeez - Galiakot*\n\n💬 *Type 2 to ask something to bot*`;
         break;
 
       case "rejected":
-        messageText = `🌹 *Afzalus Salaam ${full_name || "Mumin"}*\n\nYour application for *${program || "Tahfeez"}* (1447-48H) could not be accommodated due to batch capacity limitations.\n\nShukran.\n\n💬 *Type 2 to ask something to bot*`;
+        messageText = `🌹 *Afzalus Salaam ${full_name || "Mumin"}*\n\nYour application for *${program || "Tahfeez"}* (1447-48H) could not be accommodated due to batch capacity limitations.\n\nRegards,\n*Mauze Tahfeez - Galiakot*\n\n💬 *Type 2 to ask something to bot*`;
         break;
 
       case "approved":
-        messageText = `🌹 *Afzalus Salaam ${full_name || "Mumin"}*\n\nMubarak! Your admission application for *${program || "Tahfeez"}* (1447-48H) has been *APPROVED*! 🎉\n\nPlease confirm by replying:\n👉 *Yes* (to confirm enrollment)\n👉 *No* (to cancel)\n👉 *Want to talk* (for assistance)\n\nShukran.\n\n💬 *Type 2 to ask something to bot*`;
+        messageText = `🌹 *Afzalus Salaam ${full_name || "Mumin"}*\n\nMubarak! Your admission application for *${program || "Tahfeez"}* (1447-48H) has been *APPROVED*! 🎉\n\nPlease confirm by replying:\n👉 *Yes* (to confirm enrollment)\n👉 *No* (to cancel)\n👉 *Want to talk* (for assistance)\n\nRegards,\n*Mauze Tahfeez - Galiakot*\n\n💬 *Type 2 to ask something to bot*`;
         break;
 
       default:
-        messageText = `🌹 *Afzalus Salaam ${full_name || "Mumin"}*\n\nYour admission status has been updated to: *${trigger}*.\n\nShukran.\n\n💬 *Type 2 to ask something to bot*`;
+        messageText = `🌹 *Afzalus Salaam ${full_name || "Mumin"}*\n\nYour admission status has been updated to: *${trigger}*.\n\nRegards,\n*Mauze Tahfeez - Galiakot*\n\n💬 *Type 2 to ask something to bot*`;
     }
 
     // ------------------------------------------------------------------------

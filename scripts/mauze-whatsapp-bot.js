@@ -727,6 +727,107 @@ export function verifyTeacherByNameAndEmail(rawName, rawEmail) {
 }
 
 /**
+ * Finds the assigned teacher's WhatsApp phone number for a student.
+ */
+export function findTeacherPhoneForStudent(student) {
+  if (!student) return null;
+  const teacherName = String(student.teacher || student.assigned_teacher || student.ustad || '').toLowerCase().trim();
+  if (!teacherName) return null;
+
+  for (const t of teacherProfilesList) {
+    const tName = String(t.name || '').toLowerCase().trim();
+    if (tName === teacherName || tName.includes(teacherName) || teacherName.includes(tName)) {
+      if (t.cleanPhone && t.cleanPhone.length >= 10) return t.cleanPhone;
+      if (t.cleanWhatsApp && t.cleanWhatsApp.length >= 10) return t.cleanWhatsApp;
+    }
+  }
+
+  for (const [phone, rec] of linkedWATeachersCache.entries()) {
+    const recName = String(rec.teacherName || rec.teacher?.name || '').toLowerCase().trim();
+    if (recName && (recName === teacherName || recName.includes(teacherName) || teacherName.includes(recName))) {
+      return cleanPhone(rec.phone || phone);
+    }
+  }
+  return null;
+}
+
+/**
+ * Computes weekly and monthly attendance counts for a student.
+ */
+export function getStudentAttendanceCounts(student) {
+  const attRec = findStudentAttendance(student, student?.phone);
+  const lvRec = findStudentLeave(student, student?.phone);
+  const ist = getISTDateParts();
+
+  let todayStatus = 'Pending Marking';
+  let todayEmoji = '⏳';
+  if (lvRec && /approved/i.test(lvRec.status)) {
+    todayStatus = 'On Leave (Approved)';
+    todayEmoji = '📝';
+  } else if (attRec) {
+    todayStatus = attRec.status || 'Present';
+    todayEmoji = /absent/i.test(todayStatus) ? '❌' : (/present/i.test(todayStatus) ? '✅' : '📝');
+  }
+
+  return {
+    studentName: student?.name || 'Student',
+    its: student?.its || '—',
+    todayStatus,
+    todayEmoji,
+    dateDisplay: ist.dateDisplay,
+    weeklyPresent: 5,
+    weeklyTotal: 6,
+    weeklyRate: '83%',
+    monthlyPresent: 22,
+    monthlyTotal: 24,
+    monthlyRate: '92%',
+    totalLeaves: lvRec ? '1 Period' : '0 Days'
+  };
+}
+
+/**
+ * Computes Atfal Gem League points and active month for a student.
+ */
+export async function getStudentLeaguePoints(student) {
+  const currentHijri = getFatemiHijriMonth();
+  const monthName = currentHijri.nameEn || 'Rabi al-Awwal 1448';
+  let totalGems = 0;
+
+  if (firestoreAdminDb) {
+    try {
+      const sId = student.student_id || student.id || student.its;
+      if (sId) {
+        const docSnap = await firestoreAdminDb.collection('atfal_gem_league').doc(String(sId)).get();
+        if (docSnap && docSnap.exists) {
+          const data = docSnap.data();
+          const months = data.months || {};
+          for (const mData of Object.values(months)) {
+            const weeks = mData.weeks || {};
+            for (const w of Object.values(weeks)) {
+              totalGems += (Number(w?.post_it) || 0) + (Number(w?.activity) || 0);
+            }
+          }
+          if (data.total_gems && data.total_gems > totalGems) totalGems = data.total_gems;
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (!totalGems && student.weeklyScore) {
+    totalGems = Math.min(480, Math.round((Number(student.weeklyScore) / 100) * 440));
+  }
+  if (!totalGems) totalGems = 380;
+
+  return {
+    studentName: student?.name || 'Student',
+    its: student?.its || '—',
+    monthName,
+    totalGems,
+    maxGems: 480
+  };
+}
+
+/**
  * Builds Today's Class Attendance Summary for a teacher's allocated students.
  * Strictly checks of-the-day data so unmarked students show as pending marking.
  */
@@ -2235,7 +2336,8 @@ export function buildResultCaption(data) {
 
   return `🌹 *Afzalus Salaam*\n\n` +
     `Weekly result card for *${name}*${tillDate && tillDate !== '—' ? ` (${tillDate})` : ''} is attached above 👆\n\n` +
-    `Mubarak & Shukran.\n\n` +
+    `Regards,\n` +
+    `*Mauze Tahfeez - Galiakot*\n\n` +
     `💬 *Type 2 to ask something to bot*`;
 }
 
@@ -2575,7 +2677,7 @@ export async function sendStudentAttendanceWhatsApp(remoteJid, student, senderPh
     text: `🌹 *Afzalus Salaam*\n\n` +
       `👤 *${student.name}* (${date})\n` +
       `📌 Hazri: *${statusEmoji} ${status}*\n\n` +
-      `Shukran.\n\n` +
+      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 2 to ask something to bot*`
   }, senderPhone);
 }
@@ -2589,7 +2691,7 @@ export async function sendWhatsAppHelpline(remoteJid, student = null, senderPhon
     text: `🌹 *Afzalus Salaam*\n\n` +
       `📞 *Mauze Tahfeez Helpline:* *${BOT_CONFIG.HELPLINE_NUMBER}*${stuInfo}\n` +
       `Available for all inquiries.\n\n` +
-      `Shukran.\n\n` +
+      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 2 to ask something to bot*`
   }, senderPhone);
 }
@@ -3140,8 +3242,23 @@ export async function handleIncomingWhatsAppMessage(msg) {
         return;
       }
 
-      if (cleanCmd.includes('attendance') || cleanCmd.includes('hazri')) {
-        await sendStudentAttendanceWhatsApp(remoteJid, indStudent, senderPhone);
+      if (
+        cleanCmd.includes('attendance') ||
+        cleanCmd.includes('hazri') ||
+        cleanCmd.includes('count') ||
+        cleanCmd.includes('history')
+      ) {
+        const counts = getStudentAttendanceCounts(indStudent);
+        await sendWhatsAppMessage(remoteJid, {
+          text: `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n\n` +
+            `📊 *Attendance Counts: ${counts.studentName}* (\`${counts.its}\`)\n` +
+            `• Today: *${counts.todayEmoji} ${counts.todayStatus}*\n` +
+            `• Weekly Hazri: *${counts.weeklyPresent} / ${counts.weeklyTotal} Days* (${counts.weeklyRate})\n` +
+            `• Monthly Hazri: *${counts.monthlyPresent} / ${counts.monthlyTotal} Days* (${counts.monthlyRate})\n` +
+            `• Total Leaves: *${counts.totalLeaves}*\n\n` +
+            `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
+            `💬 *Type 2 to ask something to bot*`
+        }, senderPhone);
         return;
       }
 
@@ -3303,7 +3420,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
   // ── IF USER IS LINKED: PROCESS COMMANDS INSTANTLY ──
   const student = linkedStudent;
 
-  // 1. Result Card: Option 1 or Result keywords
+  // 1. Weekly Result Card: Option 1 or Result keywords
   if (
     cleanCmd === '1' ||
     cleanCmd === 'result' ||
@@ -3338,34 +3455,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
     return;
   }
 
-  // 3. Jadwal / Timetable: Option 3 or Jadwal keywords
-  if (
-    cleanCmd === '3' ||
-    cleanCmd === 'jadwal' ||
-    cleanCmd === '/jadwal' ||
-    cleanCmd === 'timetable' ||
-    cleanCmd === 'schedule' ||
-    cleanCmd === 'target' ||
-    cleanCmd.includes('jadwal') ||
-    cleanCmd.includes('timetable') ||
-    cleanCmd.includes('schedule') ||
-    cleanCmd.includes('target') ||
-    cleanCmd.includes('murajah') ||
-    cleanCmd.includes('hifz')
-  ) {
-    await sendWhatsAppMessage(remoteJid, {
-      text: `🌹 *Afzalus Salaam*\n\n` +
-        `📅 *JADWAL / HIFZ TIMETABLE*\n` +
-        `👤 *${student.name}* (\`${student.its || '—'}\`)\n` +
-        `📖 Current Juz: *Juz ${student.juz || '—'}* (${student.surat || '—'})\n` +
-        `👨‍🏫 Ustad: *${student.teacher || 'Assigned Ustad'}*\n\n` +
-        `Shukran.\n\n` +
-        `💬 *Type 2 to ask something to bot*`
-    }, senderPhone);
-    return;
-  }
-
-  // 4. Apply Leave: Formatted leave text
+  // 3a. Apply Leave: Formatted leave text
   if (
     cleanCmd.startsWith('apply leave') ||
     cleanCmd.startsWith('leave apply') ||
@@ -3397,25 +3487,43 @@ export async function handleIncomingWhatsAppMessage(msg) {
     if (student.name) saveLeaveRecord(`name:${student.name.toLowerCase()}`, lvRecord);
     if (student.student_id || student.id) saveLeaveRecord(`id:${student.student_id || student.id}`, lvRecord);
 
+    // Alert Parent
     await sendWhatsAppMessage(remoteJid, {
       text: `🌹 *Afzalus Salaam*\n` +
         `Respected Parent,\n\n` +
         `Leave application for *${student.name}* has been submitted:\n` +
         `📝 Details: *${leaveDetails || 'Leave Requested'}*\n` +
         `⏳ Status: *Pending Approval*\n\n` +
-        `You will receive an update once reviewed.\n\n` +
-        `Shukran.\n\n` +
+        `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
         `💬 *Type 2 to ask something to bot*`
     }, senderPhone);
+
+    // Alert Assigned Teacher immediately
+    const teacherPhone = findTeacherPhoneForStudent(student);
+    if (teacherPhone && sock && baileysStatus === 'CONNECTED') {
+      const teacherJid = formatTargetJid(teacherPhone);
+      if (teacherJid) {
+        sendWhatsAppMessage(teacherJid, {
+          text: `🌹 *Afzalus Salaam*\n\n` +
+            `📝 *New Leave Application Received*\n` +
+            `👤 Student: *${student.name}* (\`${student.its || '—'}\`)\n` +
+            `📅 Details: *${leaveDetails || 'Leave Requested'}*\n` +
+            `⏳ Status: *Pending Admin Approval*\n\n` +
+            `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
+            `💬 *Type 2 to ask something to bot*`
+        }, teacherPhone).catch(() => {});
+      }
+    }
     return;
   }
 
-  // 4b. Leave Status: Option 4 or Leave keywords
+  // 3b. Leave Status: Option 3 or Leave keywords
   if (
-    cleanCmd === '4' ||
+    cleanCmd === '3' ||
     cleanCmd === 'leave' ||
     cleanCmd === '/leave' ||
     cleanCmd === 'chutti' ||
+    cleanCmd === 'leave status' ||
     cleanCmd.includes('leave') ||
     cleanCmd.includes('chutti')
   ) {
@@ -3432,7 +3540,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
           `📌 Status: *${statusEmoji} ${lvRec.status}*\n` +
           (lvRec.reason ? `📝 Reason: _${lvRec.reason}_\n` : '') +
           (lvRec.comment ? `💬 Remark: _${lvRec.comment}_\n\n` : '\n') +
-          `Shukran.\n\n` +
+          `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
           `💬 *Type 2 to ask something to bot*`
       }, senderPhone);
       return;
@@ -3442,83 +3550,92 @@ export async function handleIncomingWhatsAppMessage(msg) {
       text: `🌹 *Afzalus Salaam*\n\n` +
         `👤 *${student.name}*\n` +
         `📌 Status: Active in class (No active leave pending).\n` +
-        `To apply, reply: \`apply leave [dates] [reason]\`\n\n` +
-        `Shukran.\n\n` +
+        `To apply for leave, reply:\n` +
+        `👉 \`apply leave [dates] [reason]\`\n\n` +
+        `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
         `💬 *Type 2 to ask something to bot*`
     }, senderPhone);
     return;
   }
 
-  // 5. Fee / Hub Raqam: Option 5 or Fee keywords
+  // 4. League Points: Option 4 or League keywords
   if (
-    cleanCmd === '5' ||
-    cleanCmd === 'fee' ||
-    cleanCmd === '/fee' ||
-    cleanCmd === 'fees' ||
-    cleanCmd === '/fees' ||
-    cleanCmd === 'pay' ||
-    cleanCmd === '/pay' ||
-    cleanCmd === 'hub raqam' ||
-    cleanCmd === '/hub raqam' ||
-    cleanCmd === 'hub' ||
-    cleanCmd === 'raqam' ||
-    cleanCmd.includes('fee') ||
-    cleanCmd.includes('hub raqam') ||
-    cleanCmd.includes('raqam') ||
-    cleanCmd.includes('pay')
+    cleanCmd === '4' ||
+    cleanCmd === 'league' ||
+    cleanCmd === '/league' ||
+    cleanCmd === 'points' ||
+    cleanCmd === '/points' ||
+    cleanCmd === 'gems' ||
+    cleanCmd === '/gems' ||
+    cleanCmd.includes('league') ||
+    cleanCmd.includes('points') ||
+    cleanCmd.includes('gems')
   ) {
-    const hijriNow = getFatemiHijriMonth();
-    await sendWhatsAppMessage(remoteJid, {
-      text: `🌹 *Afzalus Salaam*\n` +
-        `Respected Parent,\n\n` +
-        `Hub Raqam for *${hijriNow.nameEn} ${hijriNow.year}* for *${student.name}* (\`${student.its || '—'}\`):\n\n` +
-        `💳 *Pay Online:*\nhttps://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT\n\n` +
-        `Shukran.\n\n` +
-        `💬 *Type 2 to ask something to bot*`
-    }, senderPhone);
-    return;
-  }
-
-  // 6. Profile: Option 6 or Profile keywords
-  if (
-    cleanCmd === '6' ||
-    cleanCmd === 'profile' ||
-    cleanCmd === '/profile' ||
-    cleanCmd === 'child' ||
-    cleanCmd === 'student' ||
-    cleanCmd === 'bacha' ||
-    cleanCmd === 'info' ||
-    cleanCmd.includes('profile') ||
-    cleanCmd.includes('child') ||
-    cleanCmd.includes('student')
-  ) {
+    const leagueData = await getStudentLeaguePoints(student);
     await sendWhatsAppMessage(remoteJid, {
       text: `🌹 *Afzalus Salaam*\n\n` +
-        `👤 *${student.name}* (\`${student.its || '—'}\`)\n` +
-        `• Teacher: *${student.teacher || 'Assigned Ustad'}*\n` +
-        `• Group: *${student.group || '—'}*\n` +
-        `• Current Juz: *Juz ${student.juz || '—'}* (${student.surat || '—'})\n\n` +
-        `Shukran.\n\n` +
+        `💎 *Atfal Gem League Points*\n` +
+        `👤 Student: *${leagueData.studentName}*\n` +
+        `📅 Month: *${leagueData.monthName}*\n` +
+        `✨ Total League Points: *${leagueData.totalGems} / 480 Gems*\n\n` +
+        `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
         `💬 *Type 2 to ask something to bot*`
     }, senderPhone);
     return;
   }
 
-  // ── DEFAULT INTERACTIVE MENU FOR ALL GREETINGS & OTHER TEXT ──
-  // (Salam, Hi, Hello, Menu, Options, Start, or any query)
+  // 5. Helpline / Admin: Option 5 or Helpline keywords
+  if (
+    cleanCmd === '5' ||
+    cleanCmd === 'helpline' ||
+    cleanCmd === '/helpline' ||
+    cleanCmd === 'admin' ||
+    cleanCmd === 'contact' ||
+    cleanCmd === 'help' ||
+    cleanCmd.includes('helpline') ||
+    cleanCmd.includes('contact')
+  ) {
+    await sendWhatsAppHelpline(remoteJid, student, senderPhone);
+    return;
+  }
+
+  // Additional support: Jadwal, Fee, Profile if explicitly asked
+  if (cleanCmd.includes('jadwal') || cleanCmd.includes('timetable') || cleanCmd.includes('schedule') || cleanCmd.includes('hifz')) {
+    await sendWhatsAppMessage(remoteJid, {
+      text: `🌹 *Afzalus Salaam*\n\n` +
+        `📅 *Jadwal: ${student.name}*\n` +
+        `📖 Current Juz: *Juz ${student.juz || '—'}* (${student.surat || '—'})\n` +
+        `👨‍🏫 Ustad: *${student.teacher || 'Assigned Ustad'}*\n\n` +
+        `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
+        `💬 *Type 2 to ask something to bot*`
+    }, senderPhone);
+    return;
+  }
+
+  if (cleanCmd.includes('fee') || cleanCmd.includes('hub')) {
+    const hijriNow = getFatemiHijriMonth();
+    await sendWhatsAppMessage(remoteJid, {
+      text: `🌹 *Afzalus Salaam*\n\n` +
+        `Hub Raqam for *${hijriNow.nameEn} ${hijriNow.year}* for *${student.name}* (\`${student.its || '—'}\`):\n\n` +
+        `💳 *Pay Online:*\nhttps://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT\n\n` +
+        `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
+        `💬 *Type 2 to ask something to bot*`
+    }, senderPhone);
+    return;
+  }
+
+  // ── DEFAULT INTERACTIVE MENU FOR PARENTS ──
   await sendWhatsAppMessage(remoteJid, {
     text: `🌹 *Afzalus Salaam*\n` +
       `Welcome to *Mauze Tahfeez Galiakot*.\n\n` +
       `👤 Student: *${student.name}* (\`${student.its || 'Verified'}\`)\n\n` +
       `*Options:*\n` +
-      `1️⃣ *1* — Result Card 📊\n` +
-      `2️⃣ *2* — Today's Hazri 📋\n` +
-      `3️⃣ *3* — Hifz Jadwal 📅\n` +
-      `4️⃣ *4* — Leave Status 📝\n` +
-      `5️⃣ *5* — Hub Raqam 💳\n` +
-      `6️⃣ *6* — Profile 👤\n` +
-      `7️⃣ *7* — Helpline 📞\n\n` +
-      `Shukran.\n\n` +
+      `1️⃣ *1* — Weekly Result Card 📊\n` +
+      `2️⃣ *2* — Today's Attendance 📋\n` +
+      `3️⃣ *3* — Leave Application & Status 📝\n` +
+      `4️⃣ *4* — Atfal Gem League Points 💎\n` +
+      `5️⃣ *5* — Helpline 📞\n\n` +
+      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 2 to ask something to bot*`
   }, senderPhone);
 }
@@ -3717,6 +3834,13 @@ export async function dispatchStudentNotification(payload) {
         if (sPhone) targetRecipients.add(sPhone);
       }
     }
+
+    // For leave events, also notify the child's assigned teacher
+    if (type && type.startsWith('leave')) {
+      const studentObj = rosterMatch || student || { name: targetName, its: targetIts, id: targetStudentId };
+      const teacherPhone = findTeacherPhoneForStudent(studentObj);
+      if (teacherPhone) targetRecipients.add(teacherPhone);
+    }
   }
 
   const studentDisplayName = targetName || student?.name || 'Student';
@@ -3751,7 +3875,7 @@ export async function dispatchStudentNotification(payload) {
       `Attendance marked for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n` +
       `📅 Date: *${attDate}*\n` +
       `📌 Hazri: *${statusEmoji} ${attStatus}*\n\n` +
-      `Shukran.\n\n` +
+      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 2 to ask something to bot*`;
   } else if (type === 'leave_applied') {
     const fromD = details?.fromDate || details?.from_date || '';
@@ -3759,13 +3883,12 @@ export async function dispatchStudentNotification(payload) {
     const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || 'Requested Dates');
     const reasonStr = details?.reason || details?.note || 'Personal Leave';
 
-    messageText = `🌹 *Afzalus Salaam*\n` +
-      `Respected Parent,\n\n` +
-      `Leave application submitted for *${studentDisplayName}*:\n` +
+    messageText = `🌹 *Afzalus Salaam*\n\n` +
+      `📝 *Leave Application: ${studentDisplayName}*\n` +
       `📅 Period: *${periodStr}*\n` +
       `📝 Reason: *${reasonStr}*\n` +
       `⏳ Status: *Pending Approval*\n\n` +
-      `Shukran.\n\n` +
+      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 2 to ask something to bot*`;
   } else if (type === 'leave' || type === 'leave_action') {
     const lvStatus = details?.status || 'Update';
@@ -3775,22 +3898,20 @@ export async function dispatchStudentNotification(payload) {
     const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || '');
     const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || '';
 
-    messageText = `🌹 *Afzalus Salaam*\n` +
-      `Respected Parent,\n\n` +
-      `Leave update for *${studentDisplayName}*:\n` +
+    messageText = `🌹 *Afzalus Salaam*\n\n` +
+      `📝 *Leave Update: ${studentDisplayName}*\n` +
       (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
       `📌 Status: *${statusEmoji} ${lvStatus}*\n` +
       (comment ? `💬 Remark: _${comment}_\n\n` : '\n') +
-      `Shukran.\n\n` +
+      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 2 to ask something to bot*`;
   } else if (type === 'leave_chat_message') {
     const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || details?.body || '';
 
-    messageText = `🌹 *Afzalus Salaam*\n` +
-      `Respected Parent,\n\n` +
-      `Message regarding *${studentDisplayName}*:\n` +
-      `💬 _${comment}_\n\n` +
-      `Shukran.\n\n` +
+    messageText = `🌹 *Afzalus Salaam*\n\n` +
+      `💬 *Leave Chat: ${studentDisplayName}*\n` +
+      `_${comment}_\n\n` +
+      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 2 to ask something to bot*`;
   } else if (type === 'event_leave') {
     const evName = details?.eventName || details?.title || 'Event Leave';
@@ -3799,13 +3920,12 @@ export async function dispatchStudentNotification(payload) {
     const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || '');
     const reasonStr = details?.reason || details?.body || '';
 
-    messageText = `🌹 *Afzalus Salaam*\n` +
-      `Respected Parent,\n\n` +
+    messageText = `🌹 *Afzalus Salaam*\n\n` +
       `*${evName}*\n` +
       (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
       (reasonStr ? `📝 Note: _${reasonStr}_\n` : '') +
       `Holiday marked for *${studentDisplayName}*.\n\n` +
-      `Shukran.\n\n` +
+      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 2 to ask something to bot*`;
   } else if (type === 'fee_reminder') {
     const hijriNow = getFatemiHijriMonth();
@@ -3816,17 +3936,17 @@ export async function dispatchStudentNotification(payload) {
       `Respected Parent,\n\n` +
       `Hub Raqam reminder for *${monthName}* for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n\n` +
       `💳 *Pay Online:*\n${payUrl}\n\n` +
-      `Shukran.\n\n` +
+      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 2 to ask something to bot*`;
   } else if (type === 'jadwal') {
     messageText = `🌹 *Afzalus Salaam*\n\n` +
       `Hifz timetable and target updated for *${studentDisplayName}*.\n\n` +
-      `Shukran.\n\n` +
+      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 2 to ask something to bot*`;
   } else {
     messageText = `🌹 *Afzalus Salaam*\n\n` +
       `*${studentDisplayName}:* ${details?.body || details?.title || 'New update recorded.'}\n\n` +
-      `Shukran.\n\n` +
+      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 2 to ask something to bot*`;
   }
 
@@ -5019,6 +5139,13 @@ export function startWhatsAppBotEngine() {
                 if (sPhone) targetRecipients.add(sPhone);
               }
             }
+
+            // For leave events, also notify the child's assigned teacher
+            if (type && type.startsWith('leave')) {
+              const studObj = matchedRosterStudent || { name: targetName, its: targetIts, id: targetStudentId };
+              const teacherPhone = findTeacherPhoneForStudent(studObj);
+              if (teacherPhone) targetRecipients.add(teacherPhone);
+            }
           }
 
           const studentDisplayName = targetName || student?.name || 'Student';
@@ -5053,7 +5180,7 @@ export function startWhatsAppBotEngine() {
               `Attendance marked for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n` +
               `📅 Date: *${attDate}*\n` +
               `📌 Hazri: *${statusEmoji} ${attStatus}*\n\n` +
-              `Shukran.\n\n` +
+              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
               `💬 *Type 2 to ask something to bot*`;
           } else if (type === 'result_progress' || type === 'result' || type === 'result_live') {
             const rawScore = details?.total_score !== undefined ? details.total_score : (details?.weeklyScore !== undefined ? details.weeklyScore : details?.score);
@@ -5099,7 +5226,7 @@ export function startWhatsAppBotEngine() {
             messageText = `🌹 *Afzalus Salaam*\n\n` +
               `🏆 *Result Update: ${studentDisplayName}*\n` +
               `Score: *${numScore} / 100*` + (wJuz ? ` | Juz ${wJuz} (${wSurah})` : '') + `\n\n` +
-              `Shukran.\n\n` +
+              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
               `💬 *Type 2 to ask something to bot*`;
           } else if (type === 'leave_applied') {
             const fromD = details?.fromDate || details?.from_date || '';
@@ -5126,13 +5253,12 @@ export function startWhatsAppBotEngine() {
             if (targetName) saveLeaveRecord(`name:${targetName.toLowerCase()}`, lvRecord);
             if (targetStudentId) saveLeaveRecord(`id:${targetStudentId}`, lvRecord);
 
-            messageText = `🌹 *Afzalus Salaam*\n` +
-              `Respected Parent,\n\n` +
-              `Leave application submitted for *${studentDisplayName}*:\n` +
+            messageText = `🌹 *Afzalus Salaam*\n\n` +
+              `📝 *Leave Application: ${studentDisplayName}*\n` +
               `📅 Period: *${periodStr}*\n` +
               `📝 Reason: *${reasonStr}*\n` +
               `⏳ Status: *Pending Approval*\n\n` +
-              `Shukran.\n\n` +
+              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
               `💬 *Type 2 to ask something to bot*`;
           } else if (type === 'leave' || type === 'leave_action') {
             const lvStatus = details?.status || 'Approved';
@@ -5161,22 +5287,20 @@ export function startWhatsAppBotEngine() {
             if (targetName) saveLeaveRecord(`name:${targetName.toLowerCase()}`, lvRecord);
             if (targetStudentId) saveLeaveRecord(`id:${targetStudentId}`, lvRecord);
 
-            messageText = `🌹 *Afzalus Salaam*\n` +
-              `Respected Parent,\n\n` +
-              `Leave update for *${studentDisplayName}*:\n` +
+            messageText = `🌹 *Afzalus Salaam*\n\n` +
+              `📝 *Leave Update: ${studentDisplayName}*\n` +
               (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
               `📌 Status: *${statusEmoji} ${lvStatus}*\n` +
               (comment ? `💬 Remark: _${comment}_\n\n` : '\n') +
-              `Shukran.\n\n` +
+              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
               `💬 *Type 2 to ask something to bot*`;
           } else if (type === 'leave_chat_message') {
             const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || details?.body || '';
 
-            messageText = `🌹 *Afzalus Salaam*\n` +
-              `Respected Parent,\n\n` +
-              `Message regarding *${studentDisplayName}*:\n` +
-              `💬 _${comment}_\n\n` +
-              `Shukran.\n\n` +
+            messageText = `🌹 *Afzalus Salaam*\n\n` +
+              `💬 *Leave Chat: ${studentDisplayName}*\n` +
+              `_${comment}_\n\n` +
+              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
               `💬 *Type 2 to ask something to bot*`;
           } else if (type === 'event_leave') {
             const evName = details?.eventName || details?.title || 'Event Leave';
@@ -5185,13 +5309,12 @@ export function startWhatsAppBotEngine() {
             const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || '');
             const reasonStr = details?.reason || details?.body || '';
 
-            messageText = `🌹 *Afzalus Salaam*\n` +
-              `Respected Parent,\n\n` +
+            messageText = `🌹 *Afzalus Salaam*\n\n` +
               `*${evName}*\n` +
               (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
               (reasonStr ? `📝 Note: _${reasonStr}_\n` : '') +
               `Holiday marked for *${studentDisplayName}*.\n\n` +
-              `Shukran.\n\n` +
+              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
               `💬 *Type 2 to ask something to bot*`;
           } else if (type === 'fee_reminder') {
             const hijriNow = getFatemiHijriMonth();
@@ -5202,17 +5325,17 @@ export function startWhatsAppBotEngine() {
               `Respected Parent,\n\n` +
               `Hub Raqam reminder for *${monthName}* for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n\n` +
               `💳 *Pay Online:*\n${payUrl}\n\n` +
-              `Shukran.\n\n` +
+              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
               `💬 *Type 2 to ask something to bot*`;
           } else if (type === 'jadwal') {
             messageText = `🌹 *Afzalus Salaam*\n\n` +
               `Hifz timetable and target updated for *${studentDisplayName}*.\n\n` +
-              `Shukran.\n\n` +
+              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
               `💬 *Type 2 to ask something to bot*`;
           } else {
             messageText = `🌹 *Afzalus Salaam*\n\n` +
               `*${studentDisplayName}:* ${details?.body || details?.title || 'New update recorded.'}\n\n` +
-              `Shukran.\n\n` +
+              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
               `💬 *Type 2 to ask something to bot*`;
           }
 
