@@ -3422,11 +3422,12 @@ export async function handleIncomingWhatsAppMessage(msg) {
     // Welcoming response for ALL messages from unregistered users
     await sendWhatsAppMessage(remoteJid, {
       text: `🌹 *Afzalus Salaam*\n` +
-        `Welcome to *Mauze Tahfeez Galiakot* Helpline.\n\n` +
+        `Welcome to *Mauze Tahfeez Galiakot*.\n\n` +
         `To connect your child's updates, reply with your child's *8-digit ITS number* or:\n` +
         `👉 \`/verify [Contact], [Name], [ITS]\`\n\n` +
-        `📞 Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}\n\n` +
-        `Shukran.\n\n` +
+        `🌐 *Portal:* https://mouze-tahfeez-atfal.vercel.app/\n` +
+        `📞 *Helpline:* ${BOT_CONFIG.HELPLINE_NUMBER}\n\n` +
+        `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
         `💬 *Type 2 to ask something to bot*`
     }, senderPhone);
     return;
