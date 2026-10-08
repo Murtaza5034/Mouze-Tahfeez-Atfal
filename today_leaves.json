@@ -432,5 +432,61 @@
     "its": "",
     "studentId": "a9bdb9ab-7636-4106-97e1-fe4a23c8449e",
     "updatedAt": 1791284335391
+  },
+  "phone:919930852533": {
+    "status": "Pending Admin Approval",
+    "statusEmoji": "⏳",
+    "fromDate": "09/10/2026",
+    "toDate": "",
+    "periodStr": "(9 oct till 11 oct 2026) (Going for frnds shadi)",
+    "reason": "(9 oct till 11 oct 2026) (Going for frnds shadi)",
+    "comment": "",
+    "name": "Demo Student",
+    "phone": "919930852533",
+    "its": "515253",
+    "studentId": "9dda1944-b1ca-4e37-a20d-0906edc48e79",
+    "updatedAt": 1791486189966
+  },
+  "its:515253": {
+    "status": "Pending Admin Approval",
+    "statusEmoji": "⏳",
+    "fromDate": "09/10/2026",
+    "toDate": "",
+    "periodStr": "(9 oct till 11 oct 2026) (Going for frnds shadi)",
+    "reason": "(9 oct till 11 oct 2026) (Going for frnds shadi)",
+    "comment": "",
+    "name": "Demo Student",
+    "phone": "919930852533",
+    "its": "515253",
+    "studentId": "9dda1944-b1ca-4e37-a20d-0906edc48e79",
+    "updatedAt": 1791486189966
+  },
+  "name:demo student": {
+    "status": "Pending Admin Approval",
+    "statusEmoji": "⏳",
+    "fromDate": "09/10/2026",
+    "toDate": "",
+    "periodStr": "(9 oct till 11 oct 2026) (Going for frnds shadi)",
+    "reason": "(9 oct till 11 oct 2026) (Going for frnds shadi)",
+    "comment": "",
+    "name": "Demo Student",
+    "phone": "919930852533",
+    "its": "515253",
+    "studentId": "9dda1944-b1ca-4e37-a20d-0906edc48e79",
+    "updatedAt": 1791486189966
+  },
+  "id:9dda1944-b1ca-4e37-a20d-0906edc48e79": {
+    "status": "Pending Admin Approval",
+    "statusEmoji": "⏳",
+    "fromDate": "09/10/2026",
+    "toDate": "",
+    "periodStr": "(9 oct till 11 oct 2026) (Going for frnds shadi)",
+    "reason": "(9 oct till 11 oct 2026) (Going for frnds shadi)",
+    "comment": "",
+    "name": "Demo Student",
+    "phone": "919930852533",
+    "its": "515253",
+    "studentId": "9dda1944-b1ca-4e37-a20d-0906edc48e79",
+    "updatedAt": 1791486189966
   }
 }

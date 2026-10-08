@@ -22,7 +22,9 @@ import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
   Browsers,
-  makeCacheableSignalKeyStore
+  makeCacheableSignalKeyStore,
+  generateWAMessageFromContent,
+  proto
 } from '@whiskeysockets/baileys';
 import QRCode from 'qrcode';
 
@@ -2594,6 +2596,45 @@ export async function fetchLiveSheetResult(student) {
 export async function sendWhatsAppMessage(targetJid, content, senderPhone = '') {
   if (!sock) return null;
   try {
+    // If buttons are provided, construct native interactive quick-reply buttons (compatible with modern WhatsApp iOS / Android / Web)
+    if (content && Array.isArray(content.buttons) && content.buttons.length > 0 && content.text) {
+      try {
+        const nativeButtons = content.buttons.map(b => {
+          const id = String(b.buttonId || b.id || '');
+          const displayText = String(b.buttonText?.displayText || b.displayText || b.text || b.title || id);
+          return {
+            name: 'quick_reply',
+            buttonParamsJson: JSON.stringify({ display_text: displayText, id: id })
+          };
+        });
+
+        const waMsg = generateWAMessageFromContent(targetJid, {
+          viewOnceMessage: {
+            message: {
+              messageContextInfo: {
+                deviceListMetadata: {},
+                deviceListMetadataVersion: 2
+              },
+              interactiveMessage: proto.Message.InteractiveMessage.create({
+                body: proto.Message.InteractiveMessage.Body.create({ text: content.text }),
+                footer: proto.Message.InteractiveMessage.Footer.create({ text: content.footer || "Mauze Tahfeez - Galiakot" }),
+                header: proto.Message.InteractiveMessage.Header.create({ title: content.title || "", hasMediaAttachment: false }),
+                nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
+                  buttons: nativeButtons
+                })
+              })
+            }
+          }
+        }, { userJid: sock.user?.id || targetJid });
+
+        await sock.relayMessage(targetJid, waMsg.message, { messageId: waMsg.key.id });
+        console.log(`[WHATSAPP-SEND-SUCCESS] ✅ Sent native interactive button message to ${targetJid}`);
+        return waMsg;
+      } catch (btnErr) {
+        console.warn(`[WHATSAPP-SEND-NATIVE-BTN-FAIL] Native button creation warning:`, btnErr.message);
+      }
+    }
+
     const result = await sock.sendMessage(targetJid, content);
     console.log(`[WHATSAPP-SEND-SUCCESS] ✅ Sent message to ${targetJid}`);
     return result;
@@ -2661,7 +2702,21 @@ export async function sendStudentResultImageWhatsApp(remoteJid, student, senderP
       image: png,
       caption: caption,
       mimetype: 'image/png',
-      fileName: `${cleanName}_Weekly_Result.png`    }, senderPhone);
+      fileName: `${cleanName}_Weekly_Result.png`
+    }, senderPhone);
+
+    // Follow up with interactive buttons so user can immediately tap Hazri / Leave / League
+    await sendWhatsAppMessage(remoteJid, {
+      text: `👤 *${targetStudent.name}*\n` +
+        `💬 *Tap a button below for instant updates:*`,
+      footer: 'Mauze Tahfeez - Galiakot',
+      buttons: [
+        { buttonId: '2', buttonText: { displayText: '📌 Hazri' }, type: 1 },
+        { buttonId: '3', buttonText: { displayText: '📝 Leave Status' }, type: 1 },
+        { buttonId: '4', buttonText: { displayText: '💎 League Points' }, type: 1 }
+      ],
+      headerType: 1
+    }, senderPhone);
 
     const phone = senderPhone || cleanPhone(remoteJid.replace(/@.*$/, ''));
     console.log(`[DISPATCH-LIVE] 🚀 Result card image sent to ${remoteJid} for ${targetStudent.name}`);
@@ -2677,7 +2732,8 @@ export async function sendStudentResultImageWhatsApp(remoteJid, student, senderP
   } catch (err) {
     console.error('[sendStudentResultImageWhatsApp Error]:', err);
     await sendWhatsAppMessage(remoteJid, {
-      text: ``    }, senderPhone);
+      text: `Unable to generate result card image at this moment. Please try again or contact Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}`
+    }, senderPhone);
   }
 }
 
@@ -3679,8 +3735,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
 
   // ── DEFAULT INTERACTIVE MENU FOR PARENTS ──
   await sendWhatsAppMessage(remoteJid, {
-    text: `` +
-      `Welcome to *Mauze Tahfeez Galiakot*.\n\n` +
+    text: `Welcome to *Mauze Tahfeez Galiakot*.\n\n` +
       `👤 Student: *${student.name}* (\`${student.its || 'Verified'}\`)\n\n` +
       `*Options:*\n` +
       `1️⃣ *1* — Weekly Result Card 📊\n` +
@@ -3688,8 +3743,16 @@ export async function handleIncomingWhatsAppMessage(msg) {
       `3️⃣ *3* — Leave Application & Status 📝\n` +
       `4️⃣ *4* — Atfal Gem League Points 💎\n` +
       `5️⃣ *5* — Helpline 📞\n\n` +
-      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 1, 2, 3, 4 or 5 for instant updates*`  }, senderPhone);
+      `Regards,\n*Mauze Tahfeez - Galiakot*`,
+    footer: 'Mauze Tahfeez - Galiakot',
+    buttons: [
+      { buttonId: '1', buttonText: { displayText: '📊 Result Card' }, type: 1 },
+      { buttonId: '2', buttonText: { displayText: '📌 Hazri' }, type: 1 },
+      { buttonId: '3', buttonText: { displayText: '📝 Leave Status' }, type: 1 },
+      { buttonId: '4', buttonText: { displayText: '💎 League Points' }, type: 1 }
+    ],
+    headerType: 1
+  }, senderPhone);
 }
 
 /**
