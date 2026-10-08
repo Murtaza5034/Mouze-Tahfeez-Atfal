@@ -2349,6 +2349,13 @@ export async function initBaileysSocket() {
   if (isConnecting) return sock;
   isConnecting = true;
 
+  if (sock) {
+    try {
+      sock.ev?.removeAllListeners();
+      if (sock.ws) sock.ws.close();
+    } catch (_) {}
+  }
+
   if (!fs.existsSync(AUTH_DIR)) {
     fs.mkdirSync(AUTH_DIR, { recursive: true });
   }
@@ -2371,7 +2378,7 @@ export async function initBaileysSocket() {
         creds: state.creds,
         keys: makeCacheableSignalKeyStore(state.keys, createSilentLogger())
       },
-      browser: Browsers.macOS('Desktop'),
+      browser: Browsers.ubuntu('Chrome'),
       syncFullHistory: false,
       generateHighQualityLinkPreview: false,
       markOnlineOnConnect: true,
@@ -2379,7 +2386,7 @@ export async function initBaileysSocket() {
       defaultQueryTimeoutMs: 60000,
       keepAliveIntervalMs: 15000,
       emitOwnEvents: false,
-      retryRequestDelayMs: 250,
+      retryRequestDelayMs: 300,
       getMessage: async () => ({ conversation: '' })
     });
   } catch (err) {
@@ -2389,9 +2396,13 @@ export async function initBaileysSocket() {
     return null;
   }
 
-  isConnecting = false;
-
-  sock.ev.on('creds.update', saveCreds);
+  sock.ev.on('creds.update', async () => {
+    try {
+      await saveCreds();
+    } catch (e) {
+      console.warn('[SAVE-CREDS-WARN]:', e.message);
+    }
+  });
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
@@ -2399,7 +2410,7 @@ export async function initBaileysSocket() {
     if (qr) {
       latestQrRaw = qr;
       latestQrDataUrl = await QRCode.toDataURL(qr, { width: 360, margin: 2 });
-      await QRCode.toFile('openwa-qr.png', qr, { width: 400 });
+      await QRCode.toFile('openwa-qr.png', qr, { width: 400 }).catch(() => {});
       baileysStatus = 'QR_READY';
       console.log('\n======================================================');
       console.log(`📱 NEW WHATSAPP QR CODE READY FOR SCANNING`);
@@ -2409,24 +2420,29 @@ export async function initBaileysSocket() {
     }
 
     if (connection === 'close') {
-      const statusCode = (lastDisconnect?.error)?.output?.statusCode;
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut && statusCode !== 401;
+      isConnecting = false;
+      const statusCode = (lastDisconnect?.error)?.output?.statusCode || (lastDisconnect?.error)?.statusCode;
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+      const isRestartRequired = statusCode === DisconnectReason.restartRequired || statusCode === 515;
       baileysStatus = 'DISCONNECTED';
-      console.log(`[WHATSAPP BOT] ⚠️ Connection closed (code: ${statusCode}). Reconnecting: ${shouldReconnect}`);
-      if (shouldReconnect) {
-        setTimeout(() => {
-          initBaileysSocket().catch((e) => console.error('[RECONNECT-ERR]:', e.message));
-        }, 3000);
-      } else if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
-        console.log('[WHATSAPP BOT] Session logged out or credentials expired. Resetting auth directory for a fresh QR code...');
+      console.log(`[WHATSAPP BOT] ⚠️ Connection closed (code: ${statusCode}). Reconnecting...`);
+
+      if (isLoggedOut) {
+        console.log('[WHATSAPP BOT] Session logged out. Resetting auth directory for a fresh QR code...');
         try {
           fs.rmSync(AUTH_DIR, { recursive: true, force: true });
         } catch (_) { }
         setTimeout(() => {
           initBaileysSocket().catch((e) => console.error('[RECONNECT-ERR]:', e.message));
         }, 2000);
+      } else {
+        const delay = isRestartRequired ? 500 : 2500;
+        setTimeout(() => {
+          initBaileysSocket().catch((e) => console.error('[RECONNECT-ERR]:', e.message));
+        }, delay);
       }
     } else if (connection === 'open') {
+      isConnecting = false;
       baileysStatus = 'CONNECTED';
       connectedUser = sock.user;
       latestQrDataUrl = '';
@@ -2439,7 +2455,6 @@ export async function initBaileysSocket() {
       console.log(`🚀 Ready to dispatch real result images & answer parent queries!`);
       console.log(`======================================================\n`);
       
-      // Send initial presence online signal
       try {
         sock.sendPresenceUpdate('available').catch(() => {});
       } catch (_) {}
@@ -2453,17 +2468,16 @@ export async function initBaileysSocket() {
     if (!messages || !Array.isArray(messages)) return;
     for (const msg of messages) {
       if (!msg || !msg.message) continue;
-      // Never process bot's own outbound messages
       if (msg.key?.fromMe) continue;
 
-      // INSTANT READ RECEIPT: Turn 1 tick into 2 ticks / blue ticks immediately on sender's WhatsApp
+      // Instant read receipt
       try {
         if (msg.key && sock?.readMessages) {
           await sock.readMessages([msg.key]);
         }
       } catch (_) {}
 
-      // Auto-extract and cache LID mapping immediately if message contains sender LID and phone
+      // Auto-extract and cache LID mapping
       try {
         const remoteJid = msg.key?.remoteJid || '';
         const participant = msg.key?.participant || '';
@@ -2492,14 +2506,15 @@ export async function initBaileysSocket() {
       try {
         if (sock && baileysStatus === 'CONNECTED') {
           await sock.sendPresenceUpdate('available').catch(() => {});
-        } else if (baileysStatus === 'DISCONNECTED') {
+        } else if (baileysStatus === 'DISCONNECTED' && !isConnecting) {
           console.log('[WATCHDOG] 🔄 Auto-reconnecting disconnected WhatsApp socket...');
           initBaileysSocket().catch(() => {});
         }
       } catch (_) {}
-    }, 20000);
+    }, 25000);
   }
 
+  isConnecting = false;
   return sock;
 }
 
