@@ -16,6 +16,7 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import zlib from 'zlib';
 import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
@@ -40,6 +41,21 @@ try {
   Resvg = resvgMod.Resvg || resvgMod.default?.Resvg;
 } catch (e) {
   console.warn('[RESVG-FALLBACK] Resvg unavailable, fallback SVG rendering active:', e.message);
+}
+
+let fbGetApps = null;
+let fbInitializeApp = null;
+let fbCert = null;
+let fbGetFirestore = null;
+try {
+  const fbAppMod = await import('firebase-admin/app');
+  const fbFsMod = await import('firebase-admin/firestore');
+  fbGetApps = fbAppMod.getApps;
+  fbInitializeApp = fbAppMod.initializeApp;
+  fbCert = fbAppMod.cert;
+  fbGetFirestore = fbFsMod.getFirestore;
+} catch (e) {
+  // Optional module in lite environments
 }
 
 export function createSilentLogger() {
@@ -116,6 +132,36 @@ export const DISPATCH_LOG = [];
 export let botEnabled = true;
 export function setBotEnabled(val) { botEnabled = !!val; }
 const AUTH_DIR = process.env.AUTH_DIR || process.env.BAILEYS_AUTH_DIR || path.resolve('baileys_auth_info');
+
+export function hydrateAuthSession() {
+  try {
+    const credsPath = path.join(AUTH_DIR, 'creds.json');
+    if (fs.existsSync(credsPath)) {
+      return; // Already initialized locally
+    }
+    const seedCandidates = [
+      path.resolve('scripts', 'session-seed.json.gz'),
+      path.resolve('..', 'scripts', 'session-seed.json.gz'),
+      path.resolve('session-seed.json.gz')
+    ];
+    const seedPath = seedCandidates.find(p => fs.existsSync(p));
+    if (seedPath) {
+      if (!fs.existsSync(AUTH_DIR)) fs.mkdirSync(AUTH_DIR, { recursive: true });
+      const gzipped = fs.readFileSync(seedPath);
+      const jsonStr = zlib.gunzipSync(gzipped).toString('utf8');
+      const bundle = JSON.parse(jsonStr);
+      let count = 0;
+      for (const [filename, content] of Object.entries(bundle)) {
+        fs.writeFileSync(path.join(AUTH_DIR, filename), content, 'utf8');
+        count++;
+      }
+      console.log(`[WHATSAPP BOT] ⚡ Successfully hydrated ${count} cloud auth session files from seed bundle!`);
+    }
+  } catch (err) {
+    console.warn('[WHATSAPP BOT] Cloud auth session hydration warning:', err.message);
+  }
+}
+hydrateAuthSession();
 
 // ---------------------------------------------------------------------------
 // High-Speed In-Memory LID <-> Phone Mapping Cache (Sub-millisecond resolution)
@@ -976,8 +1022,7 @@ export function getISTDateParts(date = new Date()) {
     minute: parseInt(get('minute'), 10),
     second: parseInt(get('second'), 10),
     dateKey: `${get('year')}-${get('month')}-${get('day')}`,
-    dateDisplay: `${get('day')}/${get('month')}/${get('year')}`
-  };
+    dateDisplay: `${get('day')}/${get('month')}/${get('year')}`  };
 }
 
 /**
@@ -985,7 +1030,7 @@ export function getISTDateParts(date = new Date()) {
  */
 export async function sendTeacherSelfAttendanceReminder(teacher, targetJid, senderPhone = '') {
   const ist = getISTDateParts();
-  const text = `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n\n` +
+  const text = `\n\n` +
     `Kindly mark your *Self-Attendance* for today (*${ist.dateDisplay}*).\n` +
     `⏰ Scheduled Time: *4:25 PM*\n\n` +
     `Shukran jazeelan.\n\n` +
@@ -1007,7 +1052,7 @@ export async function sendTeacherElearningAttendanceReminder(teacher, targetJid,
   const absentStr = summary.absentNames.length > 0 ? `\n   ↳ _${summary.absentNames.join(', ')}_` : '';
   const leaveStr = summary.leaveNames.length > 0 ? `\n   ↳ _${summary.leaveNames.join(', ')}_` : '';
 
-  const text = `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n\n` +
+  const text = `\n\n` +
     `*Class Attendance Summary (${ist.dateDisplay}):*\n` +
     `• Total: *${summary.totalStudents}* | ✅ Present: *${summary.presentCount}* | ❌ Absent: *${summary.absentCount}*${absentStr}\n` +
     `• 📝 Leave: *${summary.leaveCount}*${leaveStr}\n\n` +
@@ -1034,8 +1079,7 @@ export async function checkAndSendTeacherDailySchedules(options = {}) {
       success: true,
       sent: 0,
       reason: 'Sunday - Teacher scheduled reminders are paused on Sundays. Regular bot responses remain fully active.',
-      currentTimeIST: `${ist.weekday} ${ist.dateDisplay} ${ist.hour}:${ist.minute}:${ist.second}`
-    };
+      currentTimeIST: `${ist.weekday} ${ist.dateDisplay} ${ist.hour}:${ist.minute}:${ist.second}`    };
   }
 
   // Collect verified teachers to receive notifications
@@ -1112,8 +1156,7 @@ export async function checkAndSendTeacherDailySchedules(options = {}) {
     success: true,
     selfAttendanceSent: selfCount,
     elearningSent: elearningCount,
-    currentTimeIST: `${ist.weekday} ${ist.dateDisplay} ${ist.hour}:${ist.minute}:${ist.second}`
-  };
+    currentTimeIST: `${ist.weekday} ${ist.dateDisplay} ${ist.hour}:${ist.minute}:${ist.second}`  };
 }
 
 /**
@@ -1218,7 +1261,7 @@ export async function checkAndSendFatemiFeeReminders(options = {}) {
       continue;
     }
 
-    const messageText = `🌹 *Afzalus Salaam*\n` +
+    const messageText = `\n` +
       `Respected Parent,\n\n` +
       `Kindly pay the Mauze Tahfeez Hub Raqam for *${hijri.nameEn} ${hijri.year}* for *${studentName}*${its ? ` (ITS: \`${its}\`)` : ''}.\n\n` +
       `💳 *Pay Online:* ${payUrl}\n\n` +
@@ -1255,7 +1298,7 @@ export async function checkAndSendFatemiFeeReminders(options = {}) {
       continue;
     }
 
-    const messageText = `🌹 *Afzalus Salaam*\n` +
+    const messageText = `\n` +
       `Respected Parent,\n\n` +
       `Kindly pay the Mauze Tahfeez Hub Raqam for *${hijri.nameEn} ${hijri.year}* for *${studentName}*${its ? ` (ITS: \`${its}\`)` : ''}.\n\n` +
       `💳 *Pay Online:* ${payUrl}\n\n` +
@@ -1277,8 +1320,7 @@ export async function checkAndSendFatemiFeeReminders(options = {}) {
 
   return {
     sent: sentCount,
-    hijriDate: `${hijri.date}/${hijri.month}/${hijri.year} (${hijri.nameEn})`
-  };
+    hijriDate: `${hijri.date}/${hijri.month}/${hijri.year} (${hijri.nameEn})`  };
 }
 export function lookupStudentInRoster(query) {
   const targetPhone = cleanPhone(query.phone || '');
@@ -1995,8 +2037,7 @@ export function checkSafetyLimit(phone) {
     const secLeft = Math.ceil((record.blockedUntil - now) / 1000);
     return {
       allowed: false,
-      reason: `⚠️ *Safety Cooldown Active*\n\nPlease wait ${secLeft}s before sending another request.`
-    };
+      reason: `⚠️ *Safety Cooldown Active*\n\nPlease wait ${secLeft}s before sending another request.`    };
   }
 
   if (now - record.firstTimestamp > 60000) {
@@ -2010,8 +2051,7 @@ export function checkSafetyLimit(phone) {
     record.blockedUntil = now + 60000;
     return {
       allowed: false,
-      reason: `⚠️ *Anti-Spam Protection*\n\nToo many requests in a short period. Please wait 60 seconds before trying again.`
-    };
+      reason: `⚠️ *Anti-Spam Protection*\n\nToo many requests in a short period. Please wait 60 seconds before trying again.`    };
   }
 
   return { allowed: true };
@@ -2334,7 +2374,7 @@ export function buildResultCaption(data) {
   const name = data.name || data.studentName || 'Student';
   const tillDate = data.tillDate || data.weekDate || '';
 
-  return `🌹 *Afzalus Salaam*\n\n` +
+  return `\n\n` +
     `Weekly result card for *${name}*${tillDate && tillDate !== '—' ? ` (${tillDate})` : ''} is attached above 👆\n\n` +
     `Regards,\n` +
     `*Mauze Tahfeez - Galiakot*\n\n` +
@@ -2638,8 +2678,7 @@ export async function sendStudentResultImageWhatsApp(remoteJid, student, senderP
       image: png,
       caption: caption,
       mimetype: 'image/png',
-      fileName: `${cleanName}_Weekly_Result.png`
-    }, senderPhone);
+      fileName: `${cleanName}_Weekly_Result.png`    }, senderPhone);
 
     const phone = senderPhone || cleanPhone(remoteJid.replace(/@.*$/, ''));
     console.log(`[DISPATCH-LIVE] 🚀 Result card image sent to ${remoteJid} for ${targetStudent.name}`);
@@ -2655,8 +2694,7 @@ export async function sendStudentResultImageWhatsApp(remoteJid, student, senderP
   } catch (err) {
     console.error('[sendStudentResultImageWhatsApp Error]:', err);
     await sendWhatsAppMessage(remoteJid, {
-      text: `🌹 *Afzalus Salaam*\n\nResult card is currently being updated. Please try again shortly.\n\nShukran.\n\n💬 *Type 2 to ask something to bot*`
-    }, senderPhone);
+      text: ``    }, senderPhone);
   }
 }
 
@@ -2689,12 +2727,11 @@ export async function sendStudentAttendanceWhatsApp(remoteJid, student, senderPh
   const date = ist.dateDisplay; // Strictly today's present day date e.g. 06/10/2026
 
   await sendWhatsAppMessage(remoteJid, {
-    text: `🌹 *Afzalus Salaam*\n\n` +
+    text: `\n\n` +
       `👤 *${student.name}* (${date})\n` +
       `📌 Hazri: *${statusEmoji} ${status}*\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 1 (Result Card) • 3 (Leave) • 4 (League Points)*`
-  }, senderPhone);
+      `💬 *Type 1 (Result Card) • 3 (Leave) • 4 (League Points)*`  }, senderPhone);
 }
 
 /**
@@ -2703,12 +2740,11 @@ export async function sendStudentAttendanceWhatsApp(remoteJid, student, senderPh
 export async function sendWhatsAppHelpline(remoteJid, student = null, senderPhone = '') {
   const stuInfo = student ? `\nStudent: *${student.name}* (\`${student.its || '—'}\`)` : '';
   await sendWhatsAppMessage(remoteJid, {
-    text: `🌹 *Afzalus Salaam*\n\n` +
+    text: `\n\n` +
       `📞 *Mauze Tahfeez Helpline:* *${BOT_CONFIG.HELPLINE_NUMBER}*${stuInfo}\n` +
       `Available for all inquiries.\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League)*`
-  }, senderPhone);
+      `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League)*`  }, senderPhone);
 }
 
 /**
@@ -2805,23 +2841,21 @@ export async function handleWhatsAppVerification(remoteJid, senderPhone, rawText
       : '30-Day Verified Access (Alternative Number)';
 
     await sock.sendMessage(remoteJid, {
-      text: `🌹 *Afzalus Salaam*\n\n` +
+      text: `\n\n` +
         `✅ Connected to *${matched.name}* (ITS: \`${matched.its}\`).\n` +
         `Dispatching result card below... 👇\n\n` +
-        `💬 *Type 2 to ask something to bot*`
-    });
+        `💬 *Type 2 to ask something to bot*`    });
 
     await sendStudentResultImageWhatsApp(remoteJid, matched);
     return true;
   } else {
     await sock.sendMessage(remoteJid, {
-      text: `🌹 *Afzalus Salaam*\n\n` +
+      text: `\n\n` +
         `❌ No matching student found.\n` +
         `Please send child's *8-digit ITS* or format:\n` +
         `👉 \`/verify Contact, Name, ITS\`\n\n` +
         `Shukran.\n\n` +
-        `💬 *Type 2 to ask something to bot*`
-    });
+        `💬 *Type 2 to ask something to bot*`    });
     return false;
   }
 }
@@ -2840,7 +2874,7 @@ export function formatTeacherVerifiedWelcomeMenu(teacher, allocatedStudents = []
   const sampleStudent = allocatedStudents.length > 0 ? allocatedStudents[0] : null;
   const sampleName = sampleStudent ? (sampleStudent.name.split(' ')[0] || 'Child') : 'Child';
 
-  return `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n\n` +
+  return `\n\n` +
     `Your WhatsApp is verified for *${studentCount} Students*.\n\n` +
     `*Commands:*\n` +
     `1️⃣ *1* — Students List 📋\n` +
@@ -2858,7 +2892,7 @@ export function formatTeacherVerifiedWelcomeMenu(teacher, allocatedStudents = []
 export function formatTeacherDashboardMenu(teacher, studentCount, sampleStudent = null) {
   const sampleName = sampleStudent ? (sampleStudent.name.split(' ')[0] || 'Child') : 'Child';
 
-  return `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n` +
+  return `\n` +
     `*Mauze Tahfeez — Teacher Portal*\n\n` +
     `📚 *Allocated Students:* *${studentCount} Children*\n\n` +
     `*Commands:*\n` +
@@ -2876,9 +2910,9 @@ export function formatTeacherDashboardMenu(teacher, studentCount, sampleStudent 
  */
 export function formatTeacherStudentsList(teacher, students) {
   if (!students || !students.length) {
-    return `🌹 *Afzalus Salaam*\n\nNo allocated students found under your profile.\n\nShukran.\n\n💬 *Type 2 to ask something to bot*`;
+    return ``;
   }
-  let text = `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n` +
+  let text = `\n` +
     `📋 *Allocated Students (${students.length}):*\n\n`;
 
   students.forEach((s, idx) => {
@@ -2898,7 +2932,7 @@ export function formatTeacherAttendanceSummaryText(teacher, summary) {
   const leaveStr = summary.leaveNames.length > 0 ? `\n   ↳ _${summary.leaveNames.join(', ')}_` : '';
   const pendingStr = summary.pendingNames.length > 0 ? `\n   ↳ _${summary.pendingNames.join(', ')}_` : '';
 
-  return `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n\n` +
+  return `\n\n` +
     `*Attendance Summary (${summary.dateDisplay}):*\n` +
     `• Total: *${summary.totalStudents}* | ✅ Present: *${summary.presentCount}*\n` +
     `• ❌ Absent: *${summary.absentCount}*${absentStr}\n` +
@@ -3043,14 +3077,13 @@ export async function handleIncomingWhatsAppMessage(msg) {
     // If teacher command has no payload, show verification instructions
     if (!cleanTeacherCmd) {
       await sendWhatsAppMessage(remoteJid, {
-        text: `🌹 *Afzalus Salaam*\n\n` +
+        text: `\n\n` +
           `To link your Ustad profile, reply:\n` +
           `👉 \`/teacher [Full Name], [Email]\`\n\n` +
           `*Example:*\n` +
           `\`/teacher Janab Mustafa bhai Manpurwala, mustafamanpur1@gmail.com\`\n\n` +
           `Shukran.\n\n` +
-          `💬 *Type 2 to ask something to bot*`
-      }, senderPhone);
+          `💬 *Type 2 to ask something to bot*`      }, senderPhone);
       return;
     }
 
@@ -3076,7 +3109,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
       return;
     } else {
       await sendWhatsAppMessage(remoteJid, {
-        text: `🌹 *Afzalus Salaam*\n\n` +
+        text: `\n\n` +
           `❌ Staff profile not found for:\n` +
           `• Name: *${reqName || '—'}*\n` +
           `• Email: *${reqEmail || '—'}*\n\n` +
@@ -3084,8 +3117,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
           `👉 \`/teacher [Full Name], [Email]\`\n\n` +
           `📞 Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}\n\n` +
           `Shukran.\n\n` +
-          `💬 *Type 2 to ask something to bot*`
-      }, senderPhone);
+          `💬 *Type 2 to ask something to bot*`      }, senderPhone);
       return;
     }
   }
@@ -3100,12 +3132,11 @@ export async function handleIncomingWhatsAppMessage(msg) {
       removeLinkedTeacher(senderPhone);
       if (rawJidId) removeLinkedTeacher(rawJidId);
       await sendWhatsAppMessage(remoteJid, {
-        text: `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n\n` +
+        text: `\n\n` +
           `Your WhatsApp (+${senderPhone}) has been unlinked.\n` +
           `To reconnect, reply \`/teacher [Name], [Email]\`.\n\n` +
           `Shukran.\n\n` +
-          `💬 *Type 2 to ask something to bot*`
-      }, senderPhone);
+          `💬 *Type 2 to ask something to bot*`      }, senderPhone);
       return;
     }
 
@@ -3197,12 +3228,11 @@ export async function handleIncomingWhatsAppMessage(msg) {
     ) {
       const ist = getISTDateParts();
       await sendWhatsAppMessage(remoteJid, {
-        text: `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n\n` +
+        text: `\n\n` +
           `Daily Self-Attendance punch time is *4:25 PM*.\n` +
           `📅 Today: *${ist.dateDisplay}*\n\n` +
           `Shukran.\n\n` +
-          `💬 *Type 2 to ask something to bot*`
-      }, senderPhone);
+          `💬 *Type 2 to ask something to bot*`      }, senderPhone);
       return;
     }
 
@@ -3218,12 +3248,11 @@ export async function handleIncomingWhatsAppMessage(msg) {
       cleanCmd.includes('admin')
     ) {
       await sendWhatsAppMessage(remoteJid, {
-        text: `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n\n` +
+        text: `\n\n` +
           `📞 *Helpline:* *${BOT_CONFIG.HELPLINE_NUMBER}*\n` +
           `Available for administrative and technical support.\n\n` +
           `Shukran.\n\n` +
-          `💬 *Type 2 to ask something to bot*`
-      }, senderPhone);
+          `💬 *Type 2 to ask something to bot*`      }, senderPhone);
       return;
     }
 
@@ -3246,14 +3275,13 @@ export async function handleIncomingWhatsAppMessage(msg) {
         const lvRec = findStudentLeave(indStudent, indStudent.phone);
         const stEmoji = lvRec && /approved/i.test(lvRec.status) ? '✅' : (lvRec && /rejected/i.test(lvRec.status) ? '❌' : '⏳');
         await sendWhatsAppMessage(remoteJid, {
-          text: `🌹 *Afzalus Salaam*\n\n` +
+          text: `\n\n` +
             `📝 *Leave Record: ${indStudent.name}*\n` +
             `• Status: *${stEmoji} ${lvRec ? lvRec.status : 'Active (No Leave)'}*\n` +
             (lvRec?.periodStr ? `• Period: *${lvRec.periodStr}*\n` : '') +
             (lvRec?.reason ? `• Reason: _${lvRec.reason}_\n` : '') +
             `\nShukran.\n\n` +
-            `💬 *Type 2 to ask something to bot*`
-        }, senderPhone);
+            `💬 *Type 2 to ask something to bot*`        }, senderPhone);
         return;
       }
 
@@ -3265,15 +3293,14 @@ export async function handleIncomingWhatsAppMessage(msg) {
       ) {
         const counts = getStudentAttendanceCounts(indStudent);
         await sendWhatsAppMessage(remoteJid, {
-          text: `🌹 *Afzalus Salaam Ustad ${teacher.name}*\n\n` +
+          text: `\n\n` +
             `📊 *Attendance Counts: ${counts.studentName}* (\`${counts.its}\`)\n` +
             `• Today: *${counts.todayEmoji} ${counts.todayStatus}*\n` +
             `• Weekly Hazri: *${counts.weeklyPresent} / ${counts.weeklyTotal} Days* (${counts.weeklyRate})\n` +
             `• Monthly Hazri: *${counts.monthlyPresent} / ${counts.monthlyTotal} Days* (${counts.monthlyRate})\n` +
             `• Total Leaves: *${counts.totalLeaves}*\n\n` +
             `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-            `💬 *Type 2 to ask something to bot*`
-        }, senderPhone);
+            `💬 *Type 2 to ask something to bot*`        }, senderPhone);
         return;
       }
 
@@ -3284,14 +3311,13 @@ export async function handleIncomingWhatsAppMessage(msg) {
 
       if (cleanCmd.includes('jadwal') || cleanCmd.includes('hifz') || cleanCmd.includes('sabaq') || cleanCmd.includes('surah')) {
         await sendWhatsAppMessage(remoteJid, {
-          text: `🌹 *Afzalus Salaam*\n\n` +
+          text: `\n\n` +
             `📖 *Hifz Jadwal: ${indStudent.name}*\n` +
             `• Juz: *Juz ${indStudent.juz || '—'}* (${indStudent.surat || '—'})\n` +
             (indStudent.totalJadeed ? `• Sabaq: *${indStudent.totalJadeed}*\n` : '') +
             `• Teacher: *${indStudent.teacher || teacher.name}*\n\n` +
             `Shukran.\n\n` +
-            `💬 *Type 2 to ask something to bot*`
-        }, senderPhone);
+            `💬 *Type 2 to ask something to bot*`        }, senderPhone);
         return;
       }
 
@@ -3303,14 +3329,13 @@ export async function handleIncomingWhatsAppMessage(msg) {
       const attEmoji = /absent/i.test(attSt) ? '❌' : (/leave/i.test(attSt) ? '📝' : (/present/i.test(attSt) ? '✅' : '⏳'));
 
       await sendWhatsAppMessage(remoteJid, {
-        text: `🌹 *Afzalus Salaam*\n\n` +
+        text: `\n\n` +
           `👤 *${enriched.name}* (\`${enriched.its || '—'}\`)\n` +
           `• Juz: *Juz ${enriched.juz || '—'}* (${enriched.surat || '—'})\n` +
           `• Weekly Score: *${enriched.weeklyScore ?? '—'} / 100*\n` +
           `• Hazri: *${attEmoji} ${attSt}*\n\n` +
           `Shukran.\n\n` +
-          `💬 *Type 2 to ask something to bot*`
-      }, senderPhone);
+          `💬 *Type 2 to ask something to bot*`      }, senderPhone);
       return;
     }
 
@@ -3342,12 +3367,11 @@ export async function handleIncomingWhatsAppMessage(msg) {
       removeLinkedSubscriber(senderPhone);
       if (rawJidId) removeLinkedSubscriber(rawJidId);
       await sendWhatsAppMessage(remoteJid, {
-        text: `🌹 *Afzalus Salaam*\n\n` +
+        text: `\n\n` +
           `Access expired for *${subRec.student?.name || 'Student'}*.\n` +
           `To renew access, reply: \`/verify [Contact], [Name], [ITS]\`\n\n` +
           `Shukran.\n\n` +
-          `💬 *Type 2 to ask something to bot*`
-      }, senderPhone);
+          `💬 *Type 2 to ask something to bot*`      }, senderPhone);
       return;
     }
     linkedStudent = subRec.student;
@@ -3392,12 +3416,11 @@ export async function handleIncomingWhatsAppMessage(msg) {
     removeLinkedSubscriber(senderPhone);
     if (rawJidId) removeLinkedSubscriber(rawJidId);
     await sendWhatsAppMessage(remoteJid, {
-      text: `🌹 *Afzalus Salaam*\n\n` +
+      text: `\n\n` +
         `Your WhatsApp has been unlinked.\n` +
         `To link again, reply with child's ITS.\n\n` +
         `Shukran.\n\n` +
-        `💬 *Type 2 to ask something to bot*`
-    }, senderPhone);
+        `💬 *Type 2 to ask something to bot*`    }, senderPhone);
     return;
   }
 
@@ -3421,15 +3444,14 @@ export async function handleIncomingWhatsAppMessage(msg) {
 
     // Welcoming response for ALL messages from unregistered users
     await sendWhatsAppMessage(remoteJid, {
-      text: `🌹 *Afzalus Salaam*\n` +
+      text: `\n` +
         `Welcome to *Mauze Tahfeez Galiakot*.\n\n` +
         `To connect your child's updates, reply with your child's *8-digit ITS number* or:\n` +
         `👉 \`/verify [Contact], [Name], [ITS]\`\n\n` +
         `🌐 *Portal:* https://mouze-tahfeez-atfal.vercel.app/\n` +
         `📞 *Helpline:* ${BOT_CONFIG.HELPLINE_NUMBER}\n\n` +
         `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Type 2 to ask something to bot*`
-    }, senderPhone);
+        `💬 *Type 2 to ask something to bot*`    }, senderPhone);
     return;
   }
 
@@ -3505,14 +3527,13 @@ export async function handleIncomingWhatsAppMessage(msg) {
 
     // Alert Parent
     await sendWhatsAppMessage(remoteJid, {
-      text: `🌹 *Afzalus Salaam*\n` +
+      text: `\n` +
         `Respected Parent,\n\n` +
         `Leave application for *${student.name}* has been submitted:\n` +
         `📝 Details: *${leaveDetails || 'Leave Requested'}*\n` +
         `⏳ Status: *Pending Approval*\n\n` +
         `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Type 1 (Result Card) • 2 (Hazri) • 4 (League Points)*`
-    }, senderPhone);
+        `💬 *Type 1 (Result Card) • 2 (Hazri) • 4 (League Points)*`    }, senderPhone);
 
     // Alert Assigned Teacher immediately
     const teacherPhone = findTeacherPhoneForStudent(student);
@@ -3520,14 +3541,13 @@ export async function handleIncomingWhatsAppMessage(msg) {
       const teacherJid = formatTargetJid(teacherPhone);
       if (teacherJid) {
         sendWhatsAppMessage(teacherJid, {
-          text: `🌹 *Afzalus Salaam*\n\n` +
+          text: `\n\n` +
             `📝 *New Leave Application Received*\n` +
             `👤 Student: *${student.name}* (\`${student.its || '—'}\`)\n` +
             `📅 Details: *${leaveDetails || 'Leave Requested'}*\n` +
             `⏳ Status: *Pending Admin Approval*\n\n` +
             `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-            `💬 *Type 1 (Class List) • 2 (Summary) • 4 (Scores)*`
-        }, teacherPhone).catch(() => {});
+            `💬 *Type 1 (Class List) • 2 (Summary) • 4 (Scores)*`        }, teacherPhone).catch(() => {});
       }
     }
     return;
@@ -3550,27 +3570,25 @@ export async function handleIncomingWhatsAppMessage(msg) {
         : (/rejected/i.test(lvRec.status) ? '❌' : '⏳');
 
       await sendWhatsAppMessage(remoteJid, {
-        text: `🌹 *Afzalus Salaam*\n\n` +
+        text: `\n\n` +
           `📝 *Leave Status: ${student.name}*\n` +
           (lvRec.periodStr ? `📅 Period: *${lvRec.periodStr}*\n` : '') +
           `📌 Status: *${statusEmoji} ${lvRec.status}*\n` +
           (lvRec.reason ? `📝 Reason: _${lvRec.reason}_\n` : '') +
           (lvRec.comment ? `💬 Remark: _${lvRec.comment}_\n\n` : '\n') +
           `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-          `💬 *Type 1 (Result Card) • 2 (Hazri) • 4 (League Points)*`
-      }, senderPhone);
+          `💬 *Type 1 (Result Card) • 2 (Hazri) • 4 (League Points)*`      }, senderPhone);
       return;
     }
 
     await sendWhatsAppMessage(remoteJid, {
-      text: `🌹 *Afzalus Salaam*\n\n` +
+      text: `\n\n` +
         `👤 *${student.name}*\n` +
         `📌 Status: Active in class (No active leave pending).\n` +
         `To apply for leave, reply:\n` +
         `👉 \`apply leave [dates] [reason]\`\n\n` +
         `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Type 1 (Result Card) • 2 (Hazri) • 4 (League Points)*`
-    }, senderPhone);
+        `💬 *Type 1 (Result Card) • 2 (Hazri) • 4 (League Points)*`    }, senderPhone);
     return;
   }
 
@@ -3589,14 +3607,13 @@ export async function handleIncomingWhatsAppMessage(msg) {
   ) {
     const leagueData = await getStudentLeaguePoints(student);
     await sendWhatsAppMessage(remoteJid, {
-      text: `🌹 *Afzalus Salaam*\n\n` +
+      text: `\n\n` +
         `💎 *Atfal Gem League Points*\n` +
         `👤 Student: *${leagueData.studentName}*\n` +
         `📅 Month: *${leagueData.monthName}*\n` +
         `✨ Total League Points: *${leagueData.totalGems} / 480 Gems*\n\n` +
         `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Type 1 (Result Card) • 2 (Hazri) • 3 (Leave)*`
-    }, senderPhone);
+        `💬 *Type 1 (Result Card) • 2 (Hazri) • 3 (Leave)*`    }, senderPhone);
     return;
   }
 
@@ -3618,31 +3635,29 @@ export async function handleIncomingWhatsAppMessage(msg) {
   // Additional support: Jadwal, Fee, Profile if explicitly asked
   if (cleanCmd.includes('jadwal') || cleanCmd.includes('timetable') || cleanCmd.includes('schedule') || cleanCmd.includes('hifz')) {
     await sendWhatsAppMessage(remoteJid, {
-      text: `🌹 *Afzalus Salaam*\n\n` +
+      text: `\n\n` +
         `📅 *Jadwal: ${student.name}*\n` +
         `📖 Current Juz: *Juz ${student.juz || '—'}* (${student.surat || '—'})\n` +
         `👨‍🏫 Ustad: *${student.teacher || 'Assigned Ustad'}*\n\n` +
         `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`
-    }, senderPhone);
+        `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`    }, senderPhone);
     return;
   }
 
   if (cleanCmd.includes('fee') || cleanCmd.includes('hub')) {
     const hijriNow = getFatemiHijriMonth();
     await sendWhatsAppMessage(remoteJid, {
-      text: `🌹 *Afzalus Salaam*\n\n` +
+      text: `\n\n` +
         `Hub Raqam for *${hijriNow.nameEn} ${hijriNow.year}* for *${student.name}* (\`${student.its || '—'}\`):\n\n` +
         `💳 *Pay Online:*\nhttps://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT\n\n` +
         `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave)*`
-    }, senderPhone);
+        `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave)*`    }, senderPhone);
     return;
   }
 
   // ── DEFAULT INTERACTIVE MENU FOR PARENTS ──
   await sendWhatsAppMessage(remoteJid, {
-    text: `🌹 *Afzalus Salaam*\n` +
+    text: `\n` +
       `Welcome to *Mauze Tahfeez Galiakot*.\n\n` +
       `👤 Student: *${student.name}* (\`${student.its || 'Verified'}\`)\n\n` +
       `*Options:*\n` +
@@ -3652,8 +3667,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
       `4️⃣ *4* — Atfal Gem League Points 💎\n` +
       `5️⃣ *5* — Helpline 📞\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 1, 2, 3, 4 or 5 for instant updates*`
-  }, senderPhone);
+      `💬 *Type 1, 2, 3, 4 or 5 for instant updates*`  }, senderPhone);
 }
 
 /**
@@ -3676,8 +3690,7 @@ export async function sendResultToParent(studentData) {
       image: pngBuffer,
       caption: caption,
       mimetype: 'image/png',
-      fileName: `${cleanName}_Weekly_Result.png`
-    });
+      fileName: `${cleanName}_Weekly_Result.png`    });
 
     console.log(`[DISPATCH-LIVE] 🚀 Real WhatsApp image sent to +${phone} for ${studentData.name} (MsgID: ${result.key.id})`);
 
@@ -3886,7 +3899,7 @@ export async function dispatchStudentNotification(payload) {
     if (targetName) saveAttendanceRecord(`name:${targetName.toLowerCase()}`, record);
     if (targetStudentId) saveAttendanceRecord(`id:${targetStudentId}`, record);
 
-    messageText = `🌹 *Afzalus Salaam*\n` +
+    messageText = `\n` +
       `Respected Parent,\n\n` +
       `Attendance marked for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n` +
       `📅 Date: *${attDate}*\n` +
@@ -3899,7 +3912,7 @@ export async function dispatchStudentNotification(payload) {
     const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || 'Requested Dates');
     const reasonStr = details?.reason || details?.note || 'Personal Leave';
 
-    messageText = `🌹 *Afzalus Salaam*\n\n` +
+    messageText = `\n\n` +
       `📝 *Leave Application: ${studentDisplayName}*\n` +
       `📅 Period: *${periodStr}*\n` +
       `📝 Reason: *${reasonStr}*\n` +
@@ -3914,7 +3927,7 @@ export async function dispatchStudentNotification(payload) {
     const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || '');
     const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || '';
 
-    messageText = `🌹 *Afzalus Salaam*\n\n` +
+    messageText = `\n\n` +
       `📝 *Leave Update: ${studentDisplayName}*\n` +
       (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
       `📌 Status: *${statusEmoji} ${lvStatus}*\n` +
@@ -3924,7 +3937,7 @@ export async function dispatchStudentNotification(payload) {
   } else if (type === 'leave_chat_message') {
     const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || details?.body || '';
 
-    messageText = `🌹 *Afzalus Salaam*\n\n` +
+    messageText = `\n\n` +
       `💬 *Leave Chat: ${studentDisplayName}*\n` +
       `_${comment}_\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
@@ -3936,7 +3949,7 @@ export async function dispatchStudentNotification(payload) {
     const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || '');
     const reasonStr = details?.reason || details?.body || '';
 
-    messageText = `🌹 *Afzalus Salaam*\n\n` +
+    messageText = `\n\n` +
       `*${evName}*\n` +
       (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
       (reasonStr ? `📝 Note: _${reasonStr}_\n` : '') +
@@ -3948,19 +3961,19 @@ export async function dispatchStudentNotification(payload) {
     const monthName = details?.monthName || hijriNow.nameEn;
     const payUrl = 'https://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT';
 
-    messageText = `🌹 *Afzalus Salaam*\n` +
+    messageText = `\n` +
       `Respected Parent,\n\n` +
       `Hub Raqam reminder for *${monthName}* for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n\n` +
       `💳 *Pay Online:*\n${payUrl}\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave)*`;
   } else if (type === 'jadwal') {
-    messageText = `🌹 *Afzalus Salaam*\n\n` +
+    messageText = `\n\n` +
       `Hifz timetable and target updated for *${studentDisplayName}*.\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`;
   } else {
-    messageText = `🌹 *Afzalus Salaam*\n\n` +
+    messageText = `\n\n` +
       `*${studentDisplayName}:* ${details?.body || details?.title || 'New update recorded.'}\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League)*`;
@@ -3999,14 +4012,18 @@ let firestoreListenersActive = false;
 export function initFirestoreRealtimeListeners() {
   if (firestoreListenersActive) return;
   try {
+    if (!fbInitializeApp || !fbGetFirestore) {
+      console.log('[FIRESTORE-LISTENER] Firebase admin SDK not imported, polling worker active.');
+      return;
+    }
     let adminApp;
-    const apps = getAdminApps();
+    const apps = fbGetApps ? fbGetApps() : [];
     if (apps && apps.length > 0) {
       adminApp = apps[0];
     } else {
-      adminApp = initAdminApp({ credential: cert(FALLBACK_SA) });
+      adminApp = fbInitializeApp({ credential: fbCert(FALLBACK_SA) });
     }
-    firestoreAdminDb = getAdminFirestore(adminApp);
+    firestoreAdminDb = fbGetFirestore(adminApp);
     firestoreListenersActive = true;
     console.log('[FIRESTORE-LISTENER] 📡 Cloud Firestore Realtime Listeners Initializing...');
 
@@ -4589,8 +4606,7 @@ export function startWhatsAppBotEngine() {
         const data = await res.json();
         const tbody = document.getElementById('logBody');
         if (!data || data.length === 0) return;
-        tbody.innerHTML = data.slice().reverse().map(d => \`
-          <tr>
+        tbody.innerHTML = data.slice().reverse().map(d => \`          <tr>
             <td>\${new Date(d.timestamp).toLocaleTimeString()}</td>
             <td><strong>+\${d.phone}</strong></td>
             <td>\${d.studentName || 'Student'}</td>
@@ -4648,8 +4664,8 @@ export function startWhatsAppBotEngine() {
       return;
     }
 
-    // 2. Health & Status (GET /api/status)
-    if (pathname === '/api/status') {
+    // 2. Health & Status (GET /api/status, /health, /status)
+    if (pathname === '/api/status' || pathname === '/health' || pathname === '/status') {
       const status = await checkSessionStatus();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
@@ -5191,7 +5207,7 @@ export function startWhatsAppBotEngine() {
             if (targetName) saveAttendanceRecord(`name:${targetName.toLowerCase()}`, record);
             if (targetStudentId) saveAttendanceRecord(`id:${targetStudentId}`, record);
 
-            messageText = `🌹 *Afzalus Salaam*\n` +
+            messageText = `\n` +
               `Respected Parent,\n\n` +
               `Attendance marked for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n` +
               `📅 Date: *${attDate}*\n` +
@@ -5239,7 +5255,7 @@ export function startWhatsAppBotEngine() {
               }
             }
 
-            messageText = `🌹 *Afzalus Salaam*\n\n` +
+            messageText = `\n\n` +
               `🏆 *Result Update: ${studentDisplayName}*\n` +
               `Score: *${numScore} / 100*` + (wJuz ? ` | Juz ${wJuz} (${wSurah})` : '') + `\n\n` +
               `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
@@ -5269,7 +5285,7 @@ export function startWhatsAppBotEngine() {
             if (targetName) saveLeaveRecord(`name:${targetName.toLowerCase()}`, lvRecord);
             if (targetStudentId) saveLeaveRecord(`id:${targetStudentId}`, lvRecord);
 
-            messageText = `🌹 *Afzalus Salaam*\n\n` +
+            messageText = `\n\n` +
               `📝 *Leave Application: ${studentDisplayName}*\n` +
               `📅 Period: *${periodStr}*\n` +
               `📝 Reason: *${reasonStr}*\n` +
@@ -5303,7 +5319,7 @@ export function startWhatsAppBotEngine() {
             if (targetName) saveLeaveRecord(`name:${targetName.toLowerCase()}`, lvRecord);
             if (targetStudentId) saveLeaveRecord(`id:${targetStudentId}`, lvRecord);
 
-            messageText = `🌹 *Afzalus Salaam*\n\n` +
+            messageText = `\n\n` +
               `📝 *Leave Update: ${studentDisplayName}*\n` +
               (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
               `📌 Status: *${statusEmoji} ${lvStatus}*\n` +
@@ -5313,7 +5329,7 @@ export function startWhatsAppBotEngine() {
           } else if (type === 'leave_chat_message') {
             const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || details?.body || '';
 
-            messageText = `🌹 *Afzalus Salaam*\n\n` +
+            messageText = `\n\n` +
               `💬 *Leave Chat: ${studentDisplayName}*\n` +
               `_${comment}_\n\n` +
               `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
@@ -5325,7 +5341,7 @@ export function startWhatsAppBotEngine() {
             const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || '');
             const reasonStr = details?.reason || details?.body || '';
 
-            messageText = `🌹 *Afzalus Salaam*\n\n` +
+            messageText = `\n\n` +
               `*${evName}*\n` +
               (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
               (reasonStr ? `📝 Note: _${reasonStr}_\n` : '') +
@@ -5337,19 +5353,19 @@ export function startWhatsAppBotEngine() {
             const monthName = details?.monthName || hijriNow.nameEn;
             const payUrl = 'https://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT';
 
-            messageText = `🌹 *Afzalus Salaam*\n` +
+            messageText = `\n` +
               `Respected Parent,\n\n` +
               `Hub Raqam reminder for *${monthName}* for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n\n` +
               `💳 *Pay Online:*\n${payUrl}\n\n` +
               `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
               `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`;
           } else if (type === 'jadwal') {
-            messageText = `🌹 *Afzalus Salaam*\n\n` +
+            messageText = `\n\n` +
               `Hifz timetable and target updated for *${studentDisplayName}*.\n\n` +
               `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
               `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
           } else {
-            messageText = `🌹 *Afzalus Salaam*\n\n` +
+            messageText = `\n\n` +
               `*${studentDisplayName}:* ${details?.body || details?.title || 'New update recorded.'}\n\n` +
               `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
               `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
