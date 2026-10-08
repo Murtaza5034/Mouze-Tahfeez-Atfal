@@ -1909,13 +1909,7 @@ const broadcastNotification = async (
       }
     };
 
-    fetch('/api/telegram-webhook', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(notifPayload)
-    }).catch((tgErr) => console.warn('[Telegram Dispatch Notice]:', tgErr.message));
-
-    // Direct instant shoot to local WhatsApp Bot (port 2785)
+    // Direct instant shoot to WhatsApp Bot
     fetch('http://localhost:2785/api/notify-student-update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
