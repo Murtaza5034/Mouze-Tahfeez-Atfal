@@ -2599,6 +2599,15 @@ export async function sendWhatsAppMessage(targetJid, content, senderPhone = '') 
     return result;
   } catch (err) {
     console.warn(`[WHATSAPP-SEND-FAIL] Direct send to ${targetJid} failed:`, err.message);
+    // If sending with button payload failed, try text-only fallback immediately
+    if (content && content.buttons && content.text) {
+      try {
+        const textFallback = { text: content.text };
+        const fbRes = await sock.sendMessage(targetJid, textFallback);
+        console.log(`[WHATSAPP-SEND-SUCCESS] ✅ Sent text fallback to ${targetJid}`);
+        return fbRes;
+      } catch (_) {}
+    }
     if (targetJid && targetJid.includes('@lid') && senderPhone && senderPhone.length >= 10 && senderPhone.length <= 13) {
       const fallbackJid = `${senderPhone}@s.whatsapp.net`;
       try {
@@ -2700,11 +2709,21 @@ export async function sendStudentAttendanceWhatsApp(remoteJid, student, senderPh
   const date = ist.dateDisplay; // Strictly today's present day date e.g. 06/10/2026
 
   await sendWhatsAppMessage(remoteJid, {
-    text: `` +
-      `👤 *${student.name}* (${date})\n` +
+    text: `👤 *${student.name}* (${date})\n` +
       `📌 Hazri: *${statusEmoji} ${status}*\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 1 (Result Card) • 3 (Leave) • 4 (League Points)*`  }, senderPhone);
+      `💬 *Tap button or type number:*\n` +
+      `1️⃣ *1* - 📊 Result Card\n` +
+      `3️⃣ *3* - 📝 Leave Status\n` +
+      `4️⃣ *4* - 💎 League Points`,
+    footer: 'Mauze Tahfeez - Galiakot',
+    buttons: [
+      { buttonId: '1', buttonText: { displayText: '📊 Result Card' }, type: 1 },
+      { buttonId: '3', buttonText: { displayText: '📝 Leave Status' }, type: 1 },
+      { buttonId: '4', buttonText: { displayText: '💎 League Points' }, type: 1 }
+    ],
+    headerType: 1
+  }, senderPhone);
 }
 
 /**
@@ -2962,18 +2981,28 @@ export function extractMessageText(message) {
     if (m.documentWithCaptionMessage?.message) { m = m.documentWithCaptionMessage.message; continue; }
     break;
   }
+  let nativeFlowId = '';
+  if (m.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson) {
+    try {
+      const parsed = JSON.parse(m.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson);
+      nativeFlowId = String(parsed.id || parsed.selectedId || parsed.rowId || '').trim();
+    } catch (_) {
+      nativeFlowId = String(m.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson || '').trim();
+    }
+  }
+
   return (
-    m.conversation ||
-    m.extendedTextMessage?.text ||
-    m.imageMessage?.caption ||
-    m.videoMessage?.caption ||
-    m.documentMessage?.caption ||
+    nativeFlowId ||
     m.buttonsResponseMessage?.selectedButtonId ||
     m.buttonsResponseMessage?.selectedDisplayText ||
     m.listResponseMessage?.singleSelectReply?.selectedRowId ||
     m.listResponseMessage?.title ||
     m.templateButtonReplyMessage?.selectedId ||
-    m.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson ||
+    m.conversation ||
+    m.extendedTextMessage?.text ||
+    m.imageMessage?.caption ||
+    m.videoMessage?.caption ||
+    m.documentMessage?.caption ||
     ''
   ).trim();
 }
@@ -3543,14 +3572,24 @@ export async function handleIncomingWhatsAppMessage(msg) {
         : (/rejected/i.test(lvRec.status) ? '❌' : '⏳');
 
       await sendWhatsAppMessage(remoteJid, {
-        text: `` +
-          `📝 *Leave Status: ${student.name}*\n` +
+        text: `📝 *Leave Status: ${student.name}*\n` +
           (lvRec.periodStr ? `📅 Period: *${lvRec.periodStr}*\n` : '') +
           `📌 Status: *${statusEmoji} ${lvRec.status}*\n` +
           (lvRec.reason ? `📝 Reason: _${lvRec.reason}_\n` : '') +
           (lvRec.comment ? `💬 Remark: _${lvRec.comment}_\n\n` : '\n') +
           `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-          `💬 *Type 1 (Result Card) • 2 (Hazri) • 4 (League Points)*`      }, senderPhone);
+          `💬 *Tap button or type number:*\n` +
+          `1️⃣ *1* - 📊 Result Card\n` +
+          `2️⃣ *2* - 📌 Hazri\n` +
+          `4️⃣ *4* - 💎 League Points`,
+        footer: 'Mauze Tahfeez - Galiakot',
+        buttons: [
+          { buttonId: '1', buttonText: { displayText: '📊 Result Card' }, type: 1 },
+          { buttonId: '2', buttonText: { displayText: '📌 Hazri' }, type: 1 },
+          { buttonId: '4', buttonText: { displayText: '💎 League Points' }, type: 1 }
+        ],
+        headerType: 1
+      }, senderPhone);
       return;
     }
 
@@ -3580,13 +3619,23 @@ export async function handleIncomingWhatsAppMessage(msg) {
   ) {
     const leagueData = await getStudentLeaguePoints(student);
     await sendWhatsAppMessage(remoteJid, {
-      text: `` +
-        `💎 *Atfal Gem League Points*\n` +
+      text: `💎 *Atfal Gem League Points*\n` +
         `👤 Student: *${leagueData.studentName}*\n` +
         `📅 Month: *${leagueData.monthName}*\n` +
         `✨ Total League Points: *${leagueData.totalGems} / 480 Gems*\n\n` +
         `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Type 1 (Result Card) • 2 (Hazri) • 3 (Leave)*`    }, senderPhone);
+        `💬 *Tap button or type number:*\n` +
+        `1️⃣ *1* - 📊 Result Card\n` +
+        `2️⃣ *2* - 📌 Hazri\n` +
+        `3️⃣ *3* - 📝 Leave Status`,
+      footer: 'Mauze Tahfeez - Galiakot',
+      buttons: [
+        { buttonId: '1', buttonText: { displayText: '📊 Result Card' }, type: 1 },
+        { buttonId: '2', buttonText: { displayText: '📌 Hazri' }, type: 1 },
+        { buttonId: '3', buttonText: { displayText: '📝 Leave Status' }, type: 1 }
+      ],
+      headerType: 1
+    }, senderPhone);
     return;
   }
 
