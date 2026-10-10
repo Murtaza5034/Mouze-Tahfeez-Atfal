@@ -17561,6 +17561,55 @@ button:not(.rp-btn-gold):not(.support-bot-send):not(.quick-action-btn):not(.side
   color: #86198f !important;
 }
 
+/* 9. LIQUID GLASS THEME */
+[data-theme="liquid-glass"] .admin-sidebar.its-teacher-sidebar {
+  background: rgba(255, 255, 255, 0.68) !important;
+  backdrop-filter: blur(32px) saturate(200%) contrast(105%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(200%) contrast(105%) !important;
+  color: #0f172a !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 12px 0 40px -10px rgba(15, 23, 42, 0.06), inset -1px 0 1.5px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+[data-theme="liquid-glass"] .its-sidebar-header {
+  background: rgba(255, 255, 255, 0.5) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.7) !important;
+}
+
+[data-theme="liquid-glass"] .its-sidebar-avatar-squircle {
+  border-color: #0284c7 !important;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.2), inset 0 1px 1.5px #fff !important;
+}
+
+[data-theme="liquid-glass"] .its-sidebar-nav,
+[data-theme="liquid-glass"] .its-sidebar-footer {
+  background: transparent !important;
+  border-top-color: rgba(255, 255, 255, 0.7) !important;
+}
+
+[data-theme="liquid-glass"] .its-sidebar-nav .sidebar-link {
+  color: #334155 !important;
+}
+
+[data-theme="liquid-glass"] .its-sidebar-nav .sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.7) !important;
+  color: #0284c7 !important;
+}
+
+[data-theme="liquid-glass"] .its-sidebar-nav .sidebar-link.active {
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.12) 0%, rgba(56, 189, 248, 0.08) 100%) !important;
+  color: #0369a1 !important;
+  border-left-color: #0284c7 !important;
+}
+
+[data-theme="liquid-glass"] .its-sidebar-nav .sidebar-link svg {
+  color: #0284c7 !important;
+}
+
+[data-theme="liquid-glass"] .its-sidebar-nav .sidebar-link.active svg {
+  color: #0284c7 !important;
+}
+
 /* Theme-adaptive Bottom Nav backgrounds */
 .dark-mode .amazon-bottom-nav,
 [data-theme="dark"] .amazon-bottom-nav {
@@ -17661,6 +17710,11 @@ button:not(.rp-btn-gold):not(.support-bot-send):not(.quick-action-btn):not(.side
   box-shadow: 0 2px 8px rgba(5, 150, 105, 0.5) !important;
 }
 
+[data-theme="liquid-glass"] .amazon-nav-slider-bar {
+  background: linear-gradient(90deg, #0284c7, #38bdf8, #0284c7) !important;
+  box-shadow: 0 2px 10px rgba(2, 132, 199, 0.6) !important;
+}
+
 /* Individual Navigation Tab Button - Pure Transparent, No Box */
 .amazon-nav-tab {
   position: relative;
@@ -17740,6 +17794,11 @@ button:not(.rp-btn-gold):not(.support-bot-send):not(.quick-action-btn):not(.side
   color: #fae29c !important;
 }
 
+[data-theme="liquid-glass"] .amazon-nav-tab.active .amazon-nav-tab-icon {
+  color: #0284c7 !important;
+  filter: drop-shadow(0 2px 8px rgba(2, 132, 199, 0.4)) !important;
+}
+
 /* Tab Label Styling */
 .amazon-nav-tab-label {
   font-size: 0.65rem;
@@ -17811,6 +17870,11 @@ button:not(.rp-btn-gold):not(.support-bot-send):not(.quick-action-btn):not(.side
 
 [data-theme="ashara"] .amazon-nav-tab.active .amazon-nav-tab-label {
   color: #fae29c !important;
+}
+
+[data-theme="liquid-glass"] .amazon-nav-tab.active .amazon-nav-tab-label {
+  color: #0284c7 !important;
+  font-weight: 800 !important;
 }
 
 /* Safe Area spacer for edge-to-edge mobile devices */

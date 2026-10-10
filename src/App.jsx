@@ -7185,6 +7185,14 @@ function SettingsPage({
       previewBg: "linear-gradient(135deg, #11111b 0%, #f81ce5 100%)",
       premium: true,
     },
+    {
+      id: "liquid-glass",
+      name: "Liquid Glass",
+      desc: "Apple VisionOS — real glass refraction, specular highlights & chromatic edges",
+      color: "#88c8f8",
+      previewBg: "linear-gradient(135deg, rgba(136,200,248,0.35) 0%, rgba(255,255,255,0.85) 30%, rgba(212,175,55,0.2) 70%, rgba(56,189,248,0.4) 100%)",
+      premium: true,
+    },
   ];
 
   const handleSupportSubmit = async (e) => {

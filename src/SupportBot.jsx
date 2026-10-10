@@ -81,7 +81,7 @@ const APP_KB = [
   {
     keywords: ['dark mode', 'theme', 'appearance', 'light mode'],
     page: 'Settings',
-    answer: 'You can switch between light and dark mode, and choose from themes like Cyber Neon (Bespoke Dark), Organic Calming, Classic, Playful Learning, Executive Dark, Royal Grace, Ashara Mode, Classic Pro, and Plutonium — all from Settings > App themes.'
+    answer: 'You can switch between light and dark mode, and choose from themes like Cyber Neon (Bespoke Dark), Organic Calming, Classic, Playful Learning, Executive Dark, Royal Grace, Ashara Mode, Classic Pro, Plutonium, and Liquid Glass (Apple VisionOS) — all from Settings > App themes.'
   },
   {
     keywords: ['password', 'change password', 'security', 'app lock'],

@@ -5496,14 +5496,14 @@
     "semantic_hash": "3013e7bcc4cf1aabe86b8f4015d4c1de"
   },
   "android/app/build.gradle": {
-    "mtime": 1791380273.9424083,
-    "seen": 1791437862.0324183,
-    "ast_hash": "0701d50e7d60afcdc23e78fa878735ce",
+    "mtime": 1791640223.6901896,
+    "seen": 1791654982.2485855,
+    "ast_hash": "599f09411b69c2423d7a4de5a8d909bc",
     "semantic_hash": ""
   },
   "android/app/capacitor.build.gradle": {
-    "mtime": 1791293005.2167354,
-    "seen": 1791363592.8289924,
+    "mtime": 1791653945.86004,
+    "seen": 1791654982.2485888,
     "ast_hash": "f3c1db3e5a1641513a1e5a6bff1ee565",
     "semantic_hash": ""
   },
@@ -5550,8 +5550,8 @@
     "semantic_hash": "682315a426653617c6a74fc12bef55b6"
   },
   "android/capacitor.settings.gradle": {
-    "mtime": 1791293005.215736,
-    "seen": 1791363592.8295074,
+    "mtime": 1791653945.8590388,
+    "seen": 1791654982.249394,
     "ast_hash": "4d3b13b87f1d8abf11219d4ea2d0fef1",
     "semantic_hash": ""
   },
@@ -6120,9 +6120,9 @@
     "semantic_hash": "fffa152f0ee02e28b0660997e2f6e452"
   },
   "package.json": {
-    "mtime": 1791640216.1534536,
-    "seen": 1791640228.0265076,
-    "ast_hash": "24455474d12ae23e1f3b77ecd322ef84",
+    "mtime": 1791653814.0910125,
+    "seen": 1791654982.2591362,
+    "ast_hash": "412f178797a23f4df3a37e10f13c8240",
     "semantic_hash": ""
   },
   "public/112c6490-1181-11ee-b0f7-871603e699f6.json": {
@@ -6348,9 +6348,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1791640075.3430114,
-    "seen": 1791640228.031016,
-    "ast_hash": "512a3b22a1c830600d5c690ef559924b",
+    "mtime": 1791654684.4637103,
+    "seen": 1791654982.2641146,
+    "ast_hash": "0328c46640d52c6d2e1aa988c95c5977",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -6420,9 +6420,9 @@
     "semantic_hash": ""
   },
   "src/SupportBot.jsx": {
-    "mtime": 1791112605.6472363,
-    "seen": 1791112840.3805645,
-    "ast_hash": "5de026b15a0ac61791cbeaa2841f7936",
+    "mtime": 1791654874.8305118,
+    "seen": 1791654982.265026,
+    "ast_hash": "02c2c7b16f9c9394daf644db04e7c0d0",
     "semantic_hash": ""
   },
   "src/TakhteetProgress.jsx": {
@@ -6581,35 +6581,11 @@
     "ast_hash": "7384fe48b01fb2f4f1b80543101a8952",
     "semantic_hash": "7384fe48b01fb2f4f1b80543101a8952"
   },
-  "test-supabase.js": {
-    "mtime": 1777093789.2396905,
-    "seen": 1787510537.2115319,
-    "ast_hash": "254cac92565b921dd42ff1413e67553c",
-    "semantic_hash": "254cac92565b921dd42ff1413e67553c"
-  },
-  "test-supabase2.cjs": {
-    "mtime": 1777093819.4806845,
-    "seen": 1787510537.2115328,
-    "ast_hash": "44388c888c93c2cec09b5fcc6cef0798",
-    "semantic_hash": "44388c888c93c2cec09b5fcc6cef0798"
-  },
   "vercel.json": {
     "mtime": 1791474673.1067364,
     "seen": 1791529796.2095783,
     "ast_hash": "d6642647d211c542ae57404e321ee4e7",
     "semantic_hash": ""
-  },
-  "verify-table-structure.cjs": {
-    "mtime": 1778331650.0353363,
-    "seen": 1787510537.2115345,
-    "ast_hash": "957bbea90bb141a8c66d5fe0b0321a96",
-    "semantic_hash": "957bbea90bb141a8c66d5fe0b0321a96"
-  },
-  "verify-table-structure.js": {
-    "mtime": 1778331580.7922463,
-    "seen": 1787510537.2115357,
-    "ast_hash": "957bbea90bb141a8c66d5fe0b0321a96",
-    "semantic_hash": "957bbea90bb141a8c66d5fe0b0321a96"
   },
   "vite.config.js": {
     "mtime": 1791531728.1431725,
@@ -10026,9 +10002,9 @@
     "semantic_hash": ""
   },
   "src/components/AtfalTeacherLeagueEntry.jsx": {
-    "mtime": 1791636267.787627,
-    "seen": 1791636367.116847,
-    "ast_hash": "cbee7cfc052813f41f1e9d4f6a5ec43a",
+    "mtime": 1791643014.668147,
+    "seen": 1791654982.266195,
+    "ast_hash": "701dae2a3d0f761260e1a8e477d9bc30",
     "semantic_hash": ""
   },
   "public/assets/gems/gem-week1-emerald.png": {
@@ -10193,12 +10169,6 @@
     "ast_hash": "4f70695cd45af315e4f13a3875e5d552",
     "semantic_hash": ""
   },
-  "update_notifications_policies.sql": {
-    "mtime": 1781174838.7135704,
-    "seen": 1788936963.5521002,
-    "ast_hash": "",
-    "semantic_hash": ""
-  },
   "update_report_settings.sql": {
     "mtime": 1781174838.7135704,
     "seen": 1788936963.5521011,
@@ -10344,9 +10314,9 @@
     "semantic_hash": ""
   },
   "today_attendance.json": {
-    "mtime": 1791638070.0064893,
-    "seen": 1791640228.0365105,
-    "ast_hash": "c3bca01ea5670eca5f52faf599097b5c",
+    "mtime": 1791648039.9547155,
+    "seen": 1791654982.2714884,
+    "ast_hash": "2efb29023bd24bd01ee1c67dfc107be3",
     "semantic_hash": ""
   },
   "today_leaves.json": {
@@ -11070,15 +11040,15 @@
     "semantic_hash": ""
   },
   "src/components/AtfalLeagueLockModal.jsx": {
-    "mtime": 1791636002.1975641,
-    "seen": 1791636152.083287,
-    "ast_hash": "d6b69847ced9d0957982e6d60673a4e2",
+    "mtime": 1791642966.6397943,
+    "seen": 1791654982.2661073,
+    "ast_hash": "59746629b31e7064ada06b73bcc999e5",
     "semantic_hash": ""
   },
   "src/utils/leagueLockManager.js": {
-    "mtime": 1791270201.0498085,
-    "seen": 1791270518.9965503,
-    "ast_hash": "480f4d052016417782150dc466d900d7",
+    "mtime": 1791649616.6151834,
+    "seen": 1791654982.271103,
+    "ast_hash": "8bc6ec0224689431f147126112812186",
     "semantic_hash": ""
   },
   "api/admission-admin.js": {
@@ -12527,40 +12497,22 @@
     "ast_hash": "915353c6889c14be8d18a6f8034b1a92",
     "semantic_hash": ""
   },
-  "scripts/create-bucket.js": {
-    "mtime": 1781174838.6390631,
-    "seen": 1791529796.2037563,
-    "ast_hash": "b091694cf202e498696747e2703d109d",
-    "semantic_hash": ""
-  },
-  "scripts/delete-user.js": {
-    "mtime": 1781174838.6390631,
-    "seen": 1791529796.2037578,
-    "ast_hash": "b33aa5ee76d98c8f921b98589982082c",
-    "semantic_hash": ""
-  },
-  "scripts/run-migration.js": {
-    "mtime": 1785391828.688623,
-    "seen": 1791529796.2037609,
-    "ast_hash": "960828eda0329170b9e9865b7a5346c6",
-    "semantic_hash": ""
-  },
   "scripts/telegram-webhook.js": {
     "mtime": 1790576787.283548,
     "seen": 1791529796.2039797,
     "ast_hash": "a7e1ef8451b3ba3c0932b5972486b509",
     "semantic_hash": ""
   },
-  "Untitled-1.txt": {
-    "mtime": 1791523453.0239816,
-    "seen": 1791529796.2531412,
-    "ast_hash": "36105ddbd5c291ab60ceb3437c7b9c43",
+  "parent_interactions.json": {
+    "mtime": 1791654566.3637612,
+    "seen": 1791654982.259139,
+    "ast_hash": "a7825141df8aa9d7008ccaad8a3bb287",
     "semantic_hash": ""
   },
-  "parent_interactions.json": {
-    "mtime": 1791615706.3986733,
-    "seen": 1791636152.078332,
-    "ast_hash": "a78e6091c7e827a2f082acb297a75571",
+  "src/components/LiquidGlass.jsx": {
+    "mtime": 1791653859.4904435,
+    "seen": 1791654982.2664874,
+    "ast_hash": "39ae6486e62daf97710a1becd1b4fc18",
     "semantic_hash": ""
   }
 }
