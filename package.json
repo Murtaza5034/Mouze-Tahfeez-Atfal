@@ -41,6 +41,7 @@
     "jspdf": "^4.2.1",
     "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
+    "liquid-gl": "^3.0.0",
     "lottie-web": "^5.13.0",
     "lucide-react": "^0.294.0",
     "pino": "^10.4.0",

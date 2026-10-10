@@ -1,0 +1,193 @@
+/* ==========================================================================
+   APPLE LIQUID GLASS DESIGN SYSTEM (VisionOS & iOS 18 Aesthetic)
+   ========================================================================== */
+
+:root {
+  --apple-glass-bg: rgba(255, 255, 255, 0.58);
+  --apple-glass-bg-hover: rgba(255, 255, 255, 0.72);
+  --apple-glass-border: rgba(255, 255, 255, 0.65);
+  --apple-glass-border-subtle: rgba(255, 255, 255, 0.35);
+  --apple-glass-shadow: 0 16px 40px -12px rgba(15, 23, 42, 0.12),
+                        0 2px 6px -1px rgba(15, 23, 42, 0.04),
+                        inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.85),
+                        inset 0 -1px 1.5px 0 rgba(0, 0, 0, 0.03);
+  --apple-glass-shadow-lg: 0 24px 60px -16px rgba(15, 23, 42, 0.18),
+                           0 4px 16px -2px rgba(15, 23, 42, 0.06),
+                           inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.9),
+                           inset 0 -1.5px 2px 0 rgba(0, 0, 0, 0.04);
+  --apple-glass-blur: blur(28px) saturate(190%) contrast(105%);
+}
+
+[data-theme="dark"] {
+  --apple-glass-bg: rgba(18, 24, 38, 0.62);
+  --apple-glass-bg-hover: rgba(28, 36, 56, 0.75);
+  --apple-glass-border: rgba(255, 255, 255, 0.16);
+  --apple-glass-border-subtle: rgba(255, 255, 255, 0.08);
+  --apple-glass-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.45),
+                        0 2px 6px -1px rgba(0, 0, 0, 0.25),
+                        inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.22),
+                        inset 0 -1px 1.5px 0 rgba(0, 0, 0, 0.4);
+  --apple-glass-shadow-lg: 0 28px 70px -18px rgba(0, 0, 0, 0.65),
+                           0 4px 16px -2px rgba(0, 0, 0, 0.35),
+                           inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.28),
+                           inset 0 -1.5px 2px 0 rgba(0, 0, 0, 0.5);
+  --apple-glass-blur: blur(32px) saturate(210%) brightness(110%);
+}
+
+/* Base Liquid Glass Pane */
+.apple-liquid-glass {
+  position: relative;
+  background: var(--apple-glass-bg) !important;
+  backdrop-filter: var(--apple-glass-blur) !important;
+  -webkit-backdrop-filter: var(--apple-glass-blur) !important;
+  border: 1px solid var(--apple-glass-border) !important;
+  box-shadow: var(--apple-glass-shadow) !important;
+  border-radius: 20px;
+  transition: all 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+/* Glass Refraction Sheen (Specular Highlight Overlay) */
+.apple-liquid-glass::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.35) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+  opacity: 0.85;
+  transition: opacity 0.3s ease;
+}
+
+[data-theme="dark"] .apple-liquid-glass::before {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.02) 50%,
+    transparent 100%
+  );
+  opacity: 0.6;
+}
+
+/* Chromatic Edge Refraction Accent */
+.apple-liquid-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.65) 0%,
+    rgba(212, 175, 55, 0.3) 25%,
+    rgba(56, 189, 248, 0.25) 60%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* Hover Physics for Interactive Glass */
+.apple-liquid-glass-interactive {
+  cursor: pointer;
+}
+
+.apple-liquid-glass-interactive:hover {
+  transform: translateY(-2px) scale(1.008);
+  background: var(--apple-glass-bg-hover) !important;
+  box-shadow: var(--apple-glass-shadow-lg) !important;
+  border-color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.apple-liquid-glass-interactive:active {
+  transform: translateY(0) scale(0.992);
+}
+
+/* Apple Liquid Floating Dock / Bar */
+.apple-glass-dock {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--apple-glass-bg);
+  backdrop-filter: var(--apple-glass-blur);
+  -webkit-backdrop-filter: var(--apple-glass-blur);
+  border: 1px solid var(--apple-glass-border);
+  box-shadow: var(--apple-glass-shadow-lg);
+  z-index: 1000;
+}
+
+/* Apple Glass Header */
+.apple-glass-header {
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  background: var(--apple-glass-bg);
+  backdrop-filter: var(--apple-glass-blur);
+  -webkit-backdrop-filter: var(--apple-glass-blur);
+  border-bottom: 1px solid var(--apple-glass-border-subtle);
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.05);
+}
+
+/* Apple Glass Card */
+.apple-glass-card {
+  border-radius: 24px;
+  padding: 24px;
+  background: var(--apple-glass-bg);
+  backdrop-filter: var(--apple-glass-blur);
+  -webkit-backdrop-filter: var(--apple-glass-blur);
+  border: 1px solid var(--apple-glass-border);
+  box-shadow: var(--apple-glass-shadow);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.apple-glass-card:hover {
+  box-shadow: var(--apple-glass-shadow-lg);
+}
+
+/* Apple Liquid Button */
+.apple-glass-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border-radius: 999px;
+  background: var(--apple-glass-bg);
+  backdrop-filter: var(--apple-glass-blur);
+  -webkit-backdrop-filter: var(--apple-glass-blur);
+  border: 1px solid var(--apple-glass-border);
+  box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.06), inset 0 1px 1px 0 rgba(255, 255, 255, 0.8);
+  color: inherit;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.apple-glass-btn:hover {
+  transform: translateY(-1px);
+  background: var(--apple-glass-bg-hover);
+  box-shadow: 0 6px 20px 0 rgba(0, 0, 0, 0.1), inset 0 1px 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.apple-glass-btn:active {
+  transform: translateY(1px) scale(0.98);
+}
