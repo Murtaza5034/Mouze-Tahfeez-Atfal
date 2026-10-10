@@ -1279,6 +1279,65 @@ export default function AtfalTeacherLeagueEntry({
       </div>
 
       {/* ----------------------------------------------------------------- */}
+      {/* MOBILE STICKY BOTTOM DOCK (For effortless on-the-go phone entry) */}
+      {/* ----------------------------------------------------------------- */}
+      <div className="league-mobile-sticky-dock">
+        <div className="mobile-dock-inner">
+          <div className="mobile-dock-nav-group">
+            <button
+              type="button"
+              className="mobile-dock-nav-btn"
+              onClick={handlePrevStudent}
+              title="Previous Student"
+              aria-label="Previous Student"
+            >
+              <ChevronLeft size={20} />
+            </button>
+
+            <div className="mobile-dock-student-info">
+              <span className="mobile-dock-name" title={activeStudent?.name || "Student"}>
+                {activeStudent?.name || "Student"}
+              </span>
+              <span className="mobile-dock-gems-tag">
+                💎 {monthlyGemsTotal} / 480
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className="mobile-dock-nav-btn"
+              onClick={handleNextStudent}
+              title="Next Student"
+              aria-label="Next Student"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+
+          <div className="mobile-dock-action-group">
+            <button
+              type="button"
+              className={`mobile-dock-save-btn ${saveSuccess ? "saved" : ""}`}
+              onClick={() => saveMarks(false)}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <>Saving...</>
+              ) : saveSuccess ? (
+                <>
+                  <Check size={16} /> Saved!
+                </>
+              ) : (
+                <>
+                  <Save size={16} /> Save
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ----------------------------------------------------------------- */}
       {/* KALAM MUBARAK MODAL (From Page 1 of the PDF) */}
       {/* ----------------------------------------------------------------- */}
       {showKalamModal && (

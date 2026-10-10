@@ -137,6 +137,10 @@ const AUTH_DIR = process.env.AUTH_DIR || process.env.BAILEYS_AUTH_DIR || path.re
 
 export function hydrateAuthSession() {
   try {
+    // Only hydrate from seed bundle if explicitly requested via HYDRATE_SEED=true
+    if (process.env.HYDRATE_SEED !== 'true') {
+      return;
+    }
     const credsPath = path.join(AUTH_DIR, 'creds.json');
     if (fs.existsSync(credsPath)) {
       return; // Already initialized locally
@@ -206,6 +210,241 @@ export function preloadLidMappings() {
 }
 preloadLidMappings();
 
+// ---------------------------------------------------------------------------
+// High-Speed In-Memory Inbound & Outbound Message Deduplication Cache
+// ---------------------------------------------------------------------------
+export const seenInboundMsgIds = new Map(); // msgId -> timestamp
+export const dispatchedOutboundSignatures = new Map(); // signature -> timestamp
+const MAX_SEEN_MSG_IDS = 10000;
+const MSG_DEDUP_TTL_MS = 15 * 60 * 1000; // 15 mins TTL
+
+export function isDuplicateInboundMsg(msgId) {
+  if (!msgId) return false;
+  const now = Date.now();
+  if (seenInboundMsgIds.has(msgId)) {
+    const ts = seenInboundMsgIds.get(msgId);
+    if (now - ts < MSG_DEDUP_TTL_MS) return true;
+  }
+  seenInboundMsgIds.set(msgId, now);
+  if (seenInboundMsgIds.size > MAX_SEEN_MSG_IDS) {
+    const oldestKey = seenInboundMsgIds.keys().next().value;
+    seenInboundMsgIds.delete(oldestKey);
+  }
+  return false;
+}
+
+export function isDuplicateOutboundMsg(signature, throttleMs = 4000) {
+  if (!signature) return false;
+  const now = Date.now();
+  if (dispatchedOutboundSignatures.has(signature)) {
+    const ts = dispatchedOutboundSignatures.get(signature);
+    if (now - ts < throttleMs) return true;
+  }
+  dispatchedOutboundSignatures.set(signature, now);
+  if (dispatchedOutboundSignatures.size > MAX_SEEN_MSG_IDS) {
+    const oldestKey = dispatchedOutboundSignatures.keys().next().value;
+    dispatchedOutboundSignatures.delete(oldestKey);
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Persistent Admission Dispatches & Lookups
+// ---------------------------------------------------------------------------
+const DISPATCHED_ADMISSIONS_FILE = path.join(AUTH_DIR, 'dispatched_admissions.json');
+export const dispatchedAdmissionsMap = new Map(); // appId -> Set of triggers (e.g. 'submission', 'approved')
+
+export function initDispatchedAdmissions() {
+  try {
+    if (fs.existsSync(DISPATCHED_ADMISSIONS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(DISPATCHED_ADMISSIONS_FILE, 'utf8'));
+      if (typeof data === 'object' && data !== null) {
+        for (const [appId, triggers] of Object.entries(data)) {
+          dispatchedAdmissionsMap.set(appId, new Set(Array.isArray(triggers) ? triggers : [triggers]));
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[ADMISSION-CACHE] Error loading dispatched admissions:', err.message);
+  }
+
+  // Pre-seed all existing historical admissions from public/admissions_data.json
+  // so past submissions are NEVER spammed with duplicate pending welcome messages!
+  try {
+    const pData = path.resolve('public', 'admissions_data.json');
+    if (fs.existsSync(pData)) {
+      const list = JSON.parse(fs.readFileSync(pData, 'utf8')) || [];
+      for (const item of list) {
+        if (item.application_id) {
+          if (!dispatchedAdmissionsMap.has(item.application_id)) {
+            dispatchedAdmissionsMap.set(item.application_id, new Set(['submission']));
+          } else {
+            dispatchedAdmissionsMap.get(item.application_id).add('submission');
+          }
+        }
+      }
+    }
+    console.log(`[WHATSAPP BOT] 🛡️ Admission cache initialized with ${dispatchedAdmissionsMap.size} existing records (Protected from spam restarts).`);
+  } catch (_) {}
+}
+initDispatchedAdmissions();
+
+export function saveDispatchedAdmission(appId, trigger = 'submission') {
+  if (!appId) return;
+  if (!dispatchedAdmissionsMap.has(appId)) {
+    dispatchedAdmissionsMap.set(appId, new Set());
+  }
+  dispatchedAdmissionsMap.get(appId).add(trigger);
+
+  try {
+    const out = {};
+    for (const [k, v] of dispatchedAdmissionsMap.entries()) {
+      out[k] = Array.from(v);
+    }
+    if (!fs.existsSync(AUTH_DIR)) fs.mkdirSync(AUTH_DIR, { recursive: true });
+    fs.writeFileSync(DISPATCHED_ADMISSIONS_FILE, JSON.stringify(out, null, 2), 'utf8');
+  } catch (_) {}
+}
+
+export function isAdmissionDispatched(appId, trigger = 'submission') {
+  if (!appId) return false;
+  const set = dispatchedAdmissionsMap.get(appId);
+  return set ? set.has(trigger) : false;
+}
+
+export function findAdmissionByPhoneOrJid(phoneOrJid) {
+  const clean = cleanPhone(phoneOrJid);
+  if (!clean || clean.length < 10) return null;
+  const clean10 = clean.slice(-10);
+
+  try {
+    const dataPath = path.resolve('public', 'admissions_data.json');
+    if (fs.existsSync(dataPath)) {
+      const list = JSON.parse(fs.readFileSync(dataPath, 'utf8')) || [];
+      const found = list.find(item => {
+        const itemPhone = cleanPhone(item.whatsapp_number || item.phone || '');
+        return itemPhone && (itemPhone === clean || itemPhone.slice(-10) === clean10);
+      });
+      if (found) return found;
+    }
+  } catch (_) {}
+  return null;
+}
+
+export function findAdmissionByAppId(text) {
+  if (!text) return null;
+  const match = text.match(/MT-\d{4}-\d+/i);
+  if (!match) return null;
+  const targetId = match[0].toUpperCase();
+  try {
+    const dataPath = path.resolve('public', 'admissions_data.json');
+    if (fs.existsSync(dataPath)) {
+      const list = JSON.parse(fs.readFileSync(dataPath, 'utf8')) || [];
+      const found = list.find(item => item.application_id && item.application_id.toUpperCase() === targetId);
+      if (found) return found;
+    }
+  } catch (_) {}
+  return null;
+}
+
+export async function confirmAdmissionApplication(adm, adminUser = 'Applicant via WhatsApp') {
+  if (!adm || !adm.application_id) return null;
+  const appId = adm.application_id;
+  const timestamp = new Date().toISOString();
+
+  let updatedRecord = {
+    ...adm,
+    status: 'approved',
+    enrollment_confirmed: true,
+    confirmed_at: timestamp,
+    updated_at: timestamp
+  };
+
+  try {
+    const dataPath = path.resolve('public', 'admissions_data.json');
+    if (fs.existsSync(dataPath)) {
+      let list = JSON.parse(fs.readFileSync(dataPath, 'utf8')) || [];
+      const idx = list.findIndex(r => r.application_id === appId || r.id === appId);
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], ...updatedRecord };
+      } else {
+        list.unshift(updatedRecord);
+      }
+      fs.writeFileSync(dataPath, JSON.stringify(list, null, 2), 'utf8');
+    }
+  } catch (_) {}
+
+  // Sync to Firestore if available
+  try {
+    if (adminDb) {
+      await adminDb.collection('admission_applications').doc(appId).set(updatedRecord, { merge: true });
+    }
+  } catch (_) {}
+
+  return updatedRecord;
+}
+
+export function formatAdmissionConfirmationCredentials(adm) {
+  const fullName = adm.full_name || 'Mumin';
+  const its = adm.its_number || 'ITS';
+  const prog = adm.program || 'Tahfeez Program';
+  const email = adm.email || (adm.its_number ? `${adm.its_number}@tahfeez.local` : 'Registered Email');
+  const phone = adm.whatsapp_number || adm.phone || '';
+  const isKibar = prog.toLowerCase().includes('kibar');
+
+  return (
+    `*Mubarak! Admission Confirmed* 🎉\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `Salaam *${fullName}*,\n` +
+    `Your enrollment for *${prog}* has been successfully confirmed!\n\n` +
+    `🔐 *STUDENT PORTAL ACCESS DETAILS:*\n` +
+    `• *Login ID (ITS):* \`${its}\`\n` +
+    `• *Registered Email:* \`${email}\`\n` +
+    `• *Access Password:* \`${its}\`\n` +
+    `  _(Sign in using your 8-digit ITS number or phone ${phone})_\n\n` +
+    `🌐 *Student Portal Access Link:*\n` +
+    (isKibar
+      ? `👉 *Al-Kibar Portal:* https://mouze-tahfeez-atfal.vercel.app/\n`
+      : `👉 *Al-Atfal Portal:* https://mouze-tahfeez-atfal.vercel.app/\n`) +
+    (adm.venue_and_time ? `\n📍 *Batch & Venue:* ${adm.venue_and_time}\n` : '') +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `📱 *WhatsApp Automated Helpline Services:*\n` +
+    `You will receive daily attendance updates, weekly report cards, and leave approvals right here!\n\n` +
+    `📞 *Helpline:* ${BOT_CONFIG.HELPLINE_NUMBER}\n` +
+    `*Mauze Tahfeez - Galiakot*`
+  );
+}
+
+export function formatAdmissionStatusCard(adm) {
+  const fullName = adm.full_name || 'Mumin';
+  const its = adm.its_number || 'ITS';
+  const prog = adm.program || 'Tahfeez Program';
+  const appId = adm.application_id || 'N/A';
+  const status = (adm.status || 'pending').toUpperCase();
+  const stEmoji = status === 'APPROVED' ? '✅' : status === 'WAITING' ? '⏳' : status === 'REJECTED' ? '❌' : '⏳';
+
+  return (
+    `📋 *Tahfeez Admission Status*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `👤 *Applicant:* ${fullName}\n` +
+    `🆔 *ITS Number:* \`${its}\`\n` +
+    `📄 *Application Ref:* \`${appId}\`\n` +
+    `📚 *Program:* ${prog}\n` +
+    `📊 *Current Status:* ${stEmoji} *${status}*\n` +
+    (adm.venue_and_time ? `📍 *Venue & Timing:* ${adm.venue_and_time}\n` : '') +
+    (adm.last_achieved_sanad ? `🏆 *Sanad:* ${adm.last_achieved_sanad}\n` : '') +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    (status === 'APPROVED'
+      ? `👉 *To confirm your admission and receive your student portal login details, reply:*\n*Yes*\n\n`
+      : status === 'WAITING'
+      ? `ℹ️ You are on the waiting list. We will notify you immediately once a seat opens up.\n\n`
+      : `ℹ️ Your application is currently under administrative review.\n\n`) +
+    `📞 *Helpline:* ${BOT_CONFIG.HELPLINE_NUMBER}\n` +
+    `*Mauze Tahfeez - Galiakot*`
+  );
+}
+
+
 /**
  * Returns candidate font files for high-fidelity SVG -> PNG rendering.
  */
@@ -265,8 +504,90 @@ export function resolveLatestStudentGroup(studentName, currentGroup = '', teache
   return cur || 'Atfal';
 }
 
+export const firestoreStudentsMap = new Map();
+
 /**
- * Loads embedded students roster from api/students-roster.json
+ * Synchronizes or deletes a single student document directly from Firestore child_profiles / kibar_child_profiles.
+ */
+export function syncStudentDoc(docId, data, section = 'atfal') {
+  if (!docId) return;
+  const sId = String(docId).trim();
+  if (!data || data.is_active === false) {
+    firestoreStudentsMap.delete(sId);
+    if (data?.student_id) firestoreStudentsMap.delete(String(data.student_id).trim());
+    // Also remove from linked subscriber cache if mapped to this student
+    for (const [phone, sub] of linkedWASubscribersCache.entries()) {
+      const subId = String(sub?.student?.student_id || sub?.student?.id || '').trim();
+      if (subId === sId) {
+        removeLinkedSubscriber(phone);
+        console.log(`[STUDENT-SYNC] 🗑️ Unlinked removed student ${docId} from subscriber cache ${phone}`);
+      }
+    }
+    return;
+  }
+
+  const resolvedId = String(data.student_id || sId).trim();
+  const name = data.full_name || data.name || 'Student';
+  const teacher = data.teacher_name || data.teacher || '';
+  const grp = data.group_name || data.group || resolveLatestStudentGroup(name, '', teacher);
+  const rawPhone = data.whatsapp_number || data.phone_number || data.phone || '';
+  const cpPhone = cleanPhone(rawPhone);
+
+  const studentRecord = {
+    student_id: resolvedId,
+    id: resolvedId,
+    name: name,
+    arabic_name: data.arabic_name || '',
+    its: data.its ? String(data.its).trim() : (data.its_number ? String(data.its_number).trim() : ''),
+    phone: cpPhone ? `+${cpPhone}` : '',
+    whatsapp_number: cpPhone ? `+${cpPhone}` : '',
+    email: data.parent_email || data.email || '',
+    teacher: teacher,
+    teacher_id: data.teacher_id || '',
+    badal_teacher_id: data.badal_teacher_id || null,
+    group: grp,
+    juz: data.juz || '',
+    surat: data.surat || '',
+    is_active: data.is_active !== false,
+    section: section,
+    photo_url: data.photo_url || data.photoUrl || data.avatar_url || '',
+    gem_league: data.gem_league || null,
+    weeklyScore: Number(data.weeklyScore) || 0,
+    marhalaRank: data.marhalaRank || 0,
+    overallRank: data.overallRank || 0,
+    totalJadeed: data.totalJadeed || '',
+    wusool_page: data.wusool_page || '',
+    totalOutOf: data.totalOutOf || 100,
+    fromDate: data.fromDate || '',
+    tillDate: data.tillDate || '',
+    status: data.status || 'Yes'
+  };
+
+  firestoreStudentsMap.set(resolvedId, studentRecord);
+  if (sId !== resolvedId) {
+    firestoreStudentsMap.set(sId, studentRecord);
+  }
+}
+
+/**
+ * Re-constructs embeddedRoster exclusively from active Firestore student profiles.
+ */
+export function refreshEmbeddedRosterFromFirestore() {
+  if (firestoreStudentsMap.size > 0) {
+    const uniqueStudents = new Map();
+    for (const s of firestoreStudentsMap.values()) {
+      if (s.is_active !== false && s.id) {
+        uniqueStudents.set(s.id, s);
+      }
+    }
+    const list = Array.from(uniqueStudents.values());
+    embeddedRoster = list.map(s => (typeof enrichStudentWithLatestResult === 'function' ? enrichStudentWithLatestResult(s) : s));
+    console.log(`[STUDENT-SYNC] 👥 Synchronized ${embeddedRoster.length} active students directly from Firestore child_profiles.`);
+  }
+}
+
+/**
+ * Loads embedded students roster from api/students-roster.json as fallback seed
  */
 export let embeddedRoster = [];
 export function loadRoster() {
@@ -277,12 +598,22 @@ export function loadRoster() {
     ];
     for (const p of rosterCandidates) {
       if (fs.existsSync(p)) {
-        embeddedRoster = JSON.parse(fs.readFileSync(p, 'utf8') || '[]');
-        // Track the latest groups for all students
+        const rawList = JSON.parse(fs.readFileSync(p, 'utf8') || '[]');
+        // Filter out any known removed or inactive students
+        embeddedRoster = rawList.filter(s => {
+          const sName = (s.name || '').toLowerCase();
+          const sId = s.student_id || s.id;
+          if (sId === '8315df71-c824-4304-9dfa-b6d221a08d29') return false;
+          if (sName.includes('fatema') && sName.includes('kothari')) return false;
+          return s.is_active !== false;
+        });
+        // Track the latest groups and pre-seed firestoreStudentsMap
         for (const s of embeddedRoster) {
           s.group = resolveLatestStudentGroup(s.name, s.group, s.teacher);
+          const sId = String(s.student_id || s.id).trim();
+          if (sId) firestoreStudentsMap.set(sId, s);
         }
-        console.log(`[WHATSAPP BOT] Loaded ${embeddedRoster.length} students from roster: ${p} (groups updated to latest)`);
+        console.log(`[WHATSAPP BOT] Loaded ${embeddedRoster.length} active students from roster seed: ${p}`);
         break;
       }
     }
@@ -371,6 +702,42 @@ export function getLinkedSubscriberRecord(phone) {
     }
   }
   return { expired: false, student: rec.student, record: rec };
+}
+
+// Persistent track of parent last inbound interaction timestamp
+const WA_PARENT_INTERACTIONS_PATH = path.resolve('parent_interactions.json');
+export const parentLastInteractionMap = new Map();
+
+export function loadParentInteractions() {
+  try {
+    if (fs.existsSync(WA_PARENT_INTERACTIONS_PATH)) {
+      const data = JSON.parse(fs.readFileSync(WA_PARENT_INTERACTIONS_PATH, 'utf8') || '{}');
+      for (const [phone, ts] of Object.entries(data)) {
+        parentLastInteractionMap.set(String(phone), Number(ts));
+      }
+    }
+  } catch (_) {}
+}
+loadParentInteractions();
+
+export function getParentLastInteraction(phone) {
+  if (!phone) return 0;
+  const p = cleanPhone(phone);
+  return parentLastInteractionMap.get(p) || 0;
+}
+
+export function recordParentInteraction(phone) {
+  if (!phone) return;
+  const p = cleanPhone(phone);
+  parentLastInteractionMap.set(p, Date.now());
+  try {
+    let disk = {};
+    if (fs.existsSync(WA_PARENT_INTERACTIONS_PATH)) {
+      disk = JSON.parse(fs.readFileSync(WA_PARENT_INTERACTIONS_PATH, 'utf8') || '{}');
+    }
+    disk[p] = Date.now();
+    fs.writeFileSync(WA_PARENT_INTERACTIONS_PATH, JSON.stringify(disk, null, 2));
+  } catch (_) {}
 }
 
 // ---------------------------------------------------------------------------
@@ -475,11 +842,19 @@ export function matchTeacherToStudent(teacherName, studentTeacherName) {
 }
 
 /**
- * Returns all students allocated to the specified teacher.
+ * Returns all students allocated to the specified teacher based on active Firestore assignments.
  */
 export function findTeacherAllocatedStudents(teacher) {
   if (!teacher) return [];
-  const allocated = embeddedRoster.filter(s => matchTeacherToStudent(teacher.name, s.teacher));
+  const tId = String(teacher.id || teacher.user_id || '').trim();
+  const tName = teacher.name || teacher.full_name || '';
+
+  const allocated = embeddedRoster.filter(s => {
+    if (s.is_active === false) return false;
+    if (tId && (String(s.teacher_id) === tId || String(s.badal_teacher_id) === tId)) return true;
+    if (tName && matchTeacherToStudent(tName, s.teacher)) return true;
+    return false;
+  });
   return allocated.map(s => (typeof enrichStudentWithLatestResult === 'function' ? enrichStudentWithLatestResult(s) : s));
 }
 
@@ -516,6 +891,72 @@ export function isActiveAtfalTeacher(name) {
     'rampura'
   ];
   return activeSurnames.some(kw => norm.includes(kw));
+}
+
+/**
+ * Real-time synchronization of teacher documents from Firestore teacher_profiles / kibar_teacher_profiles.
+ */
+export function syncTeacherProfileRecord(docId, data) {
+  if (!docId) return;
+  const id = String(docId).trim();
+  if (!data || data.is_active === false) {
+    const existing = teacherProfilesById.get(id);
+    if (existing) {
+      teacherProfilesById.delete(id);
+      if (existing.normalizedName) teacherProfilesByName.delete(existing.normalizedName);
+      if (existing.cleanPhone) {
+        teacherProfilesByPhone.delete(existing.cleanPhone);
+        if (existing.cleanPhone.length >= 10) teacherProfilesByPhone.delete(existing.cleanPhone.slice(-10));
+      }
+      if (existing.cleanWhatsApp) {
+        teacherProfilesByPhone.delete(existing.cleanWhatsApp);
+        if (existing.cleanWhatsApp.length >= 10) teacherProfilesByPhone.delete(existing.cleanWhatsApp.slice(-10));
+      }
+      const idx = teacherProfilesList.findIndex(t => t.id === id);
+      if (idx >= 0) teacherProfilesList.splice(idx, 1);
+    }
+    return;
+  }
+
+  const name = data.full_name || data.name || '';
+  const cleanP = cleanPhone(data.phone_number || data.phone || '');
+  const cleanW = cleanPhone(data.whatsapp_number || data.phone_number || data.phone || '');
+  const normName = normalizeTeacherName(name);
+
+  const profile = {
+    id: id,
+    user_id: data.user_id || id,
+    name: name,
+    normalizedName: normName,
+    phone: cleanP ? `+${cleanP}` : '',
+    cleanPhone: cleanP,
+    whatsapp: cleanW ? `+${cleanW}` : '',
+    cleanWhatsApp: cleanW,
+    email: data.email || '',
+    emails: data.email ? [data.email] : [],
+    role: data.teacher_role || 'muhaffiz',
+    isActive: data.is_active !== false,
+    photoUrl: data.photo_url || ''
+  };
+
+  teacherProfilesById.set(id, profile);
+  if (data.user_id) teacherProfilesById.set(String(data.user_id), profile);
+  if (normName) teacherProfilesByName.set(normName, profile);
+  if (cleanP) {
+    teacherProfilesByPhone.set(cleanP, profile);
+    if (cleanP.length >= 10) teacherProfilesByPhone.set(cleanP.slice(-10), profile);
+  }
+  if (cleanW) {
+    teacherProfilesByPhone.set(cleanW, profile);
+    if (cleanW.length >= 10) teacherProfilesByPhone.set(cleanW.slice(-10), profile);
+  }
+
+  const idx = teacherProfilesList.findIndex(t => t.id === id || (data.user_id && t.user_id === data.user_id));
+  if (idx >= 0) {
+    teacherProfilesList[idx] = profile;
+  } else {
+    teacherProfilesList.push(profile);
+  }
 }
 
 /**
@@ -1233,12 +1674,13 @@ export const sentFeeReminders = new Set();
 
 /**
  * Sends Hub Raqam tuition fee reminder with exact official Pay Now link.
+ * Automatically runs on Fatemi Hijri month days 27, 28, 29, 30.
  */
 export async function checkAndSendFatemiFeeReminders(options = {}) {
   const force = !!options.force;
   const targetStudentId = options.studentId ? String(options.studentId).trim() : null;
   const hijri = getFatemiHijriMonth();
-  const isMonthEnd = force || (hijri.date >= hijri.monthLen - 1);
+  const isMonthEnd = force || (hijri.date >= 27);
   if (!isMonthEnd) {
     return { sent: 0, reason: `Not Fatemi month end (Day ${hijri.date}/${hijri.monthLen})` };
   }
@@ -1263,17 +1705,23 @@ export async function checkAndSendFatemiFeeReminders(options = {}) {
       continue;
     }
 
-    const messageText = `\n` +
+    const messageText = `💰 *HUB RAQAM - MONTHLY FEE*\n\n` +
+      `Salam Jameel,\n` +
       `Respected Parent,\n\n` +
-      `Kindly pay the Mauze Tahfeez Hub Raqam for *${hijri.nameEn} ${hijri.year}* for *${studentName}*${its ? ` (ITS: \`${its}\`)` : ''}.\n\n` +
-      `💳 *Pay Online:* ${payUrl}\n\n` +
-      `Shukran.\n\n` +
-      `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
+      `This is regarding the monthly Mauze Tahfeez Hub Raqam for *${hijri.nameEn} ${hijri.year}*:\n` +
+      `👤 Student: *${studentName}*\n` +
+      `🆔 ITS: \`${its || '—'}\`\n\n` +
+      `Kindly complete the payment online via the official Mahad al Zahra portal:\n` +
+      `👉 *PAY NOW:*\n` +
+      `💳 ${payUrl}\n\n` +
+      `After payment, please preserve your transaction receipt for your records.\n\n` +
+      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
+      `💬 *Type 1 (Result Card) • 2 (Hazri) • 3 (Leave Status) • 4 (League Points)*`;
 
     const jid = formatTargetJid(phoneOrLid);
     if (jid && sock && baileysStatus === 'CONNECTED') {
       try {
-        await sock.sendMessage(jid, { text: messageText });
+        await sendWhatsAppMessage(jid, { text: messageText }, s.phone || phoneOrLid);
         sentFeeReminders.add(reminderKey);
         sentCount++;
         console.log(`[FEE-REMINDER] 💰 Sent Hub Raqam fee reminder to ${jid} for ${studentName}`);
@@ -1300,17 +1748,23 @@ export async function checkAndSendFatemiFeeReminders(options = {}) {
       continue;
     }
 
-    const messageText = `\n` +
+    const messageText = `💰 *HUB RAQAM - MONTHLY FEE*\n\n` +
+      `Salam Jameel,\n` +
       `Respected Parent,\n\n` +
-      `Kindly pay the Mauze Tahfeez Hub Raqam for *${hijri.nameEn} ${hijri.year}* for *${studentName}*${its ? ` (ITS: \`${its}\`)` : ''}.\n\n` +
-      `💳 *Pay Online:* ${payUrl}\n\n` +
-      `Shukran.\n\n` +
-      `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
+      `This is regarding the monthly Mauze Tahfeez Hub Raqam for *${hijri.nameEn} ${hijri.year}*:\n` +
+      `👤 Student: *${studentName}*\n` +
+      `🆔 ITS: \`${its || '—'}\`\n\n` +
+      `Kindly complete the payment online via the official Mahad al Zahra portal:\n` +
+      `👉 *PAY NOW:*\n` +
+      `💳 ${payUrl}\n\n` +
+      `After payment, please preserve your transaction receipt for your records.\n\n` +
+      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
+      `💬 *Type 1 (Result Card) • 2 (Hazri) • 3 (Leave Status) • 4 (League Points)*`;
 
     const jid = formatTargetJid(sPhone);
     if (jid && sock && baileysStatus === 'CONNECTED') {
       try {
-        await sock.sendMessage(jid, { text: messageText });
+        await sendWhatsAppMessage(jid, { text: messageText }, sPhone);
         sentFeeReminders.add(reminderKey);
         sentCount++;
         console.log(`[FEE-REMINDER] 💰 Sent Hub Raqam fee reminder to roster parent ${jid} for ${studentName}`);
@@ -1322,7 +1776,8 @@ export async function checkAndSendFatemiFeeReminders(options = {}) {
 
   return {
     sent: sentCount,
-    hijriDate: `${hijri.date}/${hijri.month}/${hijri.year} (${hijri.nameEn})`  };
+    hijriDate: `${hijri.date}/${hijri.month}/${hijri.year} (${hijri.nameEn})`
+  };
 }
 export function lookupStudentInRoster(query) {
   const targetPhone = cleanPhone(query.phone || '');
@@ -2376,20 +2831,32 @@ export function buildResultCaption(data) {
   const name = data.name || data.studentName || 'Student';
   const tillDate = data.tillDate || data.weekDate || '';
 
-  return `\n\n` +
+  return `🏆 *Weekly Result Card: ${name}*\n\n` +
     `Weekly result card for *${name}*${tillDate && tillDate !== '—' ? ` (${tillDate})` : ''} is attached above 👆\n\n` +
     `Regards,\n` +
     `*Mauze Tahfeez - Galiakot*\n\n` +
-    `💬 *Type 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
+    `💬 *Type 2 (Hazri) • 3 (Leave Status) • 4 (League Points)*`;
 }
 
 /**
  * Connects to Meta WhatsApp Multi-Device servers via Baileys socket.
  */
 let isConnecting = false;
+let connectingTimeoutTimer = null;
+
 export async function initBaileysSocket() {
-  if (isConnecting) return sock;
+  if (isConnecting) {
+    console.log('[WHATSAPP BOT] ⏳ Connection attempt already in progress, skipping duplicate call.');
+    return sock;
+  }
   isConnecting = true;
+  clearTimeout(connectingTimeoutTimer);
+  connectingTimeoutTimer = setTimeout(() => {
+    if (isConnecting) {
+      console.warn('[WHATSAPP BOT] ⚠️ Connection lock timed out after 30s, resetting lock.');
+      isConnecting = false;
+    }
+  }, 30000);
 
   if (sock) {
     try {
@@ -2420,7 +2887,7 @@ export async function initBaileysSocket() {
         creds: state.creds,
         keys: makeCacheableSignalKeyStore(state.keys, createSilentLogger())
       },
-      browser: Browsers.ubuntu('Chrome'),
+      browser: Browsers.macOS('Desktop'),
       syncFullHistory: false,
       generateHighQualityLinkPreview: false,
       markOnlineOnConnect: true,
@@ -2450,6 +2917,7 @@ export async function initBaileysSocket() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
+      isConnecting = false;
       latestQrRaw = qr;
       latestQrDataUrl = await QRCode.toDataURL(qr, { width: 360, margin: 2 });
       await QRCode.toFile('openwa-qr.png', qr, { width: 400 }).catch(() => {});
@@ -2505,12 +2973,18 @@ export async function initBaileysSocket() {
     }
   });
 
-  // ── INCOMING MESSAGES EVENT LISTENER ──
+  // ── INCOMING MESSAGES EVENT LISTENER (DEDUPLICATED & ROBUST) ──
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (!messages || !Array.isArray(messages)) return;
     for (const msg of messages) {
       if (!msg || !msg.message) continue;
       if (msg.key?.fromMe) continue;
+
+      // Inbound message deduplication: prevent Baileys double-event fires
+      const msgId = msg.key?.id;
+      if (msgId && isDuplicateInboundMsg(msgId)) {
+        continue;
+      }
 
       // Instant read receipt
       try {
@@ -2541,22 +3015,31 @@ export async function initBaileysSocket() {
     }
   });
 
-  // Self-healing watchdog: Keep connection hot and auto-reconnect if dropped
+  // Self-healing 24/7 watchdog: Active health-check, ping and auto-reconnect
   if (!global.__baileysWatchdogStarted) {
     global.__baileysWatchdogStarted = true;
     setInterval(async () => {
       try {
         if (sock && baileysStatus === 'CONNECTED') {
-          await sock.sendPresenceUpdate('available').catch(() => {});
+          // Check if socket websocket stream is still open
+          const isWsOpen = sock.ws ? (typeof sock.ws.isOpen === 'boolean' ? sock.ws.isOpen : (sock.ws.socket ? sock.ws.socket.readyState === 1 : true)) : false;
+          if (!isWsOpen && !isConnecting) {
+            console.warn('[WATCHDOG] ⚠️ WhatsApp WebSocket stream is not open. Reconnecting...');
+            baileysStatus = 'DISCONNECTED';
+            initBaileysSocket().catch(() => {});
+          } else {
+            await sock.sendPresenceUpdate('available').catch(() => {});
+          }
         } else if (baileysStatus === 'DISCONNECTED' && !isConnecting) {
-          console.log('[WATCHDOG] 🔄 Auto-reconnecting disconnected WhatsApp socket...');
+          console.log('[WATCHDOG] 🔄 Auto-reconnecting disconnected WhatsApp socket (24/7 Keep-Alive)...');
           initBaileysSocket().catch(() => {});
         }
-      } catch (_) {}
-    }, 25000);
+      } catch (wErr) {
+        console.warn('[WATCHDOG-ERR] Watchdog check note:', wErr.message);
+      }
+    }, 15000);
   }
 
-  isConnecting = false;
   return sock;
 }
 
@@ -2591,91 +3074,67 @@ export async function fetchLiveSheetResult(student) {
 
 /**
  * Robust message sender that handles both standard phone JIDs and private @lid JIDs
- * with automatic fallback to @s.whatsapp.net.
+ * with automatic phone JID prioritization so mobile WhatsApp clients reliably render the messages.
  */
 export async function sendWhatsAppMessage(targetJid, content, senderPhone = '') {
   if (!sock) return null;
-  try {
-    // If buttons are provided, construct native interactive quick-reply buttons (compatible with modern WhatsApp iOS / Android / Web)
-    if (content && Array.isArray(content.buttons) && content.buttons.length > 0 && content.text) {
-      try {
-        const nativeButtons = content.buttons.map(b => {
-          const id = String(b.buttonId || b.id || '');
-          const displayText = String(b.buttonText?.displayText || b.displayText || b.text || b.title || id);
-          return {
-            name: 'quick_reply',
-            buttonParamsJson: JSON.stringify({ display_text: displayText, id: id })
-          };
-        });
 
-        const waMsg = generateWAMessageFromContent(targetJid, {
-          viewOnceMessage: {
-            message: {
-              messageContextInfo: {
-                deviceListMetadata: {},
-                deviceListMetadataVersion: 2
-              },
-              interactiveMessage: proto.Message.InteractiveMessage.create({
-                body: proto.Message.InteractiveMessage.Body.create({ text: content.text }),
-                footer: proto.Message.InteractiveMessage.Footer.create({ text: content.footer || "Mauze Tahfeez - Galiakot" }),
-                header: proto.Message.InteractiveMessage.Header.create({ title: content.title || "", hasMediaAttachment: false }),
-                nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-                  buttons: nativeButtons
-                })
-              })
-            }
-          }
-        }, { userJid: sock.user?.id || targetJid });
-
-        await sock.relayMessage(targetJid, waMsg.message, { messageId: waMsg.key.id });
-        console.log(`[WHATSAPP-SEND-SUCCESS] ✅ Sent native interactive button message to ${targetJid}`);
-        return waMsg;
-      } catch (btnErr) {
-        console.warn(`[WHATSAPP-SEND-NATIVE-BTN-FAIL] Native button creation warning:`, btnErr.message);
-      }
+  // Deduplicate rapid identical outbound messages to prevent double-shot bugs
+  const textBody = content?.text || content?.caption || '';
+  if (textBody) {
+    const sig = `${targetJid}:${textBody.trim().substring(0, 80)}`;
+    if (isDuplicateOutboundMsg(sig, 3000)) {
+      console.log(`[WHATSAPP-SEND-SKIPPED] 🛡️ Skipped duplicate message dispatch to ${targetJid}`);
+      return { duplicate_skipped: true };
     }
-
-    const result = await sock.sendMessage(targetJid, content);
-    console.log(`[WHATSAPP-SEND-SUCCESS] ✅ Sent message to ${targetJid}`);
-    return result;
-  } catch (err) {
-    console.warn(`[WHATSAPP-SEND-FAIL] Direct send to ${targetJid} failed:`, err.message);
-    // If sending with button payload failed, try text-only fallback immediately
-    if (content && content.buttons && content.text) {
-      try {
-        const textFallback = { text: content.text };
-        const fbRes = await sock.sendMessage(targetJid, textFallback);
-        console.log(`[WHATSAPP-SEND-SUCCESS] ✅ Sent text fallback to ${targetJid}`);
-        return fbRes;
-      } catch (_) {}
-    }
-    if (targetJid && targetJid.includes('@lid') && senderPhone && senderPhone.length >= 10 && senderPhone.length <= 13) {
-      const fallbackJid = `${senderPhone}@s.whatsapp.net`;
-      try {
-        console.log(`[WHATSAPP-SEND-FALLBACK] Retrying to phone JID: ${fallbackJid}...`);
-        const fbResult = await sock.sendMessage(fallbackJid, content);
-        console.log(`[WHATSAPP-SEND-SUCCESS] ✅ Sent message to fallback ${fallbackJid}`);
-        return fbResult;
-      } catch (err2) {
-        console.error(`[WHATSAPP-SEND-FALLBACK-FAIL] Fallback to ${fallbackJid} failed:`, err2.message);
-      }
-    } else if (targetJid && targetJid.includes('@s.whatsapp.net')) {
-      const cleanP = cleanPhone(targetJid.replace(/@.*$/, ''));
-      const knownLid = phoneToLidCache.get(cleanP);
-      if (knownLid) {
-        const lidJid = `${knownLid}@lid`;
-        try {
-          console.log(`[WHATSAPP-SEND-FALLBACK] Retrying to known LID: ${lidJid}...`);
-          const fbResult = await sock.sendMessage(lidJid, content);
-          console.log(`[WHATSAPP-SEND-SUCCESS] ✅ Sent message to fallback ${lidJid}`);
-          return fbResult;
-        } catch (err3) {
-          console.error(`[WHATSAPP-SEND-FALLBACK-FAIL] Fallback to ${lidJid} failed:`, err3.message);
-        }
-      }
-    }
-    return null;
   }
+
+  // Always use clean text payload (strip buttons array if any to prevent Baileys button rejection)
+  const sendPayload = (content && content.buttons && content.text) ? { text: content.text } : content;
+
+  // Resolve direct phone number to guarantee delivery to mobile chat
+  let resolvedPhone = cleanPhone(senderPhone);
+  if (!resolvedPhone && targetJid && targetJid.includes('@lid')) {
+    const lidDigits = targetJid.replace(/@.*$/, '').replace(/\D/g, '');
+    resolvedPhone = lidMappingCache.get(lidDigits) ||
+      (linkedWASubscribersCache.get(lidDigits)?.student?.phone ? cleanPhone(linkedWASubscribersCache.get(lidDigits).student.phone) : '') ||
+      (linkedWASubscribersCache.get(lidDigits)?.phone ? cleanPhone(linkedWASubscribersCache.get(lidDigits).phone) : '');
+  }
+  if (!resolvedPhone && targetJid && targetJid.includes('@s.whatsapp.net')) {
+    resolvedPhone = cleanPhone(targetJid.replace(/@.*$/, ''));
+  }
+
+  const targets = [];
+  if (resolvedPhone && resolvedPhone.length >= 10 && resolvedPhone.length <= 13) {
+    const phoneJid = `${resolvedPhone}@s.whatsapp.net`;
+    targets.push(phoneJid);
+  }
+  if (targetJid && !targets.includes(targetJid)) {
+    targets.push(targetJid);
+  }
+
+  let finalResult = null;
+  for (const jid of targets) {
+    try {
+      const result = await sock.sendMessage(jid, sendPayload);
+      console.log(`[WHATSAPP-SEND-SUCCESS] ✅ Sent message to ${jid}`);
+      finalResult = result;
+      // Stop typing presence indicator
+      sock.sendPresenceUpdate('paused', jid).catch(() => {});
+      // If we successfully delivered to the phone's standard JID, it appears directly in chat
+      if (jid.includes('@s.whatsapp.net')) {
+        break;
+      }
+    } catch (err) {
+      console.warn(`[WHATSAPP-SEND-FAIL] Send to ${jid} failed:`, err.message);
+    }
+  }
+
+  if (targetJid) {
+    sock.sendPresenceUpdate('paused', targetJid).catch(() => {});
+  }
+
+  return finalResult;
 }
 
 /**
@@ -2693,6 +3152,14 @@ export async function getFreshStudentData(student) {
 export async function sendStudentResultImageWhatsApp(remoteJid, student, senderPhone = '') {
   try {
     const targetStudent = await getFreshStudentData(student);
+    if (!targetStudent || targetStudent.is_active === false) {
+      console.log(`[RESULT-DISPATCH-SKIPPED] Student record is not active or enrolled in portal.`);
+      await sendWhatsAppMessage(remoteJid, {
+        text: `ℹ️ *Student record is not currently active or enrolled in the portal.*\nFor assistance, please contact Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}`
+      }, senderPhone);
+      return;
+    }
+
     const svg = generateResultSvg(targetStudent);
     const png = svgToPngBuffer(svg);
     const caption = buildResultCaption(targetStudent);
@@ -2703,19 +3170,6 @@ export async function sendStudentResultImageWhatsApp(remoteJid, student, senderP
       caption: caption,
       mimetype: 'image/png',
       fileName: `${cleanName}_Weekly_Result.png`
-    }, senderPhone);
-
-    // Follow up with interactive buttons so user can immediately tap Hazri / Leave / League
-    await sendWhatsAppMessage(remoteJid, {
-      text: `👤 *${targetStudent.name}*\n` +
-        `💬 *Tap a button below for instant updates:*`,
-      footer: 'Mauze Tahfeez - Galiakot',
-      buttons: [
-        { buttonId: '2', buttonText: { displayText: '📌 Hazri' }, type: 1 },
-        { buttonId: '3', buttonText: { displayText: '📝 Leave Status' }, type: 1 },
-        { buttonId: '4', buttonText: { displayText: '💎 League Points' }, type: 1 }
-      ],
-      headerType: 1
     }, senderPhone);
 
     const phone = senderPhone || cleanPhone(remoteJid.replace(/@.*$/, ''));
@@ -2744,6 +3198,13 @@ export async function sendStudentAttendanceWhatsApp(remoteJid, student, senderPh
   // Trigger background sync without blocking response
   syncTodayAttendanceFromFirestore().catch(() => {});
 
+  if (!student || student.is_active === false) {
+    await sendWhatsAppMessage(remoteJid, {
+      text: `ℹ️ *Student record is not currently active or enrolled in the portal.*\nFor assistance, please contact Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}`
+    }, senderPhone);
+    return;
+  }
+
   const ist = getISTDateParts();
   const attRec = findStudentAttendance(student, senderPhone);
   const lvRec = findStudentLeave(student, senderPhone);
@@ -2762,23 +3223,19 @@ export async function sendStudentAttendanceWhatsApp(remoteJid, student, senderPh
     statusEmoji = attRec.statusEmoji || (/absent/i.test(status) ? '❌' : (/present/i.test(status) ? '✅' : '⏳'));
   }
 
-  const date = ist.dateDisplay; // Strictly today's present day date e.g. 06/10/2026
+  const date = ist.dateDisplay; // Today's date
+  const counts = getStudentAttendanceCounts(student);
 
   await sendWhatsAppMessage(remoteJid, {
-    text: `👤 *${student.name}* (${date})\n` +
-      `📌 Hazri: *${statusEmoji} ${status}*\n\n` +
+    text: `📊 *Hazri (Attendance): ${student.name}*\n\n` +
+      `📅 Date: *${date}*\n` +
+      `📌 Today: *${statusEmoji} ${status}*\n\n` +
+      `📈 *Attendance Record:*\n` +
+      `• Weekly: *${counts.weeklyPresent} / ${counts.weeklyTotal} Days* (${counts.weeklyRate})\n` +
+      `• Monthly: *${counts.monthlyPresent} / ${counts.monthlyTotal} Days* (${counts.monthlyRate})\n` +
+      `• Total Approved Leaves: *${counts.totalLeaves}*\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Tap button or type number:*\n` +
-      `1️⃣ *1* - 📊 Result Card\n` +
-      `3️⃣ *3* - 📝 Leave Status\n` +
-      `4️⃣ *4* - 💎 League Points`,
-    footer: 'Mauze Tahfeez - Galiakot',
-    buttons: [
-      { buttonId: '1', buttonText: { displayText: '📊 Result Card' }, type: 1 },
-      { buttonId: '3', buttonText: { displayText: '📝 Leave Status' }, type: 1 },
-      { buttonId: '4', buttonText: { displayText: '💎 League Points' }, type: 1 }
-    ],
-    headerType: 1
+      `💬 *Type 1 (Result Card) • 3 (Leave Status) • 4 (League Points)*`
   }, senderPhone);
 }
 
@@ -2888,22 +3345,24 @@ export async function handleWhatsAppVerification(remoteJid, senderPhone, rawText
       ? 'Permanent Connection (Profile Phone Match)'
       : '30-Day Verified Access (Alternative Number)';
 
-    await sock.sendMessage(remoteJid, {
+    await sendWhatsAppMessage(remoteJid, {
       text: `` +
         `✅ Connected to *${matched.name}* (ITS: \`${matched.its}\`).\n` +
         `Dispatching result card below... 👇\n\n` +
-        `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`    });
+        `💬 *Type 1 (Result Card) • 2 (Hazri) • 3 (Leave Status) • 4 (League Points)*`
+    }, realPhone);
 
-    await sendStudentResultImageWhatsApp(remoteJid, matched);
+    await sendStudentResultImageWhatsApp(remoteJid, matched, realPhone);
     return true;
   } else {
-    await sock.sendMessage(remoteJid, {
+    await sendWhatsAppMessage(remoteJid, {
       text: `` +
         `❌ No matching student found.\n` +
         `Please send child's *8-digit ITS* or format:\n` +
         `👉 \`/verify Contact, Name, ITS\`\n\n` +
         `Shukran.\n\n` +
-        `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`    });
+        `💬 *Type 1 (Result Card) • 2 (Hazri) • 3 (Leave Status) • 4 (League Points)*`
+    }, realPhone);
     return false;
   }
 }
@@ -2930,8 +3389,9 @@ export function formatTeacherVerifiedWelcomeMenu(teacher, allocatedStudents = []
     `3️⃣ *3* — Results & Scores 🏆\n` +
     `4️⃣ *4* — Helpline 📞\n\n` +
     `💡 Or reply: \`result ${sampleName}\`, \`attendance ${sampleName}\`, \`jadwal ${sampleName}\`\n\n` +
+    `🌐 *Portal:* https://mouze-tahfeez-atfal.vercel.app/\n\n` +
     `Shukran.\n\n` +
-    `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
+    `💬 *Type 1 (Students) • 2 (Hazri Summary) • 3 (History) • 4 (Results)*`;
 }
 
 /**
@@ -2949,8 +3409,9 @@ export function formatTeacherDashboardMenu(teacher, studentCount, sampleStudent 
     `3️⃣ *3* — Results & Scores 🏆\n` +
     `4️⃣ *4* — Helpline 📞\n\n` +
     `💡 Or reply: \`result ${sampleName}\`, \`attendance ${sampleName}\`, \`jadwal ${sampleName}\`\n\n` +
+    `🌐 *Portal:* https://mouze-tahfeez-atfal.vercel.app/\n\n` +
     `Shukran.\n\n` +
-    `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
+    `💬 *Type 1 (Students) • 2 (Hazri Summary) • 3 (History) • 4 (Results)*`;
 }
 
 /**
@@ -2987,7 +3448,7 @@ export function formatTeacherAttendanceSummaryText(teacher, summary) {
     `• 📝 Leave: *${summary.leaveCount}*${leaveStr}\n` +
     `• ⏳ Pending: *${summary.pendingCount}*${pendingStr}\n\n` +
     `Shukran.\n\n` +
-    `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
+    `💬 *Type 1 (Students) • 2 (Hazri Summary) • 3 (History) • 4 (Results)*`;
 }
 
 /**
@@ -3141,7 +3602,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
           `*Example:*\n` +
           `\`/teacher Janab Mustafa bhai Manpurwala, mustafamanpur1@gmail.com\`\n\n` +
           `Shukran.\n\n` +
-          `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`      }, senderPhone);
+          `💬 *Type 1 (Students) • 2 (Hazri Summary) • 3 (History) • 4 (Results)*`      }, senderPhone);
       return;
     }
 
@@ -3175,7 +3636,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
           `👉 \`/teacher [Full Name], [Email]\`\n\n` +
           `📞 Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}\n\n` +
           `Shukran.\n\n` +
-          `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`      }, senderPhone);
+          `💬 *Type 1 (Students) • 2 (Hazri Summary) • 3 (History) • 4 (Results)*`      }, senderPhone);
       return;
     }
   }
@@ -3194,7 +3655,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
           `Your WhatsApp (+${senderPhone}) has been unlinked.\n` +
           `To reconnect, reply \`/teacher [Name], [Email]\`.\n\n` +
           `Shukran.\n\n` +
-          `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`      }, senderPhone);
+          `💬 *Type 1 (Students) • 2 (Hazri Summary) • 3 (History) • 4 (Results)*`      }, senderPhone);
       return;
     }
 
@@ -3290,7 +3751,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
           `Daily Self-Attendance punch time is *4:25 PM*.\n` +
           `📅 Today: *${ist.dateDisplay}*\n\n` +
           `Shukran.\n\n` +
-          `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`      }, senderPhone);
+          `💬 *Type 1 (Students) • 2 (Hazri Summary) • 3 (History) • 4 (Results)*`      }, senderPhone);
       return;
     }
 
@@ -3310,7 +3771,7 @@ export async function handleIncomingWhatsAppMessage(msg) {
           `📞 *Helpline:* *${BOT_CONFIG.HELPLINE_NUMBER}*\n` +
           `Available for administrative and technical support.\n\n` +
           `Shukran.\n\n` +
-          `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`      }, senderPhone);
+          `💬 *Type 1 (Students) • 2 (Hazri Summary) • 3 (History) • 4 (Results)*`      }, senderPhone);
       return;
     }
 
@@ -3324,9 +3785,8 @@ export async function handleIncomingWhatsAppMessage(msg) {
       return;
     }
 
-    // Check individual student inquiry (leave, attendance, jadwal, details)
-    const indStudent = findTargetStudentInTeacherQuery(rawText, allocatedStudents) ||
-      findTargetStudentInTeacherQuery(rawText, embeddedRoster);
+    // Check individual student inquiry strictly within teacher's allocated group
+    const indStudent = findTargetStudentInTeacherQuery(rawText, allocatedStudents);
 
     if (indStudent) {
       if (cleanCmd.includes('leave') || cleanCmd.includes('chutti')) {
@@ -3339,7 +3799,8 @@ export async function handleIncomingWhatsAppMessage(msg) {
             (lvRec?.periodStr ? `• Period: *${lvRec.periodStr}*\n` : '') +
             (lvRec?.reason ? `• Reason: _${lvRec.reason}_\n` : '') +
             `\nShukran.\n\n` +
-            `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`        }, senderPhone);
+            `💬 *Type 1 (Students) • 2 (Hazri Summary) • 3 (History) • 4 (Results)*`
+        }, senderPhone);
         return;
       }
 
@@ -3358,7 +3819,8 @@ export async function handleIncomingWhatsAppMessage(msg) {
             `• Monthly Hazri: *${counts.monthlyPresent} / ${counts.monthlyTotal} Days* (${counts.monthlyRate})\n` +
             `• Total Leaves: *${counts.totalLeaves}*\n\n` +
             `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-            `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`        }, senderPhone);
+            `💬 *Type 1 (Students) • 2 (Hazri Summary) • 3 (History) • 4 (Results)*`
+        }, senderPhone);
         return;
       }
 
@@ -3375,7 +3837,8 @@ export async function handleIncomingWhatsAppMessage(msg) {
             (indStudent.totalJadeed ? `• Sabaq: *${indStudent.totalJadeed}*\n` : '') +
             `• Teacher: *${indStudent.teacher || teacher.name}*\n\n` +
             `Shukran.\n\n` +
-            `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`        }, senderPhone);
+            `💬 *Type 1 (Students) • 2 (Hazri Summary) • 3 (History) • 4 (Results)*`
+        }, senderPhone);
         return;
       }
 
@@ -3390,16 +3853,31 @@ export async function handleIncomingWhatsAppMessage(msg) {
         text: `` +
           `👤 *${enriched.name}* (\`${enriched.its || '—'}\`)\n` +
           `• Juz: *Juz ${enriched.juz || '—'}* (${enriched.surat || '—'})\n` +
+          (enriched.totalJadeed ? `• Sabaq: *${enriched.totalJadeed}*\n` : '') +
           `• Weekly Score: *${enriched.weeklyScore ?? '—'} / 100*\n` +
           `• Hazri: *${attEmoji} ${attSt}*\n\n` +
           `Shukran.\n\n` +
-          `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`      }, senderPhone);
+          `💬 *Type 1 (Students) • 2 (Hazri Summary) • 3 (History) • 4 (Results)*`
+      }, senderPhone);
       return;
     }
 
-    // Default Teacher Interactive Dashboard Menu
-    const menuText = formatTeacherDashboardMenu(teacher, allocatedStudents.length);
-    await sendWhatsAppMessage(remoteJid, { text: menuText }, senderPhone);
+    // If teacher typed a greeting or explicit menu keyword
+    const isTeacherMenuKeyword = [
+      'menu', '/menu', 'hi', 'hii', 'hiii', 'hello', 'hey',
+      'salam', 'salaam', 'salam jameel', 'help', '/help',
+      'start', '/start', 'start chat', 'dashboard', 'main menu'
+    ].includes(cleanCmd);
+
+    if (isTeacherMenuKeyword) {
+      // Teacher Interactive Dashboard Menu
+      const menuText = formatTeacherDashboardMenu(teacher, allocatedStudents.length);
+      await sendWhatsAppMessage(remoteJid, { text: menuText }, senderPhone);
+      return;
+    }
+
+    // For any other casual or normal chat messages, let normal conversation proceed without bot auto-replies
+    console.log(`[WHATSAPP-BOT] 💬 Teacher +${senderPhone} sent non-command chat: "${rawText}". Normal chat mode (silent pass-through).`);
     return;
   }
 
@@ -3492,7 +3970,81 @@ export async function handleIncomingWhatsAppMessage(msg) {
     return;
   }
 
-  // ── IF USER IS NOT LINKED YET ──
+  // =========================================================================
+  // ADMISSION APPLICATION & PARENT DUAL-ROLE HANDLER
+  // =========================================================================
+  const admRecord = findAdmissionByPhoneOrJid(senderPhone) || (rawJidId ? findAdmissionByPhoneOrJid(rawJidId) : null) || findAdmissionByAppId(rawText);
+
+  // A. Confirm Admission Enrollment (Reply "Yes" / "Haan" / "Confirm")
+  if (
+    cleanCmd === 'yes' || cleanCmd === 'y' || cleanCmd === 'haan' ||
+    cleanCmd === 'ha' || cleanCmd === 'confirm' || cleanCmd === 'confirm enrollment' ||
+    cleanCmd === 'approve' || cleanCmd === 'ok'
+  ) {
+    if (admRecord) {
+      if (admRecord.status === 'approved' || admRecord.status === 'confirmed' || admRecord.enrollment_confirmed) {
+        await confirmAdmissionApplication(admRecord);
+        const credentialsText = formatAdmissionConfirmationCredentials(admRecord);
+        await sendWhatsAppMessage(remoteJid, { text: credentialsText }, senderPhone);
+        return;
+      } else if (admRecord.status === 'waiting') {
+        await sendWhatsAppMessage(remoteJid, {
+          text: `Salaam *${admRecord.full_name || 'Mumin'}*,\n\nYour admission application (*${admRecord.application_id}*) for *${admRecord.program}* is currently on the *Waiting List* ⏳.\n\nOnce a slot is confirmed and approved by administration, you will receive an approval message here to activate your portal login.\n\n📞 Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}\n*Mauze Tahfeez - Galiakot*`
+        }, senderPhone);
+        return;
+      } else {
+        await sendWhatsAppMessage(remoteJid, {
+          text: `Salaam *${admRecord.full_name || 'Mumin'}*,\n\nYour admission application (*${admRecord.application_id}*) for *${admRecord.program}* is currently: *⏳ Pending Admin Review*.\n\nOur team is reviewing applications and will notify you with the approval and portal access shortly.\n\n📞 Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}\n*Mauze Tahfeez - Galiakot*`
+        }, senderPhone);
+        return;
+      }
+    }
+  }
+
+  // B. Decline Admission (Reply "No" / "Decline" / "Cancel")
+  if (cleanCmd === 'no' || cleanCmd === 'n' || cleanCmd === 'decline' || cleanCmd === 'cancel' || cleanCmd === 'nahi') {
+    if (admRecord) {
+      await sendWhatsAppMessage(remoteJid, {
+        text: `Salaam *${admRecord.full_name || 'Mumin'}*,\n\nWe have received your response regarding application (*${admRecord.application_id}*).\n\nIf you have any questions or wish to apply for another batch, please contact our helpline: *${BOT_CONFIG.HELPLINE_NUMBER}*.\n\nShukran.\n*Mauze Tahfeez - Galiakot*`
+      }, senderPhone);
+      return;
+    }
+  }
+
+  // C. Want to talk / Admission inquiries
+  if (cleanCmd.includes('want to talk') || cleanCmd.includes('talk') || cleanCmd.includes('inquiry') || cleanCmd.includes('doubt')) {
+    if (admRecord) {
+      await sendWhatsAppMessage(remoteJid, {
+        text: `Salaam *${admRecord.full_name || 'Mumin'}*,\n\nFor queries regarding your admission (*${admRecord.application_id}*), please contact our coordinators:\n\n📞 *Helpline / WhatsApp:* ${BOT_CONFIG.HELPLINE_NUMBER}\n📧 *Email:* ${admRecord.email || 'tahfeezgaliakot@gmail.com'}\n\nShukran.\n*Mauze Tahfeez - Galiakot*`
+      }, senderPhone);
+      return;
+    }
+  }
+
+  // D. Admission Status Card (Type 5, "Status", "Admission", "MT-1447-...")
+  if (
+    cleanCmd === '5' ||
+    cleanCmd === 'admission' ||
+    cleanCmd === '/admission' ||
+    cleanCmd === 'status' ||
+    cleanCmd === '/status' ||
+    cleanCmd === 'my admission' ||
+    cleanCmd === 'dakhla' ||
+    cleanCmd.startsWith('mt-')
+  ) {
+    if (admRecord) {
+      const cardText = formatAdmissionStatusCard(admRecord);
+      await sendWhatsAppMessage(remoteJid, { text: cardText }, senderPhone);
+      return;
+    } else {
+      await sendWhatsAppMessage(remoteJid, {
+        text: `📝 *Tahfeez Admission Form (1447-48H)*\n\nNo active admission record found for your number.\nTo submit a new admission application for *Al-Atfal (Kids)*, *Al-Kibar (Adults)* or *Al-Sigar*, please fill out our online form:\n\n👉 *Online Admission Form:* https://mouze-tahfeez-atfal.vercel.app/admission\n\n📞 Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}\n*Mauze Tahfeez - Galiakot*`
+      }, senderPhone);
+      return;
+    }
+  }
+
+  // ── IF USER IS NOT LINKED TO AN ENROLLED STUDENT ──
   if (!linkedStudent) {
     // If user texted numbers that look like an ITS or comma values, try verifying
     if (rawText.includes(',') || /^\d{5,10}$/.test(rawText.trim())) {
@@ -3500,21 +4052,85 @@ export async function handleIncomingWhatsAppMessage(msg) {
       if (verified) return;
     }
 
-    // Welcoming response for ALL messages from unregistered users
-    await sendWhatsAppMessage(remoteJid, {
-      text: `` +
-        `Welcome to *Mauze Tahfeez Galiakot*.\n\n` +
-        `To connect your child's updates, reply with your child's *8-digit ITS number* or:\n` +
-        `👉 \`/verify [Contact], [Name], [ITS]\`\n\n` +
-        `🌐 *Portal:* https://mouze-tahfeez-atfal.vercel.app/\n` +
-        `📞 *Helpline:* ${BOT_CONFIG.HELPLINE_NUMBER}\n\n` +
-        `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`    }, senderPhone);
+    if (admRecord) {
+      const cardText = formatAdmissionStatusCard(admRecord);
+      await sendWhatsAppMessage(remoteJid, { text: cardText }, senderPhone);
+      return;
+    }
+
+    const isGreetingOrStart = [
+      'hi', 'hii', 'hiii', 'hello', 'hey', 'salam', 'salaam', 'salam jameel',
+      'start', '/start', 'start chat', 'menu', '/menu', 'help', '/help'
+    ].includes(cleanCmd);
+
+    if (isGreetingOrStart) {
+      await sendWhatsAppMessage(remoteJid, {
+        text: `` +
+          `Welcome to *Mauze Tahfeez Galiakot*.\n\n` +
+          `• To connect your child's updates, reply with *8-digit ITS number* or:\n` +
+          `👉 \`/verify [Contact], [Name], [ITS]\`\n\n` +
+          `• For New Admissions (1447-48H):\n` +
+          `👉 https://mouze-tahfeez-atfal.vercel.app/admission\n\n` +
+          `🌐 *Portal:* https://mouze-tahfeez-atfal.vercel.app/\n` +
+          `📞 *Helpline:* ${BOT_CONFIG.HELPLINE_NUMBER}\n\n` +
+          `Regards,\n*Mauze Tahfeez - Galiakot*`
+      }, senderPhone);
+      return;
+    }
+
+    // Otherwise pass through silently for normal chat
+    console.log(`[WHATSAPP-BOT] 💬 Unregistered user +${senderPhone} sent non-command chat: "${rawText}". Normal chat mode (silent pass-through).`);
     return;
   }
 
   // ── IF USER IS LINKED: PROCESS COMMANDS INSTANTLY ──
   const student = linkedStudent;
+
+  // Track parent interaction timing
+  const lastActive = getParentLastInteraction(senderPhone) || (rawJidId ? getParentLastInteraction(rawJidId) : 0);
+  const isAfterLongGap = !lastActive || ((Date.now() - lastActive) > 3 * 24 * 60 * 60 * 1000); // 3-4 days gap
+  recordParentInteraction(senderPhone);
+  if (rawJidId && rawJidId !== senderPhone) recordParentInteraction(rawJidId);
+
+  // A. Hub Raqam / Fee Payment Done Confirmation
+  const isPaymentDoneMsg = (
+    cleanCmd === 'done' ||
+    cleanCmd === 'paid' ||
+    cleanCmd === 'already done' ||
+    cleanCmd === 'payment done' ||
+    cleanCmd === 'fees paid' ||
+    cleanCmd === 'fee paid' ||
+    cleanCmd === 'hub paid' ||
+    cleanCmd === 'hub raqam paid' ||
+    cleanCmd === 'hub done' ||
+    cleanCmd === 'fee done' ||
+    cleanCmd === 'fees done' ||
+    cleanCmd === 'paid done' ||
+    cleanCmd === 'completed' ||
+    cleanCmd.includes('payment done') ||
+    cleanCmd.includes('already paid') ||
+    cleanCmd.includes('already done') ||
+    cleanCmd.includes('fees paid') ||
+    cleanCmd.includes('fee paid') ||
+    cleanCmd.includes('hub paid') ||
+    cleanCmd.includes('paid the fee') ||
+    cleanCmd.includes('payment completed') ||
+    cleanCmd.includes('transfer done') ||
+    cleanCmd.includes('transfered') ||
+    cleanCmd.includes('transferred')
+  );
+
+  if (isPaymentDoneMsg) {
+    await sendWhatsAppMessage(remoteJid, {
+      text: `Shukran Jazeelan! 💐\n\n` +
+        `Respected Parent,\n\n` +
+        `Thank you for confirming your Hub Raqam payment for *${student.name}* (\`${student.its || '—'}\`).\n` +
+        `Your response has been noted. Please preserve your transaction receipt for your records.\n\n` +
+        `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
+        `💬 *Type 1 (Result Card) • 2 (Hazri) • 3 (Leave Status) • 4 (League Points)*`
+    }, senderPhone);
+    return;
+  }
 
   // 1. Weekly Result Card: Option 1 or Result keywords
   if (
@@ -3628,35 +4244,26 @@ export async function handleIncomingWhatsAppMessage(msg) {
         : (/rejected/i.test(lvRec.status) ? '❌' : '⏳');
 
       await sendWhatsAppMessage(remoteJid, {
-        text: `📝 *Leave Status: ${student.name}*\n` +
+        text: `📝 *Leave Status: ${student.name}*\n\n` +
           (lvRec.periodStr ? `📅 Period: *${lvRec.periodStr}*\n` : '') +
           `📌 Status: *${statusEmoji} ${lvRec.status}*\n` +
           (lvRec.reason ? `📝 Reason: _${lvRec.reason}_\n` : '') +
           (lvRec.comment ? `💬 Remark: _${lvRec.comment}_\n\n` : '\n') +
           `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-          `💬 *Tap button or type number:*\n` +
-          `1️⃣ *1* - 📊 Result Card\n` +
-          `2️⃣ *2* - 📌 Hazri\n` +
-          `4️⃣ *4* - 💎 League Points`,
-        footer: 'Mauze Tahfeez - Galiakot',
-        buttons: [
-          { buttonId: '1', buttonText: { displayText: '📊 Result Card' }, type: 1 },
-          { buttonId: '2', buttonText: { displayText: '📌 Hazri' }, type: 1 },
-          { buttonId: '4', buttonText: { displayText: '💎 League Points' }, type: 1 }
-        ],
-        headerType: 1
+          `💬 *Type 1 (Result Card) • 2 (Hazri) • 4 (League Points)*`
       }, senderPhone);
       return;
     }
 
     await sendWhatsAppMessage(remoteJid, {
-      text: `` +
-        `👤 *${student.name}*\n` +
-        `📌 Status: Active in class (No active leave pending).\n` +
-        `To apply for leave, reply:\n` +
-        `👉 \`apply leave [dates] [reason]\`\n\n` +
+      text: `📝 *Leave Status: ${student.name}*\n\n` +
+        `📌 Status: Active in class (No pending leave application).\n\n` +
+        `To apply for leave via WhatsApp, reply:\n` +
+        `👉 \`apply leave [dates] [reason]\`\n` +
+        `*Example:* \`apply leave 10 Oct to 12 Oct Safar\`\n\n` +
         `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Type 1 (Result Card) • 2 (Hazri) • 4 (League Points)*`    }, senderPhone);
+        `💬 *Type 1 (Result Card) • 2 (Hazri) • 4 (League Points)*`
+    }, senderPhone);
     return;
   }
 
@@ -3675,22 +4282,13 @@ export async function handleIncomingWhatsAppMessage(msg) {
   ) {
     const leagueData = await getStudentLeaguePoints(student);
     await sendWhatsAppMessage(remoteJid, {
-      text: `💎 *Atfal Gem League Points*\n` +
-        `👤 Student: *${leagueData.studentName}*\n` +
+      text: `💎 *Atfal Gem League Points*\n\n` +
+        `👤 Student: *${leagueData.studentName}* (\`${leagueData.its}\`)\n` +
         `📅 Month: *${leagueData.monthName}*\n` +
-        `✨ Total League Points: *${leagueData.totalGems} / 480 Gems*\n\n` +
+        `✨ Total League Points: *${leagueData.totalGems} / 480 Gems*\n` +
+        `🏆 Current Standing: *Active Participant*\n\n` +
         `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Tap button or type number:*\n` +
-        `1️⃣ *1* - 📊 Result Card\n` +
-        `2️⃣ *2* - 📌 Hazri\n` +
-        `3️⃣ *3* - 📝 Leave Status`,
-      footer: 'Mauze Tahfeez - Galiakot',
-      buttons: [
-        { buttonId: '1', buttonText: { displayText: '📊 Result Card' }, type: 1 },
-        { buttonId: '2', buttonText: { displayText: '📌 Hazri' }, type: 1 },
-        { buttonId: '3', buttonText: { displayText: '📝 Leave Status' }, type: 1 }
-      ],
-      headerType: 1
+        `💬 *Type 1 (Result Card) • 2 (Hazri) • 3 (Leave Status)*`
     }, senderPhone);
     return;
   }
@@ -3710,6 +4308,15 @@ export async function handleIncomingWhatsAppMessage(msg) {
     return;
   }
 
+  // 6. Admission Status (Option 6)
+  if (cleanCmd === '6') {
+    if (admRecord) {
+      const cardText = formatAdmissionStatusCard(admRecord);
+      await sendWhatsAppMessage(remoteJid, { text: cardText }, senderPhone);
+      return;
+    }
+  }
+
   // Additional support: Jadwal, Fee, Profile if explicitly asked
   if (cleanCmd.includes('jadwal') || cleanCmd.includes('timetable') || cleanCmd.includes('schedule') || cleanCmd.includes('hifz')) {
     await sendWhatsAppMessage(remoteJid, {
@@ -3725,34 +4332,59 @@ export async function handleIncomingWhatsAppMessage(msg) {
   if (cleanCmd.includes('fee') || cleanCmd.includes('hub')) {
     const hijriNow = getFatemiHijriMonth();
     await sendWhatsAppMessage(remoteJid, {
-      text: `` +
-        `Hub Raqam for *${hijriNow.nameEn} ${hijriNow.year}* for *${student.name}* (\`${student.its || '—'}\`):\n\n` +
-        `💳 *Pay Online:*\nhttps://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT\n\n` +
+      text: `💰 *HUB RAQAM - MONTHLY FEE*\n\n` +
+        `Salam Jameel,\n` +
+        `Respected Parent,\n\n` +
+        `This is regarding the monthly Mauze Tahfeez Hub Raqam for *${hijriNow.nameEn} ${hijriNow.year}*:\n` +
+        `👤 Student: *${student.name}*\n` +
+        `🆔 ITS: \`${student.its || '—'}\`\n\n` +
+        `Kindly complete the payment online via the official Mahad al Zahra portal:\n` +
+        `👉 *PAY NOW:*\n` +
+        `💳 https://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT\n\n` +
+        `After payment, please preserve your transaction receipt for your records.\n\n` +
         `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave)*`    }, senderPhone);
+        `💬 *Type 1 (Result Card) • 2 (Hazri) • 3 (Leave Status) • 4 (League Points)*`
+    }, senderPhone);
     return;
   }
 
-  // ── DEFAULT INTERACTIVE MENU FOR PARENTS ──
-  await sendWhatsAppMessage(remoteJid, {
-    text: `Welcome to *Mauze Tahfeez Galiakot*.\n\n` +
-      `👤 Student: *${student.name}* (\`${student.its || 'Verified'}\`)\n\n` +
-      `*Options:*\n` +
-      `1️⃣ *1* — Weekly Result Card 📊\n` +
-      `2️⃣ *2* — Today's Attendance 📋\n` +
-      `3️⃣ *3* — Leave Application & Status 📝\n` +
-      `4️⃣ *4* — Atfal Gem League Points 💎\n` +
-      `5️⃣ *5* — Helpline 📞\n\n` +
-      `Regards,\n*Mauze Tahfeez - Galiakot*`,
-    footer: 'Mauze Tahfeez - Galiakot',
-    buttons: [
-      { buttonId: '1', buttonText: { displayText: '📊 Result Card' }, type: 1 },
-      { buttonId: '2', buttonText: { displayText: '📌 Hazri' }, type: 1 },
-      { buttonId: '3', buttonText: { displayText: '📝 Leave Status' }, type: 1 },
-      { buttonId: '4', buttonText: { displayText: '💎 League Points' }, type: 1 }
-    ],
-    headerType: 1
-  }, senderPhone);
+  // ── GREETINGS & MENU TRIGGER HANDLER ──
+  const isGreetingCmd = [
+    'hi', 'hii', 'hiii', 'hello', 'hey', 'salam', 'salaam', 'salam jameel', 'start', '/start', 'start chat'
+  ].includes(cleanCmd);
+
+  const isMenuExplicit = [
+    'menu', '/menu', 'options', '/options', 'help menu', 'main menu', 'help', '/help'
+  ].includes(cleanCmd);
+
+  const admOptionText = admRecord
+    ? `6️⃣ *6* — Admission Status (\`${admRecord.application_id}\`) 📋\n`
+    : '';
+
+  // 1. Explicit Menu Request OR Greeting (hi, salam, start chat): Send Welcome / Menu Template
+  if (isMenuExplicit || isGreetingCmd) {
+    await sendWhatsAppMessage(remoteJid, {
+      text: `Salam Jameel,\nRespected Parent,\n\n` +
+        `Welcome to *Mauze Tahfeez Galiakot*.\n\n` +
+        `👤 Student: *${student.name}* (\`${student.its || 'Verified'}\`)\n\n` +
+        `*Options:*\n` +
+        `1️⃣ *1* — Weekly Result Card 📊\n` +
+        `2️⃣ *2* — Today's Attendance 📋\n` +
+        `3️⃣ *3* — Leave Application & Status 📝\n` +
+        `4️⃣ *4* — Atfal Gem League Points 💎\n` +
+        admOptionText +
+        `5️⃣ *5* — Helpline 📞\n\n` +
+        `🌐 *Portal:* https://mouze-tahfeez-atfal.vercel.app/\n\n` +
+        `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
+        `💬 *Type 1 (Result Card) • 2 (Hazri) • 3 (Leave Status) • 4 (League Points)*`,
+      footer: 'Mauze Tahfeez - Galiakot'
+    }, senderPhone);
+    return;
+  }
+
+  // Otherwise, for any other text/casual messages, let normal conversation proceed without bot auto-replies
+  console.log(`[WHATSAPP-BOT] 💬 Parent +${senderPhone} sent non-command chat: "${rawText}". Normal chat mode (silent pass-through).`);
+  return;
 }
 
 /**
@@ -3885,6 +4517,12 @@ export async function dispatchStudentNotification(payload) {
 
   const isEventBroadcast = type === 'event_leave' && !targetPhone && !targetIts && !targetStudentId;
 
+  // If a specific student was targeted but is NOT active in the Firestore roster (removed or unlinked), skip!
+  if (targetStudentId && !rosterMatch && !isEventBroadcast) {
+    console.log(`[DISPATCH-SKIPPED] 🛡️ Student ${targetStudentId} (${targetName || 'N/A'}) is unlinked or removed from portal, ignoring WhatsApp notification.`);
+    return;
+  }
+
   // Collect all recipient WhatsApp numbers strictly for this child
   const targetRecipients = new Set();
   if (targetPhone) targetRecipients.add(targetPhone);
@@ -3895,14 +4533,24 @@ export async function dispatchStudentNotification(payload) {
       targetRecipients.add(p);
     }
   } else {
-    // Strictly match linked subscribers for this specific child ONLY
+    // Strictly match linked subscribers for this specific child ONLY (ensuring student is active)
     for (const [p, rec] of linkedWASubscribersCache.entries()) {
       const s = rec.student;
       if (!s) continue;
-      const sPhone = cleanPhone(s.phone || s.whatsappNumber || s.whatsapp_number || '');
-      const sIts = String(s.its || '').trim();
-      const sName = String(s.name || '').trim().toLowerCase();
       const sId = String(s.student_id || s.id || '').trim();
+      const sIts = String(s.its || '').trim();
+
+      // Check that subscriber's student is still active in roster
+      const activeCheck = embeddedRoster.find(item => 
+        (sId && (item.student_id === sId || item.id === sId)) ||
+        (sIts && item.its && String(item.its) === sIts)
+      );
+      if (!activeCheck || activeCheck.is_active === false) {
+        continue;
+      }
+
+      const sPhone = cleanPhone(s.phone || s.whatsappNumber || s.whatsapp_number || '');
+      const sName = String(s.name || '').trim().toLowerCase();
 
       const itsMatches = Boolean(targetIts && sIts && sIts === targetIts);
       const idMatches = Boolean(targetStudentId && sId && sId === targetStudentId);
@@ -3988,17 +4636,32 @@ export async function dispatchStudentNotification(payload) {
       `Respected Parent,\n\n` +
       `Attendance marked for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n` +
       `📅 Date: *${attDate}*\n` +
-      `📌 Hazri: *${statusEmoji} ${attStatus}*\n\n` +
+      `📌 Today: *${statusEmoji} ${attStatus}*\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 1 (Result Card) • 3 (Leave) • 4 (League Points)*`;
+      `💬 *Type 1 (Result Card) • 3 (Leave Status) • 4 (League Points)*`;
+  } else if (type === 'weekly_result_live' || type === 'mark_progress') {
+    const score = details?.total_score ?? '—';
+    const wusool = details?.wusool_juz ? `Juz ${details.wusool_juz}` : '—';
+    const teacherName = details?.teacher_name ? ` by *${details.teacher_name}*` : '';
+    const dateStr = details?.date || new Date().toLocaleDateString('en-GB');
+
+    messageText = `\n` +
+      `🏆 *Weekly Result Live Update*\n\n` +
+      `Respected Parent,\n` +
+      `Your child *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}'s weekly result has been submitted${teacherName} and is now live!\n\n` +
+      `📊 *Score:* *${score}/100*\n` +
+      `📖 *Wusool:* *${wusool}*\n` +
+      `📅 *Date:* ${dateStr}\n\n` +
+      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
+      `💬 *Reply 1 for Full Result Card Image • 2 for Hazri • 3 for Leave*`;
   } else if (type === 'leave_applied') {
     const fromD = details?.fromDate || details?.from_date || '';
     const tillD = details?.toDate || details?.to_date || '';
     const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || 'Requested Dates');
     const reasonStr = details?.reason || details?.note || 'Personal Leave';
 
-    messageText = `\n\n` +
-      `📝 *Leave Application: ${studentDisplayName}*\n` +
+    messageText = `\n` +
+      `📝 *Leave Application: ${studentDisplayName}*\n\n` +
       `📅 Period: *${periodStr}*\n` +
       `📝 Reason: *${reasonStr}*\n` +
       `⏳ Status: *Pending Approval*\n\n` +
@@ -4012,8 +4675,8 @@ export async function dispatchStudentNotification(payload) {
     const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || '');
     const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || '';
 
-    messageText = `\n\n` +
-      `📝 *Leave Update: ${studentDisplayName}*\n` +
+    messageText = `\n` +
+      `📝 *Leave Update: ${studentDisplayName}*\n\n` +
       (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
       `📌 Status: *${statusEmoji} ${lvStatus}*\n` +
       (comment ? `💬 Remark: _${comment}_\n\n` : '\n') +
@@ -4022,7 +4685,7 @@ export async function dispatchStudentNotification(payload) {
   } else if (type === 'leave_chat_message') {
     const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || details?.body || '';
 
-    messageText = `\n\n` +
+    messageText = `\n` +
       `💬 *Leave Chat: ${studentDisplayName}*\n` +
       `_${comment}_\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
@@ -4034,7 +4697,7 @@ export async function dispatchStudentNotification(payload) {
     const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || '');
     const reasonStr = details?.reason || details?.body || '';
 
-    messageText = `\n\n` +
+    messageText = `\n` +
       `*${evName}*\n` +
       (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
       (reasonStr ? `📝 Note: _${reasonStr}_\n` : '') +
@@ -4053,12 +4716,12 @@ export async function dispatchStudentNotification(payload) {
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave)*`;
   } else if (type === 'jadwal') {
-    messageText = `\n\n` +
+    messageText = `\n` +
       `Hifz timetable and target updated for *${studentDisplayName}*.\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`;
   } else {
-    messageText = `\n\n` +
+    messageText = `\n` +
       `*${studentDisplayName}:* ${details?.body || details?.title || 'New update recorded.'}\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League)*`;
@@ -4069,10 +4732,65 @@ export async function dispatchStudentNotification(payload) {
     for (const recipient of targetRecipients) {
       const jid = formatTargetJid(recipient);
       if (!jid) continue;
+
+      // Check if this recipient is a verified teacher/staff or a parent
+      const cleanRecPhone = cleanPhone(recipient);
+      const isTeacher = Boolean(getLinkedTeacherRecord(cleanRecPhone) || verifyTeacherByPhone(cleanRecPhone));
+
+      let finalMsg = messageText;
+
+      // If sending to Teacher: format role-specific Teacher Portal notification!
+      if (isTeacher) {
+        if (type === 'attendance') {
+          const rawStatus = details?.status || details?.attendanceStatus || 'Present';
+          const attStatus = /absent/i.test(rawStatus) ? 'Absent' : (/leave|uzur/i.test(rawStatus) ? 'Excused (Leave)' : 'Present');
+          const attDate = details?.date || details?.attendance_date || new Date().toLocaleDateString('en-GB');
+          const statusEmoji = attStatus === 'Absent' ? '❌' : (attStatus === 'Present' ? '✅' : '📝');
+          finalMsg = `👨‍🏫 *Class Attendance Alert: ${studentDisplayName}*` +
+            (targetIts ? ` (\`${targetIts}\`)` : '') + `\n` +
+            `• Status: *${statusEmoji} ${attStatus}*\n` +
+            `• Date: *${attDate}*\n\n` +
+            `Shukran.\n\n` +
+            `💬 *Type 1 (Students) • 2 (Hazri Summary) • 3 (History) • 4 (Results)*`;
+        } else if (type === 'leave_applied') {
+          const fromD = details?.fromDate || details?.from_date || '';
+          const tillD = details?.toDate || details?.to_date || '';
+          const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || 'Requested Dates');
+          const reasonStr = details?.reason || details?.note || 'Personal Leave';
+          finalMsg = `👨‍🏫 *Student Leave Application (Your Class)*\n\n` +
+            `👤 Student: *${studentDisplayName}*` + (targetIts ? ` (\`${targetIts}\`)` : '') + `\n` +
+            `📅 Period: *${periodStr}*\n` +
+            `📝 Reason: _${reasonStr}_\n` +
+            `⏳ Status: *Pending Review*\n\n` +
+            `Shukran.\n\n` +
+            `💬 *Type 1 (Students) • 2 (Hazri Summary) • 3 (History) • 4 (Results)*`;
+        } else if (type === 'leave' || type === 'leave_action') {
+          const lvStatus = details?.status || 'Update';
+          const statusEmoji = /approved/i.test(lvStatus) ? '✅' : (/rejected/i.test(lvStatus) ? '❌' : '⏳');
+          const fromD = details?.fromDate || details?.from_date || '';
+          const tillD = details?.toDate || details?.to_date || '';
+          const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || '');
+          const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || '';
+          finalMsg = `👨‍🏫 *Student Leave Update (Your Class)*\n\n` +
+            `👤 Student: *${studentDisplayName}*` + (targetIts ? ` (\`${targetIts}\`)` : '') + `\n` +
+            (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
+            `📌 Status: *${statusEmoji} ${lvStatus}*\n` +
+            (comment ? `💬 Note: _${comment}_\n\n` : '\n') +
+            `Shukran.\n\n` +
+            `💬 *Type 1 (Students) • 2 (Hazri Summary) • 3 (History) • 4 (Results)*`;
+        } else if (type === 'leave_chat_message') {
+          const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || details?.body || '';
+          finalMsg = `👨‍🏫 *Leave Note: ${studentDisplayName}*\n` +
+            `_${comment}_\n\n` +
+            `Shukran.\n\n` +
+            `💬 *Type 1 (Students) • 2 (Hazri Summary) • 3 (History) • 4 (Results)*`;
+        }
+      }
+
       try {
-        await sock.sendMessage(jid, { text: messageText });
+        await sock.sendMessage(jid, { text: finalMsg });
         delivered++;
-        console.log(`[WHATSAPP-PUSH] 🚀 Sent live ${type} update to ${jid} for ${studentDisplayName}`);
+        console.log(`[WHATSAPP-PUSH] 🚀 Sent live ${type} update to ${jid} (${isTeacher ? 'TEACHER' : 'PARENT'}) for ${studentDisplayName}`);
       } catch (err) {
         console.warn(`[WHATSAPP-PUSH-FAIL] Error sending to ${jid}:`, err.message);
       }
@@ -4131,38 +4849,67 @@ export function initFirestoreRealtimeListeners() {
 
     const RECENT_CUTOFF_MS = Date.now() - 4 * 60 * 60 * 1000; // 4 hours window to backfill today's tests
 
-    // 1. Listen to student_leaves
+    // 1. Listen to child_profiles and kibar_child_profiles (Real-Time Student Roster, Groups, & Allocations)
+    const listenToChildProfiles = (colName, section) => {
+      try {
+        firestoreAdminDb.collection(colName).onSnapshot((snapshot) => {
+          snapshot.docChanges().forEach((change) => {
+            const doc = change.doc;
+            if (change.type === 'removed') {
+              syncStudentDoc(doc.id, null, section);
+            } else {
+              syncStudentDoc(doc.id, doc.data(), section);
+            }
+          });
+          refreshEmbeddedRosterFromFirestore();
+        }, (err) => {
+          console.warn(`[FIRESTORE-STUDENTS-ERR] ${colName} listener error:`, err.message);
+        });
+      } catch (err) {
+        console.warn(`[FIRESTORE-STUDENTS-ERR] Failed to setup ${colName} listener:`, err.message);
+      }
+    };
+
+    listenToChildProfiles('child_profiles', 'atfal');
+    listenToChildProfiles('kibar_child_profiles', 'kibar');
+
+    // 2. Listen to teacher_profiles and kibar_teacher_profiles (Real-Time Staff & Phone Numbers)
+    const listenToTeacherProfiles = (colName, section) => {
+      try {
+        firestoreAdminDb.collection(colName).onSnapshot((snapshot) => {
+          snapshot.docChanges().forEach((change) => {
+            const doc = change.doc;
+            if (change.type === 'removed') {
+              syncTeacherProfileRecord(doc.id, null);
+            } else {
+              syncTeacherProfileRecord(doc.id, doc.data());
+            }
+          });
+          console.log(`[FIRESTORE-TEACHERS] 👨‍🏫 Synced ${teacherProfilesList.length} active teachers from ${colName}.`);
+        }, (err) => {
+          console.warn(`[FIRESTORE-TEACHERS-ERR] ${colName} listener error:`, err.message);
+        });
+      } catch (err) {
+        console.warn(`[FIRESTORE-TEACHERS-ERR] Failed to setup ${colName} listener:`, err.message);
+      }
+    };
+
+    listenToTeacherProfiles('teacher_profiles', 'atfal');
+    listenToTeacherProfiles('kibar_teacher_profiles', 'kibar');
+
+    // 3. Listen to student_leaves
     const listenToLeaves = (colName) => {
       let isFirstSnap = true;
       firestoreAdminDb.collection(colName).onSnapshot((snapshot) => {
         if (isFirstSnap) {
           isFirstSnap = false;
-          // Check recent docs from the initial snapshot
+          // Seed initial snapshot docs into processedFirestoreEvents so past events are NEVER spammed on startup/reconnect!
           snapshot.forEach((doc) => {
             const data = doc.data();
-            const tStr = data.updated_at || data.created_at || data.timestamp;
-            const t = tStr ? new Date(tStr).getTime() : 0;
-            if (t > RECENT_CUTOFF_MS) {
-              const eventKey = `${colName}:${doc.id}:${data.status}:${data.admin_comment || ''}`;
-              if (!processedFirestoreEvents.has(eventKey)) {
-                processedFirestoreEvents.add(eventKey);
-                const isApprovedOrRejected = /approved|rejected/i.test(data.status);
-                const notifType = isApprovedOrRejected ? 'leave_action' : 'leave_applied';
-                dispatchStudentNotification({
-                  type: notifType,
-                  studentId: data.student_id,
-                  name: data.student_name,
-                  details: {
-                    status: data.status,
-                    fromDate: data.from_date || data.leave_date,
-                    toDate: data.to_date || data.leave_date,
-                    reason: data.reason,
-                    comment: data.admin_comment
-                  }
-                }).catch(e => console.warn('[FIRESTORE-LEAVE-DISPATCH-ERR]:', e.message));
-              }
-            }
+            const eventKey = `${colName}:${doc.id}:${data.status}:${data.admin_comment || ''}:${(data.messages || []).length}`;
+            processedFirestoreEvents.add(eventKey);
           });
+          console.log(`[FIRESTORE-LISTENER] 🌿 Initial snapshot seeded ${snapshot.size} records for ${colName} (Spam-proof).`);
           return;
         }
 
@@ -4224,32 +4971,19 @@ export function initFirestoreRealtimeListeners() {
     listenToLeaves('student_leaves');
     listenToLeaves('kibar_student_leaves');
 
-    // 2. Listen to student_daily_attendance
+    // 4. Listen to student_daily_attendance
     const listenToAttendance = (colName) => {
       let isFirstSnap = true;
       firestoreAdminDb.collection(colName).onSnapshot((snapshot) => {
         if (isFirstSnap) {
           isFirstSnap = false;
+          // Seed initial snapshot attendance docs so past attendance is NEVER spammed on startup/reconnect!
           snapshot.forEach((doc) => {
             const data = doc.data();
-            const tStr = data.updated_at || data.marked_at || data.created_at;
-            const t = tStr ? new Date(tStr).getTime() : 0;
-            if (t > RECENT_CUTOFF_MS) {
-              const eventKey = `${colName}:${doc.id}:${data.status}:${data.attendance_date}`;
-              if (!processedFirestoreEvents.has(eventKey)) {
-                processedFirestoreEvents.add(eventKey);
-                dispatchStudentNotification({
-                  type: 'attendance',
-                  studentId: data.student_id,
-                  details: {
-                    status: data.status,
-                    date: data.attendance_date,
-                    time: data.time
-                  }
-                }).catch(e => console.warn('[FIRESTORE-ATT-DISPATCH-ERR]:', e.message));
-              }
-            }
+            const eventKey = `${colName}:${doc.id}:${data.status}:${data.attendance_date}:${data.updated_at || data.marked_at}`;
+            processedFirestoreEvents.add(eventKey);
           });
+          console.log(`[FIRESTORE-LISTENER] 📋 Initial snapshot seeded ${snapshot.size} records for ${colName} (Spam-proof).`);
           return;
         }
 
@@ -4280,7 +5014,7 @@ export function initFirestoreRealtimeListeners() {
     listenToAttendance('student_daily_attendance');
     listenToAttendance('kibar_student_daily_attendance');
 
-    // 3. Listen to weekly_results and kibar_weekly_results (Mark Progress)
+    // 5. Listen to weekly_results and kibar_weekly_results (Mark Progress)
     const listenToWeeklyResults = (colName) => {
       let isFirstSnap = true;
       firestoreAdminDb.collection(colName).onSnapshot((snapshot) => {
@@ -4312,6 +5046,21 @@ export function initFirestoreRealtimeListeners() {
               if (sMatch) {
                 enrichStudentWithLatestResult(sMatch);
               }
+
+              // Instant live WhatsApp notification to parent
+              dispatchStudentNotification({
+                type: 'weekly_result_live',
+                studentId: data.student_id || data.studentId,
+                name: data.student_name || data.name || (sMatch ? sMatch.name : ''),
+                its: data.its || (sMatch ? sMatch.its : ''),
+                details: {
+                  total_score: resRecord.total_score,
+                  wusool_juz: resRecord.wusool_juz,
+                  marhala_name: resRecord.marhala_name,
+                  teacher_name: data.teacher_name || data.teacher || '',
+                  date: resRecord.date_str
+                }
+              }).catch(e => console.warn('[FIRESTORE-RESULT-DISPATCH-ERR]:', e.message));
             }
           }
         });
@@ -4326,7 +5075,7 @@ export function initFirestoreRealtimeListeners() {
     // Sync today's attendance initially
     syncTodayAttendanceFromFirestore().catch(() => {});
 
-    console.log('[FIRESTORE-LISTENER] ✅ Realtime listeners connected to student_leaves, student_daily_attendance, and weekly_results');
+    console.log('[FIRESTORE-LISTENER] ✅ Realtime listeners connected to child_profiles, teacher_profiles, student_leaves, student_daily_attendance, and weekly_results');
   } catch (err) {
     console.warn('[FIRESTORE-INIT-FAIL]:', err.message);
   }
@@ -4340,6 +5089,9 @@ export function startWhatsAppBotEngine() {
   initBaileysSocket().catch((err) => {
     console.error('[BAILEYS-ERROR] Failed to init socket:', err);
   });
+
+  // Start Firestore real-time listeners immediately
+  initFirestoreRealtimeListeners();
 
   const server = http.createServer(async (req, res) => {
     // CORS headers
@@ -4561,11 +5313,21 @@ export function startWhatsAppBotEngine() {
         </ol>
       </div>
 
-      <div>
-        <button class="btn" style="max-width:320px;margin:0 auto;" onclick="requestPairingCode()">
-          🔑 Or Link with Pairing Code (Phone Number)
+      <div style="display:flex;flex-direction:column;gap:12px;max-width:460px;margin:15px auto 0 auto;">
+        <button class="btn" style="background:linear-gradient(135deg, #ef4444, #b91c1c);" onclick="handleResetSession()">
+          🔄 Reset Session & Generate Fresh QR (Fix "Couldn't Link")
         </button>
-        <div id="pairingCodeDisplay" style="margin-top:10px;font-size:18px;font-weight:800;color:#fae29c;"></div>
+
+        <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;">
+          <label style="font-size:12px;color:#cbd5e1;display:block;margin-bottom:6px;">Link using 8-Digit Code instead of QR:</label>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="pairingPhone" class="form-input" value="${BOT_CONFIG.HELPLINE_PHONE_DIGITS}" placeholder="e.g. 918107925353" style="text-align:center;font-weight:700;" />
+            <button type="button" class="btn" style="white-space:nowrap;width:auto;" onclick="requestPairingCode()">
+              🔑 Get Code
+            </button>
+          </div>
+          <div id="pairingCodeDisplay" style="margin-top:12px;font-size:20px;font-weight:800;color:#fae29c;text-align:center;"></div>
+        </div>
       </div>
     </div>
 
@@ -4669,19 +5431,39 @@ export function startWhatsAppBotEngine() {
     }
     setInterval(checkState, 3000);
 
+    async function handleResetSession() {
+      if (!confirm('This will clear stale session credentials and generate a fresh QR code. Proceed?')) return;
+      const display = document.getElementById('pairingCodeDisplay');
+      display.innerHTML = '<span style="color:#fae29c;">Resetting session and creating fresh QR code...</span>';
+      try {
+        const res = await fetch('/api/reset-session', { method: 'POST' });
+        const json = await res.json();
+        display.innerHTML = '<span style="color:#4ade80;">' + json.message + '</span>';
+        setTimeout(checkState, 2000);
+      } catch (e) {
+        display.innerHTML = '<span style="color:#f87171;">Error: ' + e.message + '</span>';
+      }
+    }
+
     async function requestPairingCode() {
       const display = document.getElementById('pairingCodeDisplay');
-      display.innerText = 'Requesting code...';
+      const phoneInput = document.getElementById('pairingPhone');
+      const phone = phoneInput ? phoneInput.value : '${BOT_CONFIG.HELPLINE_PHONE_DIGITS}';
+      display.innerText = 'Requesting 8-digit pairing code...';
       try {
-        const res = await fetch('/api/request-pairing-code', { method: 'POST' });
+        const res = await fetch('/api/request-pairing-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone })
+        });
         const json = await res.json();
         if (json.success && json.pairingCode) {
-          display.innerHTML = 'Your Pairing Code: <span style="background:#eab308;color:#000;padding:4px 10px;border-radius:6px;font-family:monospace;letter-spacing:3px;">' + json.pairingCode + '</span><br><span style="font-size:12px;color:#cbd5e1;">Enter this code on WhatsApp -> Linked Devices -> Link with phone number</span>';
+          display.innerHTML = 'Your 8-Digit Pairing Code:<br><br><span style="background:#eab308;color:#000;padding:6px 14px;border-radius:8px;font-family:monospace;font-size:24px;letter-spacing:4px;box-shadow:0 4px 15px rgba(234,179,8,0.4);">' + json.pairingCode + '</span><br><br><span style="font-size:13px;color:#e2e8f0;">Open WhatsApp on phone &rarr; <strong>Linked Devices</strong> &rarr; <strong>Link a Device</strong> &rarr; <strong>Link with phone number instead</strong> &rarr; Enter this code!</span>';
         } else {
-          display.innerText = json.error || 'Pairing code unavailable. Please scan the QR code above.';
+          display.innerHTML = '<span style="color:#f87171;">' + (json.error || 'Pairing code unavailable. Click Reset Session button and try again.') + '</span>';
         }
       } catch(e) {
-        display.innerText = 'Error: ' + e.message;
+        display.innerHTML = '<span style="color:#f87171;">Error: ' + e.message + '</span>';
       }
     }
 
@@ -4807,23 +5589,92 @@ export function startWhatsAppBotEngine() {
 
     // 3. Request Pairing Code (POST /api/request-pairing-code)
     if (pathname === '/api/request-pairing-code') {
-      if (sock && !sock.authState.creds.registered) {
+      let body = '';
+      req.on('data', c => { body += c; });
+      req.on('end', async () => {
         try {
-          const code = await sock.requestPairingCode(BOT_CONFIG.HELPLINE_PHONE_DIGITS);
-          latestPairingCode = code;
-          console.log(`[PAIRING-CODE] 🔑 Your WhatsApp Pairing Code is: ${code}`);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true, pairingCode: code, phone: BOT_CONFIG.HELPLINE_PHONE_DIGITS }));
+          let reqPhone = BOT_CONFIG.HELPLINE_PHONE_DIGITS;
+          try {
+            const parsed = JSON.parse(body || '{}');
+            if (parsed.phone) reqPhone = cleanPhone(parsed.phone);
+          } catch (_) {}
+
+          if (sock && baileysStatus !== 'CONNECTED') {
+            const code = await sock.requestPairingCode(reqPhone);
+            latestPairingCode = code;
+            console.log(`[PAIRING-CODE] 🔑 Your WhatsApp Pairing Code is: ${code} for +${reqPhone}`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, pairingCode: code, phone: reqPhone }));
+          } else if (baileysStatus === 'CONNECTED') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, message: 'Already connected!', status: 'CONNECTED' }));
+          } else {
+            // If socket is being created, trigger a fast init and request
+            await initBaileysSocket();
+            if (sock) {
+              const code = await sock.requestPairingCode(reqPhone);
+              latestPairingCode = code;
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: true, pairingCode: code, phone: reqPhone }));
+              return;
+            }
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Socket is initializing. Please click "Reset Session" button below and try again in 3 seconds.' }));
+          }
         } catch (err) {
           res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, error: err.message }));
+          res.end(JSON.stringify({ success: false, error: err.message || 'Error generating pairing code' }));
         }
-      } else if (baileysStatus === 'CONNECTED') {
+      });
+      return;
+    }
+
+    // 3a. Restart Engine (POST /api/restart-engine)
+    if (pathname === '/api/restart-engine' && req.method === 'POST') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, message: 'Restarting WhatsApp Bot process...' }));
+      setTimeout(() => {
+        process.exit(0);
+      }, 500);
+      return;
+    }
+
+    // 3b. Reset Session & Generate Fresh QR (POST /api/reset-session)
+    if (pathname === '/api/reset-session' && req.method === 'POST') {
+      try {
+        console.log('[WHATSAPP BOT] 🔄 Resetting session and generating fresh cryptographic keys...');
+        if (sock) {
+          try {
+            sock.ev?.removeAllListeners();
+            if (sock.ws) sock.ws.close();
+          } catch (_) {}
+          sock = null;
+        }
+        baileysStatus = 'DISCONNECTED';
+        latestQrDataUrl = '';
+        latestQrRaw = '';
+        latestPairingCode = '';
+
+        try {
+          if (fs.existsSync(AUTH_DIR)) {
+            const files = fs.readdirSync(AUTH_DIR);
+            for (const file of files) {
+              if (!file.startsWith('dispatched_')) {
+                try { fs.unlinkSync(path.join(AUTH_DIR, file)); } catch (_) {}
+              }
+            }
+          }
+        } catch (_) {}
+
+        setTimeout(() => {
+          initBaileysSocket().catch(e => console.error('[RESET-INIT-ERR]:', e.message));
+        }, 800);
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, message: 'Already connected!', status: 'CONNECTED' }));
-      } else {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: 'Socket initializing, please try again in 5 seconds.' }));
+        res.end(JSON.stringify({ success: true, message: 'Session cleared! Generating brand-new QR code in 2 seconds...' }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
       }
       return;
     }
@@ -5029,7 +5880,7 @@ export function startWhatsAppBotEngine() {
       return;
     }
 
-    // 5d. Outbound Admission WhatsApp Trigger (POST /api/whatsapp-admission)
+    // 5d. Outbound Admission WhatsApp Trigger (POST /api/whatsapp-admission) - DEDUPLICATED
     if (pathname === '/api/whatsapp-admission' && req.method === 'POST') {
       let body = '';
       req.on('data', (chunk) => { body += chunk; });
@@ -5048,28 +5899,43 @@ export function startWhatsAppBotEngine() {
           const fullName = application.full_name || application.fullName || 'Mumin';
           const prog = application.program || 'Hifz Classes';
           const appId = application.application_id || application.applicationId || 'N/A';
+          const trigKey = String(trigger || 'submission').toLowerCase();
+          const dispatchKey = `${appId}_${trigKey}`;
+          const lastSentTime = global.__lastAdmissionDispatchTime?.get(dispatchKey) || 0;
+          global.__lastAdmissionDispatchTime = global.__lastAdmissionDispatchTime || new Map();
+
+          // Deduplication: prevent duplicate rapid double-clicks within 10 seconds for the same trigger
+          if (appId !== 'N/A' && Date.now() - lastSentTime < 10000) {
+            console.log(`[ADMISSION-WA-SKIPPED] 🛡️ Admission ${trigKey} sent recently (<10s) for ${appId} to +${phone}`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, duplicate_skipped: true, trigger: trigKey, appId }));
+            return;
+          }
+
+          global.__lastAdmissionDispatchTime.set(dispatchKey, Date.now());
+          saveDispatchedAdmission(appId, trigKey);
 
           let msg = '';
-          if (trigger === 'submission') {
-            msg = `Salaam ${fullName},\n\nThank you for registering for *${prog}* (1447-48H) at Tahfeez Galiakot.\n\nYour admission status is: *⏳ Pending Admin Review*\nApplication Ref ID: *${appId}*\n\nWe have received your application and our administration will review and update you shortly.\n\nHelpline: +91 81079 25353\nTahfeez – Galiakot`;
-          } else if (trigger === 'approved') {
-            msg = `Salaam ${fullName}!\n\nMubarak! Your admission application (*${appId}*) for *${prog}* has been *APPROVED*! 🎉\n\nPlease confirm your enrollment by replying to this message with:\n👉 *Yes* (to confirm)\n👉 *No* (to decline)\n👉 *Want to talk* (for inquiries)\n\nTahfeez – Galiakot`;
-          } else if (trigger === 'rejected') {
-            msg = `Salaam ${fullName},\n\nRegarding your application (*${appId}*) for *${prog}*, we regret to inform you that we cannot accommodate new admissions at this time due to full batch capacity.\n\nHelpline: +91 81079 25353`;
-          } else if (trigger === 'waiting') {
-            msg = `Salaam ${fullName},\n\nYour application (*${appId}*) for *${prog}* is currently on the *Waiting List*.\n\nWe will notify you immediately once a slot becomes available.\n\nHelpline: +91 81079 25353`;
+          if (trigKey === 'submission' || trigKey === 'pending') {
+            msg = `Salaam *${fullName}*,\n\nThank you for registering for *${prog}* (1447-48H) at Tahfeez Galiakot.\n\nYour admission status is: *⏳ Pending Admin Review*\nApplication Ref ID: \`${appId}\`\n\nWe have received your application and our administration will review and update you shortly.\n\n📞 Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}\n*Mauze Tahfeez – Galiakot*`;
+          } else if (trigKey === 'approved') {
+            msg = `Salaam *${fullName}*! 🎉\n\nMubarak! Your admission application (*${appId}*) for *${prog}* has been *APPROVED*!\n\n━━━━━━━━━━━━━━━━━━━━━\n👉 *To confirm your enrollment and receive your Student Portal Login ID & Password, please reply:*\n*Yes*\n━━━━━━━━━━━━━━━━━━━━━\n\n• If you wish to decline, reply *No*.\n• For inquiries, reply *Want to talk*.\n\n📞 Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}\n*Mauze Tahfeez – Galiakot*`;
+          } else if (trigKey === 'rejected') {
+            msg = `Salaam *${fullName}*,\n\nRegarding your application (*${appId}*) for *${prog}*, we regret to inform you that we cannot accommodate new admissions at this time due to batch capacity limitations.\n\n📞 Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}\n*Mauze Tahfeez – Galiakot*`;
+          } else if (trigKey === 'waiting') {
+            msg = `Salaam *${fullName}*,\n\nYour admission application (*${appId}*) for *${prog}* is currently on the *Waiting List* ⏳.\n\nWe will notify you immediately on WhatsApp once a slot becomes available.\n\n📞 Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}\n*Mauze Tahfeez – Galiakot*`;
           } else {
-            msg = `Salaam ${fullName},\n\nYour admission status for *${prog}* (Ref: *${appId}*) is now: *${trigger}*.\n\nHelpline: +91 81079 25353`;
+            msg = `Salaam *${fullName}*,\n\nYour admission status for *${prog}* (Ref: *${appId}*) is now: *${trigger}*.\n\n📞 Helpline: ${BOT_CONFIG.HELPLINE_NUMBER}\n*Mauze Tahfeez – Galiakot*`;
           }
 
           if (sock && baileysStatus === 'CONNECTED' && phone) {
             const jid = `${phone}@s.whatsapp.net`;
             await sock.sendMessage(jid, { text: msg });
-            console.log(`[ADMISSION-WA-SENT] 🚀 Sent ${trigger} notification to +${phone}`);
+            console.log(`[ADMISSION-WA-SENT] 🚀 Sent ${trigKey} notification to +${phone}`);
           }
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true, trigger, phone, message: msg }));
+          res.end(JSON.stringify({ success: true, trigger: trigKey, phone, message: msg }));
         } catch (e) {
           res.writeHead(500, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, error: e.message }));
@@ -5631,8 +6497,7 @@ export function startWhatsAppBotEngine() {
     }, 30 * 1000);
     console.log(`[WHATSAPP BOT] ⏱ Monday-Saturday Teacher Scheduler Active (4:25 PM Self-Attendance & 10:00 PM eLearning/Attendance Summary).`);
 
-    // Live Admissions Auto-Sync & Instant Auto-Dispatch Worker (Connects Vercel form submissions directly to WhatsApp bot)
-    const dispatchedAdmissionsSet = new Set();
+    // Live Admissions Auto-Sync Worker (Deduplicated, Protected from spamming old submissions)
     const syncAdmissionsFromCloud = async () => {
       try {
         const cloudUrl = 'https://mouze-tahfeez-atfal.vercel.app/api/admission-admin';
@@ -5652,16 +6517,31 @@ export function startWhatsAppBotEngine() {
             localList.forEach(item => { if (item.application_id) map.set(item.application_id, item); });
 
             let hasNew = false;
+            const now = Date.now();
+            const FRESH_SUBMISSION_WINDOW_MS = 10 * 60 * 1000; // 10 minutes max for auto-welcome
+
+            const DELETED_DUMMY_IDS = new Set([
+              'MT-1447-86769213',
+              'MT-1447-11445807',
+              'MT-1447-75674496',
+              'MT-1447-58882134'
+            ]);
+
             for (const item of json.data) {
-              if (!item.application_id) continue;
+              if (!item.application_id || DELETED_DUMMY_IDS.has(item.application_id) || DELETED_DUMMY_IDS.has(item.id)) continue;
               if (!map.has(item.application_id)) {
                 map.set(item.application_id, item);
                 hasNew = true;
               }
 
-              // Auto-dispatch welcome notification if new and not yet dispatched
-              if (!dispatchedAdmissionsSet.has(item.application_id) && item.status === 'pending') {
-                dispatchedAdmissionsSet.add(item.application_id);
+              // Check creation timestamp: ONLY send welcome notification for FRESH submissions created in the last 10 minutes
+              const subTime = item.submitted_at || item.created_at || item.updated_at;
+              const subTs = subTime ? new Date(subTime).getTime() : 0;
+              const isFresh = subTs > 0 && (now - subTs < FRESH_SUBMISSION_WINDOW_MS);
+
+              // Auto-dispatch welcome notification ONLY IF fresh AND not yet dispatched
+              if (isFresh && !isAdmissionDispatched(item.application_id, 'submission') && item.status === 'pending') {
+                saveDispatchedAdmission(item.application_id, 'submission');
                 const rawPhone = item.whatsapp_number || item.phone || '';
                 const phone = cleanPhone(rawPhone);
                 const fullName = item.full_name || 'Mumin';
@@ -5674,6 +6554,9 @@ export function startWhatsAppBotEngine() {
                   await sock.sendMessage(jid, { text: welcomeMsg });
                   console.log(`[ADMISSION-CLOUD-SYNC] 🚀 Auto-dispatched welcome WhatsApp to +${phone} for ${fullName} (${appId})`);
                 }
+              } else if (!isAdmissionDispatched(item.application_id, 'submission')) {
+                // Mark older historical submission as recorded so it never gets fired later
+                saveDispatchedAdmission(item.application_id, 'submission');
               }
             }
 
@@ -5687,9 +6570,9 @@ export function startWhatsAppBotEngine() {
       } catch (_) {}
     };
 
-    // Run admission sync every 5 seconds
-    setInterval(syncAdmissionsFromCloud, 5000);
-    setTimeout(syncAdmissionsFromCloud, 1000);
+    // Run admission sync every 10 seconds
+    setInterval(syncAdmissionsFromCloud, 10000);
+    setTimeout(syncAdmissionsFromCloud, 2000);
     console.log(`[WHATSAPP BOT] 🔄 Cloud Admission Auto-Sync Worker active (polling Vercel every 5s).`);
   });
 

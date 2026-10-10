@@ -5,16 +5,16 @@
 .league-lock-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 999999;
-  background: rgba(14, 10, 6, 0.76);
+  z-index: 9999999;
+  background: rgba(14, 10, 6, 0.78);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   padding: 16px;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
 }
 
@@ -25,19 +25,21 @@
   max-height: calc(100dvh - 32px);
   max-height: calc(100vh - 32px);
   margin: auto;
-  display: flex;
+  display: flex !important;
   flex-direction: column;
-  background: #ffffff;
+  background: #ffffff !important;
   border-radius: 22px;
   border: 1.5px solid rgba(212, 175, 55, 0.38);
   box-shadow: 0 25px 60px rgba(0, 0, 0, 0.32), 0 6px 24px rgba(212, 175, 55, 0.18);
   overflow: hidden;
   box-sizing: border-box;
-  animation: modalScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 1 !important;
+  visibility: visible !important;
+  animation: modalScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .league-lock-modal-backdrop.dark-theme .league-lock-modal-card {
-  background: #1c1712;
+  background: #1c1712 !important;
   border-color: rgba(212, 175, 55, 0.32);
   box-shadow: 0 25px 65px rgba(0, 0, 0, 0.75);
 }

@@ -1,3 +1,21 @@
+
+async function dispatchAdminStatusWhatsApp(trigger, application) {
+  if (!application || !application.whatsapp_number) return;
+  for (const botUrl of [
+    "http://localhost:2785/api/whatsapp-admission",
+    "http://127.0.0.1:2785/api/whatsapp-admission"
+  ]) {
+    try {
+      await fetch(botUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trigger, application }),
+        signal: AbortSignal.timeout ? AbortSignal.timeout(2000) : undefined
+      });
+      return;
+    } catch (_) {}
+  }
+}
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import fs from "fs";
@@ -19,7 +37,12 @@ const FALLBACK_SA = {
 const CACHE_FILE = path.join("/tmp", "admission_applications_cache.json");
 const PUBLIC_SEED_FILE = path.join(process.cwd(), "public", "admissions_data.json");
 
-global.__ADMISSIONS_CACHE__ = global.__ADMISSIONS_CACHE__ || new Map();
+const DELETED_DUMMY_IDS = new Set([
+  "MT-1447-86769213",
+  "MT-1447-11445807",
+  "MT-1447-75674496",
+  "MT-1447-58882134"
+]);
 
 function readDiskCache() {
   const map = new Map();
@@ -31,7 +54,7 @@ function readDiskCache() {
       const pList = JSON.parse(pContent) || [];
       pList.forEach(item => {
         const k = item.application_id || item.id;
-        if (k) map.set(k, item);
+        if (k && !DELETED_DUMMY_IDS.has(k)) map.set(k, item);
       });
     }
   } catch (_) {}
@@ -43,7 +66,7 @@ function readDiskCache() {
       const cList = JSON.parse(content) || [];
       cList.forEach(item => {
         const k = item.application_id || item.id;
-        if (k) map.set(k, item);
+        if (k && !DELETED_DUMMY_IDS.has(k)) map.set(k, item);
       });
     }
   } catch (_) {}
@@ -51,7 +74,7 @@ function readDiskCache() {
   // 3. Read from global in-memory cache
   if (global.__ADMISSIONS_CACHE__) {
     for (const [k, v] of global.__ADMISSIONS_CACHE__.entries()) {
-      map.set(k, v);
+      if (!DELETED_DUMMY_IDS.has(k)) map.set(k, v);
     }
   }
 
@@ -186,6 +209,54 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true, data: merged });
   }
 
+  // DELETE or action === 'permanent_delete' / 'empty_trash'
+  if (req.method === "DELETE" || (req.body && (req.body.action === "permanent_delete" || req.body.action === "empty_trash"))) {
+    try {
+      let body = req.body || {};
+      if (typeof body === "string") {
+        try { body = JSON.parse(body); } catch (_) {}
+      }
+
+      if (body.action === "empty_trash") {
+        let list = readDiskCache();
+        const trashedIds = list.filter(r => r.status === "trash" || r.is_trash).map(r => r.application_id || r.id);
+        list = list.filter(r => r.status !== "trash" && !r.is_trash);
+        try {
+          const db = getAdminDb();
+          for (const tid of trashedIds) {
+            await db.collection("admission_applications").doc(tid).delete().catch(() => {});
+          }
+        } catch (_) {}
+        try {
+          fs.writeFileSync(CACHE_FILE, JSON.stringify(list), "utf8");
+          if (fs.existsSync(PUBLIC_SEED_FILE)) {
+            fs.writeFileSync(PUBLIC_SEED_FILE, JSON.stringify(list, null, 2), "utf8");
+          }
+        } catch (_) {}
+        return res.status(200).json({ success: true, message: "Trash emptied" });
+      }
+
+      const appId = req.query?.applicationId || body.applicationId || body.application_id || body.id;
+      if (appId) {
+        let list = readDiskCache();
+        list = list.filter(r => r.application_id !== appId && r.id !== appId);
+        try {
+          const db = getAdminDb();
+          await db.collection("admission_applications").doc(appId).delete().catch(() => {});
+        } catch (_) {}
+        try {
+          fs.writeFileSync(CACHE_FILE, JSON.stringify(list), "utf8");
+          if (fs.existsSync(PUBLIC_SEED_FILE)) {
+            fs.writeFileSync(PUBLIC_SEED_FILE, JSON.stringify(list, null, 2), "utf8");
+          }
+        } catch (_) {}
+        return res.status(200).json({ success: true, message: "Permanently deleted", applicationId: appId });
+      }
+    } catch (delErr) {
+      return res.status(500).json({ success: false, error: delErr.message });
+    }
+  }
+
   // PATCH / POST: Update application status or record
   if (req.method === "PATCH" || req.method === "POST" || req.method === "PUT") {
     try {
@@ -200,28 +271,38 @@ export default async function handler(req, res) {
       }
 
       const cachedList = readDiskCache();
-      const existing = cachedList.find(r => r.application_id === appId) || {};
+      const existing = cachedList.find(r => r.application_id === appId || r.id === appId) || {};
       const prevStatus = existing.status || "pending";
       const timestamp = new Date().toISOString();
 
-      let newStatus = body.newStatus || body.status || existing.status || "pending";
+      let newStatus = existing.status || "pending";
+      let isTrash = Boolean(existing.is_trash);
       let newEnrolled = existing.enrolled_count || 0;
       let newExit = existing.exit_count || 0;
       let newResume = existing.resume_count || 0;
 
-      if (body.action === "exit") {
+      if (body.action === "move_to_trash") {
+        newStatus = "trash";
+        isTrash = true;
+      } else if (body.action === "restore_from_trash") {
+        newStatus = existing.trashed_from_status || "pending";
+        isTrash = false;
+      } else if (body.action === "exit") {
         newStatus = "exited";
         newExit += 1;
       } else if (body.action === "resume") {
         newStatus = "approved";
         newResume += 1;
-      } else if (newStatus === "approved" && prevStatus !== "approved") {
-        newEnrolled += 1;
+      } else if (body.newStatus || body.status) {
+        newStatus = body.newStatus || body.status;
+        if (newStatus === "approved" && prevStatus !== "approved") {
+          newEnrolled += 1;
+        }
       }
 
       const newLog = {
         id: `log_${Date.now()}`,
-        action: newStatus,
+        action: body.action || newStatus,
         from_status: prevStatus,
         to_status: newStatus,
         timestamp,
@@ -236,6 +317,9 @@ export default async function handler(req, res) {
         ...body,
         application_id: appId,
         status: newStatus,
+        is_trash: isTrash,
+        trashed_at: isTrash ? (existing.trashed_at || timestamp) : null,
+        trashed_from_status: body.action === "move_to_trash" ? prevStatus : existing.trashed_from_status,
         enrolled_count: newEnrolled,
         exit_count: newExit,
         resume_count: newResume,
@@ -253,6 +337,13 @@ export default async function handler(req, res) {
         await db.collection("admission_applications").doc(appId).set(updatedRecord, { merge: true });
       } catch (dbErr) {
         console.warn("Firestore update note:", dbErr.message);
+      }
+
+      // Dispatch WhatsApp notification for status change (Approved, Waiting, Rejected, etc.)
+      if (prevStatus !== newStatus && ["approved", "waiting", "rejected", "pending"].includes(newStatus)) {
+        try {
+          await dispatchAdminStatusWhatsApp(newStatus, updatedRecord);
+        } catch (_) {}
       }
 
       return res.status(200).json({ success: true, data: updatedRecord });

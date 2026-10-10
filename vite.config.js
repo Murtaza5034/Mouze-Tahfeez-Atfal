@@ -257,39 +257,68 @@ export function getRefreshReg() {
             return;
           }
 
-          if (req.method === 'POST' || req.method === 'PATCH') {
+          if (req.method === 'POST' || req.method === 'PATCH' || req.method === 'DELETE') {
             const chunks = [];
             for await (const chunk of req) chunks.push(chunk);
             const body = JSON.parse(Buffer.concat(chunks).toString() || '{}');
-            const list = readData();
+            let list = readData();
             const appId = body.applicationId || body.application_id || body.id;
-            const idx = list.findIndex(r => r.application_id === appId);
-            let updated = null;
             const timestamp = new Date().toISOString();
+
+            if (body.action === 'empty_trash') {
+              list = list.filter(r => r.status !== 'trash' && !r.is_trash);
+              writeData(list);
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: true, message: 'Trash emptied' }));
+              return;
+            }
+
+            if (body.action === 'permanent_delete' || req.method === 'DELETE') {
+              list = list.filter(r => r.application_id !== appId && r.id !== appId);
+              writeData(list);
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: true, message: 'Permanently deleted', applicationId: appId }));
+              return;
+            }
+
+            const idx = list.findIndex(r => r.application_id === appId || r.id === appId);
+            let updated = null;
 
             if (idx >= 0) {
               const current = list[idx];
-              const newStatus = body.newStatus || body.status || (body.action === 'exit' ? 'exited' : body.action === 'resume' ? 'approved' : current.status);
-              const prevStatus = current.status;
+              let newStatus = current.status;
+              let isTrash = Boolean(current.is_trash);
+              let prevStatus = current.status;
               let newEnrolled = current.enrolled_count || 0;
               let newExit = current.exit_count || 0;
               let newResume = current.resume_count || 0;
 
-              if (newStatus === "approved" && prevStatus !== "approved") {
-                newEnrolled += 1;
-              } else if (newStatus === "exited" && prevStatus !== "exited") {
+              if (body.action === 'move_to_trash') {
+                newStatus = 'trash';
+                isTrash = true;
+              } else if (body.action === 'restore_from_trash') {
+                newStatus = current.trashed_from_status || 'pending';
+                isTrash = false;
+              } else if (body.action === 'exit') {
+                newStatus = 'exited';
                 newExit += 1;
-              } else if (body.action === "resume") {
+              } else if (body.action === 'resume') {
+                newStatus = 'approved';
                 newResume += 1;
+              } else if (body.newStatus || body.status) {
+                newStatus = body.newStatus || body.status;
+                if (newStatus === 'approved' && prevStatus !== 'approved') newEnrolled += 1;
               }
 
               const newLog = {
                 id: `log_${Date.now()}`,
-                action: newStatus,
+                action: body.action || newStatus,
                 from_status: prevStatus,
                 to_status: newStatus,
                 timestamp,
-                actor: body.adminUser || "Admin",
+                actor: body.adminUser || 'Admin',
                 note: body.adminNote || (body.exitReason ? `Exited: ${body.exitReason}` : body.resumeNote ? `Resumed: ${body.resumeNote}` : `Status updated from ${prevStatus} to ${newStatus}`)
               };
 
@@ -299,19 +328,33 @@ export function getRefreshReg() {
                 ...current,
                 ...body,
                 status: newStatus,
+                is_trash: isTrash,
+                trashed_at: isTrash ? (current.trashed_at || timestamp) : null,
+                trashed_from_status: body.action === 'move_to_trash' ? prevStatus : current.trashed_from_status,
                 enrolled_count: newEnrolled,
                 exit_count: newExit,
                 resume_count: newResume,
                 timeline_audit_log: [newLog, ...existingLogs],
                 updated_at: timestamp,
-                last_action_by: body.adminUser || "Admin"
+                last_action_by: body.adminUser || 'Admin'
               };
               updated = list[idx];
+
+              // Dispatch WhatsApp on status changes
+              if (prevStatus !== newStatus && ['approved', 'waiting', 'rejected', 'pending'].includes(newStatus)) {
+                try {
+                  fetch('http://127.0.0.1:2785/api/whatsapp-admission', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ trigger: newStatus, application: updated })
+                  }).catch(() => {});
+                } catch (_) {}
+              }
             } else {
               updated = {
                 application_id: appId,
                 ...body,
-                status: body.newStatus || body.status || "pending",
+                status: body.newStatus || body.status || 'pending',
                 created_at: timestamp,
                 updated_at: timestamp
               };
@@ -413,6 +456,45 @@ export function getRefreshReg() {
             res.statusCode = 200;
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ success: true, applicationId: appId, data: record }));
+            return;
+          }
+        });
+
+        // 4. Dev server handler for /api/whatsapp-admission
+        server.middlewares.use('/api/whatsapp-admission', async (req, res) => {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+          if (req.method === 'OPTIONS') {
+            res.statusCode = 204;
+            res.end();
+            return;
+          }
+
+          if (req.method === 'POST') {
+            const chunks = [];
+            for await (const chunk of req) chunks.push(chunk);
+            const payload = JSON.parse(Buffer.concat(chunks).toString() || '{}');
+
+            try {
+              const botRes = await fetch('http://127.0.0.1:2785/api/whatsapp-admission', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              if (botRes.ok) {
+                const botJson = await botRes.json();
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify(botJson));
+                return;
+              }
+            } catch (_) {}
+
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: true, forwarded: true }));
             return;
           }
         });

@@ -283,7 +283,7 @@ export default function AtfalLeagueLockModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="league-lock-modal-card card-appear" onClick={(e) => e.stopPropagation()}>
+      <div className="league-lock-modal-card" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="league-lock-modal-header">
           <div className="modal-header-left">

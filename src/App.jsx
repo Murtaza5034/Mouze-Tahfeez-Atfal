@@ -38025,9 +38025,6 @@ function TeacherPortal({
               <>
                 <div className="its-sidebar-user-details">
                   <h2 className="its-sidebar-name">{teacherName}</h2>
-                  <p className="its-sidebar-its">
-                    ITS: {teacherIts || "50432737"}
-                  </p>
                 </div>
                 <div className="its-sidebar-avatar-squircle">
                   {photoUrl ? (

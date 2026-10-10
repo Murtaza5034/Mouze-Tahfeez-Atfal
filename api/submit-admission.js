@@ -83,14 +83,34 @@ async function dispatchSubmissionWhatsApp(application) {
   if (cleanPhone.startsWith("+")) cleanPhone = cleanPhone.substring(1);
   else if (cleanPhone.length === 10) cleanPhone = "91" + cleanPhone;
 
-  const messageText = `Salaam ${full_name || "Mumin"},\n\nThank you for registering for *${program || "Hifz Classes"}* (1447-48H) at Tahfeez Galiakot.\n\nYour admission status is *Pending Admin Review*. You will receive an official update from the administration soon.\n\nRef ID: *${application_id || "N/A"}*\nHelpline: +918107925353`;
+  // 1. Trigger via Local WhatsApp Bot (Port 2785) with deduplication support
+  for (const botUrl of [
+    "http://localhost:2785/api/whatsapp-admission",
+    "http://127.0.0.1:2785/api/whatsapp-admission",
+    "http://localhost:2785/api/send-message",
+    "http://127.0.0.1:2785/api/send-message"
+  ]) {
+    try {
+      const res = await fetch(botUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trigger: "submission",
+          application,
+          phone: cleanPhone
+        }),
+        signal: AbortSignal.timeout ? AbortSignal.timeout(2000) : undefined
+      });
+      if (res.ok) return;
+    } catch (_) {}
+  }
 
-  // 1. Meta WhatsApp Cloud API
+  // 2. Meta WhatsApp Cloud API Fallback
   const cloudApiToken = process.env.WHATSAPP_TOKEN || process.env.WHATSAPP_CLOUD_API_KEY;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-
   if (cloudApiToken && phoneNumberId) {
     try {
+      const messageText = `Salaam ${full_name || "Mumin"},\n\nThank you for registering for *${program || "Hifz Classes"}* (1447-48H) at Tahfeez Galiakot.\n\nYour admission status is: *⏳ Pending Admin Review*\nApplication Ref ID: *${application_id || "N/A"}*\n\nWe have received your application and our administration will review and update you shortly.\n\nHelpline: +91 81079 25353\nTahfeez – Galiakot`;
       await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
         method: "POST",
         headers: {
@@ -103,21 +123,9 @@ async function dispatchSubmissionWhatsApp(application) {
           to: cleanPhone,
           type: "text",
           text: { preview_url: false, body: messageText }
-        })
+        }),
+        signal: AbortSignal.timeout ? AbortSignal.timeout(2000) : undefined
       });
-      return;
-    } catch (_) {}
-  }
-
-  // 2. Local Baileys WhatsApp Bot
-  for (const botUrl of ["http://localhost:2785/api/send-message", "http://127.0.0.1:2785/api/send-message"]) {
-    try {
-      await fetch(botUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: cleanPhone, message: messageText })
-      });
-      return;
     } catch (_) {}
   }
 }
