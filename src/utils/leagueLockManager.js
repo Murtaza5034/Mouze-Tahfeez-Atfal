@@ -1,6 +1,5 @@
 import { doc, getDoc, setDoc, onSnapshot, getFirestore } from "firebase/firestore";
 import { firebaseApp } from "../firebase/config";
-import { supabase } from "../supabaseClient";
 
 export const DEFAULT_LEAGUE_LOCK_CONFIG = {
   // Global Month and Week Lock Matrix
@@ -78,7 +77,6 @@ export function subscribeToLeagueLockConfig(callback) {
   callback(initial);
 
   let unsubFirestore = () => {};
-  let supabaseChannel = null;
 
   const handleNewConfig = (data) => {
     if (!data) return;
@@ -120,19 +118,7 @@ export function subscribeToLeagueLockConfig(callback) {
     console.warn("Error subscribing to Firestore league lock config:", err);
   }
 
-  // 3. Subscribe to Supabase real-time broadcast channel for instant cross-device mobile sync
-  try {
-    supabaseChannel = supabase
-      .channel("atfal-league-lock-sync")
-      .on("broadcast", { event: "lock_config_updated" }, (payload) => {
-        if (payload?.payload) {
-          handleNewConfig(payload.payload);
-        }
-      })
-      .subscribe();
-  } catch (_e) {}
-
-  // 4. Fallback fetch from Firestore once (in case onSnapshot is delayed on mobile)
+  // 3. Fallback fetch from Firestore once (in case onSnapshot is delayed on mobile)
   try {
     const db = getFirestore(firebaseApp);
     const docRef = doc(db, "system_settings", "atfal_league_lock_config");
@@ -143,7 +129,7 @@ export function subscribeToLeagueLockConfig(callback) {
     }).catch(() => {});
   } catch (_e) {}
 
-  // 5. Cross-tab storage listener
+  // 4. Cross-tab storage listener
   const handleStorage = (e) => {
     if (e.key === LOCAL_STORAGE_KEY && e.newValue) {
       try {
@@ -160,9 +146,6 @@ export function subscribeToLeagueLockConfig(callback) {
     try {
       unsubFirestore();
     } catch (_e) {}
-    try {
-      if (supabaseChannel) supabase.removeChannel(supabaseChannel);
-    } catch (_e) {}
     if (typeof window !== "undefined") {
       window.removeEventListener("storage", handleStorage);
     }
@@ -170,7 +153,7 @@ export function subscribeToLeagueLockConfig(callback) {
 }
 
 /**
- * Saves League Lock Configuration to Firestore, Supabase Broadcast & local cache
+ * Saves League Lock Configuration to Firestore & local cache
  */
 export async function saveLeagueLockConfig(config) {
   const payload = {
@@ -180,15 +163,6 @@ export async function saveLeagueLockConfig(config) {
 
   try {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload));
-  } catch (_e) {}
-
-  // Broadcast to all active clients (mobile and web) via Supabase real-time channel
-  try {
-    supabase.channel("atfal-league-lock-sync").send({
-      type: "broadcast",
-      event: "lock_config_updated",
-      payload,
-    }).catch(() => {});
   } catch (_e) {}
 
   try {
