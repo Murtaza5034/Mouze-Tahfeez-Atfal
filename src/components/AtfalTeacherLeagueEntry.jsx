@@ -272,6 +272,8 @@ export default function AtfalTeacherLeagueEntry({
   allStudents = [],
   teacherIdentity = "",
   currentUserId = "",
+  teacherProfile = null,
+  portalAccess = null,
   isDarkMode = false,
 }) {
   // 1. Student List Preparation
@@ -613,7 +615,7 @@ export default function AtfalTeacherLeagueEntry({
   // 6. Handling marks input changes (0 to 60) with instant UI calculation
   const handleScoreChange = useCallback((weekKey, field, rawValue, immediateFlush = false) => {
     // Check lock permission before modifying
-    const lockStatus = checkWeekLockStatus(lockConfig, selectedMonthId, weekKey, teacherIdentity, currentUserId);
+    const lockStatus = checkWeekLockStatus(lockConfig, selectedMonthId, weekKey, teacherIdentity, currentUserId, teacherProfile || portalAccess);
     if (lockStatus.isLocked) {
       setSaveError(`This week is locked by Admin (${lockStatus.reason}). Changes cannot be saved.`);
       return;
@@ -1050,7 +1052,7 @@ export default function AtfalTeacherLeagueEntry({
             </div>
 
             {/* Month Lock Banner when month is archived/locked */}
-            {WEEKS_META.every(w => checkWeekLockStatus(lockConfig, selectedMonthId, w.key, teacherIdentity, currentUserId).isLocked) && (
+            {WEEKS_META.every(w => checkWeekLockStatus(lockConfig, selectedMonthId, w.key, teacherIdentity, currentUserId, teacherProfile || portalAccess).isLocked) && (
               <div className="league-month-locked-alert">
                 <Lock size={15} />
                 <span>
@@ -1063,7 +1065,7 @@ export default function AtfalTeacherLeagueEntry({
           {/* 4 WEEK ENTRY CARDS GRID */}
           <div className="parchment-weeks-grid">
             {WEEKS_META.filter(w => selectedWeekFilter === "all" || selectedWeekFilter === String(w.number)).map((week) => {
-              const lockStatus = checkWeekLockStatus(lockConfig, selectedMonthId, week.key, teacherIdentity, currentUserId);
+              const lockStatus = checkWeekLockStatus(lockConfig, selectedMonthId, week.key, teacherIdentity, currentUserId, teacherProfile || portalAccess);
               const isWeekLocked = lockStatus.isLocked;
 
               const weekData = activeMonthData.weeks?.[week.key] || { post_it: 0, activity: 0 };

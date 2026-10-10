@@ -35,18 +35,23 @@ export const DEFAULT_LEAGUE_LOCK_CONFIG = {
       weeks: { week1: false, week2: false, week3: false, week4: false },
     },
   },
-  // Individual teacher overrides:
-  // teacherOverrides[teacherKey]: {
-  //   teacherName: "Murtaza",
-  //   months: {
-  //     rabi2: { locked: false, weeks: { week1: false, week2: false } }
-  //   }
-  // }
   teacherOverrides: {},
   updated_at: new Date().toISOString(),
 };
 
 const LOCAL_STORAGE_KEY = "atfal_league_lock_config_v1";
+
+/**
+ * Normalizes text for robust matching (removes special chars, extra spaces)
+ */
+export function cleanNorm(str) {
+  if (!str) return "";
+  return String(str)
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\d\s]/g, "")
+    .replace(/\s+/g, " ");
+}
 
 /**
  * Gets cached lock config synchronously from localStorage with fallback
@@ -65,60 +70,107 @@ export function getCachedLeagueLockConfig() {
 }
 
 /**
- * Subscribes to Real-time League Lock Configuration
+ * Subscribes to Real-time League Lock Configuration across Firestore, Supabase, and localStorage
  */
 export function subscribeToLeagueLockConfig(callback) {
   // 1. Immediately emit cached config
   const initial = getCachedLeagueLockConfig();
   callback(initial);
 
-  let unsub = () => {};
+  let unsubFirestore = () => {};
+  let supabaseChannel = null;
 
+  const handleNewConfig = (data) => {
+    if (!data) return;
+    const merged = {
+      ...DEFAULT_LEAGUE_LOCK_CONFIG,
+      ...data,
+      months: {
+        ...DEFAULT_LEAGUE_LOCK_CONFIG.months,
+        ...(data.months || {}),
+      },
+      teacherOverrides: data.teacherOverrides || {},
+    };
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
+    } catch (_e) {}
+    callback(merged);
+  };
+
+  // 2. Subscribe to Firestore real-time doc
   try {
     const db = getFirestore(firebaseApp);
     const docRef = doc(db, "system_settings", "atfal_league_lock_config");
 
-    unsub = onSnapshot(
+    unsubFirestore = onSnapshot(
       docRef,
       (snap) => {
         if (snap.exists()) {
-          const data = snap.data();
-          const merged = {
-            ...DEFAULT_LEAGUE_LOCK_CONFIG,
-            ...data,
-            months: {
-              ...DEFAULT_LEAGUE_LOCK_CONFIG.months,
-              ...(data.months || {}),
-            },
-            teacherOverrides: data.teacherOverrides || {},
-          };
-          try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
-          } catch (_e) {}
-          callback(merged);
+          handleNewConfig(snap.data());
         } else {
-          // Initialize doc if missing
           setDoc(docRef, DEFAULT_LEAGUE_LOCK_CONFIG, { merge: true }).catch(() => {});
           callback(DEFAULT_LEAGUE_LOCK_CONFIG);
         }
       },
       (err) => {
-        console.warn("Firestore lock config listener fallback:", err);
+        console.warn("Firestore lock config listener note:", err);
       }
     );
   } catch (err) {
-    console.warn("Error subscribing to league lock config:", err);
+    console.warn("Error subscribing to Firestore league lock config:", err);
+  }
+
+  // 3. Subscribe to Supabase real-time broadcast channel for instant cross-device mobile sync
+  try {
+    supabaseChannel = supabase
+      .channel("atfal-league-lock-sync")
+      .on("broadcast", { event: "lock_config_updated" }, (payload) => {
+        if (payload?.payload) {
+          handleNewConfig(payload.payload);
+        }
+      })
+      .subscribe();
+  } catch (_e) {}
+
+  // 4. Fallback fetch from Firestore once (in case onSnapshot is delayed on mobile)
+  try {
+    const db = getFirestore(firebaseApp);
+    const docRef = doc(db, "system_settings", "atfal_league_lock_config");
+    getDoc(docRef).then((snap) => {
+      if (snap.exists()) {
+        handleNewConfig(snap.data());
+      }
+    }).catch(() => {});
+  } catch (_e) {}
+
+  // 5. Cross-tab storage listener
+  const handleStorage = (e) => {
+    if (e.key === LOCAL_STORAGE_KEY && e.newValue) {
+      try {
+        const parsed = JSON.parse(e.newValue);
+        if (parsed && parsed.months) callback(parsed);
+      } catch (_err) {}
+    }
+  };
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", handleStorage);
   }
 
   return () => {
     try {
-      unsub();
+      unsubFirestore();
     } catch (_e) {}
+    try {
+      if (supabaseChannel) supabase.removeChannel(supabaseChannel);
+    } catch (_e) {}
+    if (typeof window !== "undefined") {
+      window.removeEventListener("storage", handleStorage);
+    }
   };
 }
 
 /**
- * Saves League Lock Configuration to Firestore & local cache
+ * Saves League Lock Configuration to Firestore, Supabase Broadcast & local cache
  */
 export async function saveLeagueLockConfig(config) {
   const payload = {
@@ -128,6 +180,15 @@ export async function saveLeagueLockConfig(config) {
 
   try {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload));
+  } catch (_e) {}
+
+  // Broadcast to all active clients (mobile and web) via Supabase real-time channel
+  try {
+    supabase.channel("atfal-league-lock-sync").send({
+      type: "broadcast",
+      event: "lock_config_updated",
+      payload,
+    }).catch(() => {});
   } catch (_e) {}
 
   try {
@@ -156,6 +217,7 @@ export function normalizeTeacherKey(teacherIdentity, currentUserId) {
 
 /**
  * Checks if a specific month and week is locked for a teacher
+ * Employs multi-identifier resolution (Auth UID, ITS number, DB ID, Teacher Name)
  * @returns {{ isLocked: boolean, reason: string, isOverridden: boolean }}
  */
 export function checkWeekLockStatus(
@@ -163,23 +225,96 @@ export function checkWeekLockStatus(
   monthId,
   weekKey,
   teacherIdentity = "",
-  currentUserId = ""
+  currentUserId = "",
+  teacherProfile = null
 ) {
   const cfg = lockConfig || DEFAULT_LEAGUE_LOCK_CONFIG;
   const monthData = cfg.months?.[monthId] || { locked: false, weeks: {} };
 
-  // Check individual teacher override first
-  const tKeyId = currentUserId ? String(currentUserId).trim().toLowerCase() : null;
-  const tKeyName = teacherIdentity ? String(teacherIdentity).trim().toLowerCase() : null;
+  // Collect all possible candidate keys and identifiers for the current teacher
+  const candidateKeys = new Set();
+
+  if (currentUserId) {
+    const s = String(currentUserId).trim().toLowerCase();
+    candidateKeys.add(s);
+  }
+
+  if (teacherIdentity) {
+    if (typeof teacherIdentity === "string") {
+      const trimmed = teacherIdentity.trim();
+      candidateKeys.add(trimmed.toLowerCase());
+      candidateKeys.add(cleanNorm(trimmed));
+      const digits = trimmed.match(/\d{5,9}/)?.[0];
+      if (digits) candidateKeys.add(digits);
+    } else if (typeof teacherIdentity === "object") {
+      if (teacherIdentity.id) candidateKeys.add(String(teacherIdentity.id).trim().toLowerCase());
+      if (teacherIdentity.user_id) candidateKeys.add(String(teacherIdentity.user_id).trim().toLowerCase());
+      if (teacherIdentity.its || teacherIdentity.its_id) candidateKeys.add(String(teacherIdentity.its || teacherIdentity.its_id).trim().toLowerCase());
+      if (teacherIdentity.name || teacherIdentity.full_name) {
+        candidateKeys.add(cleanNorm(teacherIdentity.name || teacherIdentity.full_name));
+      }
+    }
+  }
+
+  if (teacherProfile && typeof teacherProfile === "object") {
+    if (teacherProfile.id) candidateKeys.add(String(teacherProfile.id).trim().toLowerCase());
+    if (teacherProfile.user_id) candidateKeys.add(String(teacherProfile.user_id).trim().toLowerCase());
+    if (teacherProfile.its || teacherProfile.its_id) candidateKeys.add(String(teacherProfile.its || teacherProfile.its_id).trim().toLowerCase());
+    if (teacherProfile.full_name || teacherProfile.name) {
+      candidateKeys.add(cleanNorm(teacherProfile.full_name || teacherProfile.name));
+    }
+  }
+
+  // Also check localStorage for cached teacher credentials
+  if (typeof localStorage !== "undefined") {
+    try {
+      const localIts = localStorage.getItem("mauze_teacher_its") || localStorage.getItem("portal_its") || localStorage.getItem("mauze_user_its");
+      if (localIts) candidateKeys.add(String(localIts).trim().toLowerCase());
+      const localName = localStorage.getItem("mauze_teacher_name") || localStorage.getItem("teacher_name");
+      if (localName) candidateKeys.add(cleanNorm(localName));
+    } catch (_e) {}
+  }
 
   const overrides = cfg.teacherOverrides || {};
-  const teacherOverride =
-    (tKeyId && overrides[tKeyId]) ||
-    (tKeyName && overrides[tKeyName]) ||
-    null;
+  let matchedOverride = null;
 
-  if (teacherOverride && teacherOverride.months?.[monthId]) {
-    const tMonth = teacherOverride.months[monthId];
+  // 1. Direct candidate keys lookup in overrides dictionary
+  for (const k of candidateKeys) {
+    if (k && overrides[k]) {
+      matchedOverride = overrides[k];
+      break;
+    }
+  }
+
+  // 2. Comprehensive object scan across all override records
+  if (!matchedOverride) {
+    for (const [ovKey, ov] of Object.entries(overrides)) {
+      if (!ov) continue;
+      const ovNormKey = cleanNorm(ovKey);
+      const ovName = cleanNorm(ov.teacherName || ov.name || "");
+      const ovIts = String(ov.its || ov.its_id || "").trim();
+      const ovUserId = String(ov.user_id || ov.id || "").trim().toLowerCase();
+
+      for (const cand of candidateKeys) {
+        if (!cand) continue;
+        const candNorm = cleanNorm(cand);
+        if (
+          cand === ovKey.toLowerCase() ||
+          candNorm === ovNormKey ||
+          (ovName && (candNorm === ovName || candNorm.includes(ovName) || ovName.includes(candNorm))) ||
+          (ovIts && (cand === ovIts || candNorm.includes(ovIts))) ||
+          (ovUserId && cand === ovUserId)
+        ) {
+          matchedOverride = ov;
+          break;
+        }
+      }
+      if (matchedOverride) break;
+    }
+  }
+
+  if (matchedOverride && matchedOverride.months?.[monthId]) {
+    const tMonth = matchedOverride.months[monthId];
     // Specific week override for this teacher
     if (tMonth.weeks && typeof tMonth.weeks[weekKey] === "boolean") {
       const isLocked = tMonth.weeks[weekKey];

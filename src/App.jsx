@@ -45302,6 +45302,15 @@ function TeacherPortal({
               allStudents={schoolData?.students || []}
               teacherIdentity={teacherIdentity}
               currentUserId={user?.id}
+              teacherProfile={
+                (teacherProfiles || []).find(
+                  (p) =>
+                    (teacherIdentity && normalizeText(p.full_name) === normalizeText(teacherIdentity)) ||
+                    (user?.id && (String(p.user_id) === String(user.id) || String(p.id) === String(user.id))) ||
+                    (user?.email && p.email && p.email.toLowerCase() === user.email.toLowerCase())
+                ) || null
+              }
+              portalAccess={portalAccess}
               isDarkMode={isDarkMode}
             />
           ) : activePage === "Online Tahfeez" ? (

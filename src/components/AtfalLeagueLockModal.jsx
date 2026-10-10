@@ -22,6 +22,7 @@ import {
   DEFAULT_LEAGUE_LOCK_CONFIG,
   subscribeToLeagueLockConfig,
   saveLeagueLockConfig,
+  cleanNorm,
 } from "../utils/leagueLockManager";
 
 const MONTHS_LIST = [
@@ -203,8 +204,20 @@ export default function AtfalLeagueLockModal({
 
       const teacherMeta = teachersList.find((t) => t.id === teacherId);
       teacherObj.teacherName = teacherMeta?.name || "Teacher";
+      teacherObj.id = teacherMeta?.id || teacherId;
+      teacherObj.user_id = teacherMeta?.id || teacherId;
+      teacherObj.its = teacherMeta?.its || "";
 
       overrides[tKey] = teacherObj;
+
+      // Save under all alias keys for 100% reliable multi-platform lookup
+      if (teacherMeta?.its && String(teacherMeta.its).trim()) {
+        overrides[String(teacherMeta.its).trim().toLowerCase()] = teacherObj;
+      }
+      if (teacherMeta?.name) {
+        overrides[cleanNorm(teacherMeta.name)] = teacherObj;
+        overrides[String(teacherMeta.name).trim().toLowerCase()] = teacherObj;
+      }
 
       return {
         ...prev,
