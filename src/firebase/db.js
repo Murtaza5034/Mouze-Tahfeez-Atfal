@@ -582,7 +582,104 @@ async function loadCandidates(state, ref) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// High-Speed In-Memory L1 Cache & Cross-Tab Broadcast Engine
+// ---------------------------------------------------------------------------
+const memoryQueryCache = new Map();
+const MEMORY_CACHE_TTL_MS = 6000; // 6s ultra-fast warm cache
+
+const syncChannel =
+  typeof window !== "undefined" && typeof BroadcastChannel !== "undefined"
+    ? new BroadcastChannel("mauze-firestore-sync")
+    : null;
+
+export function notifyDataChange(collectionName, details = {}) {
+  const baseCol = String(collectionName).replace(/^kibar_/, "");
+  // Invalidate memory query cache for this collection and kibar counterpart
+  for (const key of memoryQueryCache.keys()) {
+    if (
+      key.startsWith(`${collectionName}::`) ||
+      key.startsWith(`${baseCol}::`) ||
+      key.startsWith(`kibar_${baseCol}::`)
+    ) {
+      memoryQueryCache.delete(key);
+    }
+  }
+
+  // Local window real-time event for zero-refresh UI updates
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("firestore-data-updated", {
+        detail: { collection: collectionName, baseCollection: baseCol, ...details },
+      })
+    );
+  }
+
+  // Broadcast to all open tabs
+  if (syncChannel) {
+    try {
+      syncChannel.postMessage({ collection: collectionName, baseCollection: baseCol, ...details });
+    } catch (_) {}
+  }
+}
+
+if (syncChannel) {
+  syncChannel.onmessage = (event) => {
+    const col = event.data?.collection;
+    const baseCol = event.data?.baseCollection;
+    if (col) {
+      for (const key of memoryQueryCache.keys()) {
+        if (
+          key.startsWith(`${col}::`) ||
+          (baseCol &&
+            (key.startsWith(`${baseCol}::`) || key.startsWith(`kibar_${baseCol}::`)))
+        ) {
+          memoryQueryCache.delete(key);
+        }
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("firestore-data-updated", { detail: event.data })
+        );
+      }
+    }
+  };
+}
+
 async function executeSelect(state) {
+  const queryKey = `${state.collection}::${JSON.stringify(state.filters || [])}::${JSON.stringify(state.orFilters || [])}::${JSON.stringify(state.orderByClauses || [])}::${state.limit}::${state.single}::${state.countOnly}`;
+
+  // 1. Check ultra-fast warm L1 cache (< 0.05ms)
+  const cached = memoryQueryCache.get(queryKey);
+  const now = Date.now();
+  if (cached && now - cached.timestamp < MEMORY_CACHE_TTL_MS) {
+    // SWR: Refresh asynchronously in background if cached > 1.5s ago
+    if (now - cached.timestamp > 1500) {
+      setTimeout(async () => {
+        try {
+          const fresh = await loadCandidates(state, collection(db, state.collection));
+          let freshRows = matchesAll(fresh, state);
+          freshRows = sortRows(freshRows, state.orderByClauses || []);
+          if (state.limit) freshRows = freshRows.slice(0, state.limit);
+          let result;
+          if (state.countOnly) {
+            result = { count: freshRows.length, data: null, error: null };
+          } else if (state.single === "single") {
+            result = freshRows.length
+              ? { data: freshRows[0], error: null }
+              : { data: null, error: { message: "Not found", code: "PGRST116" } };
+          } else if (state.single === "maybeSingle") {
+            result = { data: freshRows[0] || null, error: null };
+          } else {
+            result = { data: freshRows, error: null };
+          }
+          memoryQueryCache.set(queryKey, { result, timestamp: Date.now() });
+        } catch (_) {}
+      }, 0);
+    }
+    return cached.result;
+  }
+
   const ref = collection(db, state.collection);
   let rows;
   try {
@@ -602,24 +699,30 @@ async function executeSelect(state) {
   rows = sortRows(rows, state.orderByClauses || []);
   if (state.limit) rows = rows.slice(0, state.limit);
 
-  if (state.countOnly) return { count: rows.length, data: null, error: null };
-
-  if (state.single === "single") {
+  let finalOutput;
+  if (state.countOnly) {
+    finalOutput = { count: rows.length, data: null, error: null };
+  } else if (state.single === "single") {
     if (rows.length === 0) {
-      return {
+      finalOutput = {
         data: null,
         error: {
           message: "JSON object requested, multiple (or no) rows returned",
           code: "PGRST116",
         },
       };
+    } else {
+      finalOutput = { data: rows[0], error: null };
     }
-    return { data: rows[0], error: null };
+  } else if (state.single === "maybeSingle") {
+    finalOutput = { data: rows[0] || null, error: null };
+  } else {
+    finalOutput = { data: rows, error: null };
   }
-  if (state.single === "maybeSingle") {
-    return { data: rows[0] || null, error: null };
-  }
-  return { data: rows, error: null };
+
+  // Save to warm L1 memory cache
+  memoryQueryCache.set(queryKey, { result: finalOutput, timestamp: Date.now() });
+  return finalOutput;
 }
 
 // ---------------------------------------------------------------------------
@@ -648,6 +751,7 @@ async function executeInsert(state) {
       }
       rows.push({ ...sanitizeValue(value), id: docId });
     }
+    notifyDataChange(state.collection, { action: "insert", count: rows.length });
   } catch (e) {
     console.error(`Firestore insert error on collection "${state.collection}":`, e);
     return { data: null, error: { message: e.message || String(e) } };
@@ -683,6 +787,7 @@ async function executeUpsert(state) {
     }
     rows.push({ ...sanitizeValue(value), id });
   }
+  notifyDataChange(state.collection, { action: "upsert", count: rows.length });
   if (!state.markSelectAfterWrite) return { data: null, error: null };
   return filterAfterRows(rows, state);
 }
@@ -698,6 +803,7 @@ async function executePatch(state) {
       return { data: null, error: { message: e.message || String(e) } };
     }
   }
+  notifyDataChange(state.collection, { action: "update", count: (found || []).length });
   if (!state.markSelectAfterWrite) return { data: null, error: null };
   const rows = (found || []).map((r) => ({ ...r, ...sanitizeValue(state.patch) }));
   return filterAfterRows(rows, state);
@@ -711,6 +817,7 @@ async function executeDelete(state) {
       await deleteDoc(doc(db, state.collection, String(row.id)));
     } catch (_e) {}
   }
+  notifyDataChange(state.collection, { action: "delete", count: (found || []).length });
   return { data: null, error: null };
 }
 

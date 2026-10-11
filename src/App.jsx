@@ -3907,247 +3907,243 @@ let portalLoadInFlight = false;
 // child selection is honored instead of being silently dropped.
 let portalLoadPending = false;
 
-async function detectUserAllowedPortal(user) {
+async function detectUserAllowedPortal(user, preferredTab = null) {
   if (!user) return null;
   const normEmail = (user?.email || "").trim().toLowerCase();
 
+  // 0. Instant Cache Lookup (< 0.1ms)
+  try {
+    const cachedRoleStr = localStorage.getItem(`mauze_allowed_portal_${user.id}`);
+    if (cachedRoleStr) {
+      const parsed = JSON.parse(cachedRoleStr);
+      if (parsed?.allowedTab) {
+        if (!preferredTab || parsed.allowedTab === preferredTab) {
+          return parsed;
+        }
+      }
+    }
+  } catch (_) {}
+
   // 1. Explicit master cases
   if (normEmail === "tmjiger@gmail.com") {
-    return {
+    const res = {
       allowedTab: "teacher",
       portalRole: "kibar-teacher",
       portalLabel: "Teacher Portal",
       isKibar: true,
     };
+    try { localStorage.setItem(`mauze_allowed_portal_${user.id}`, JSON.stringify(res)); } catch (_) {}
+    return res;
   }
   if (normEmail === "mh.developer53@gmail.com") {
-    return {
+    const res = {
       allowedTab: "admin",
       portalRole: "admin",
       portalLabel: "Admin Portal",
       isKibar: false,
     };
+    try { localStorage.setItem(`mauze_allowed_portal_${user.id}`, JSON.stringify(res)); } catch (_) {}
+    return res;
   }
 
-  // 2. Check metadata assigned roles
+  // 2. Check metadata assigned roles (instant)
   const assigned = getAssignedRoles(user);
   if (assigned.includes("kibar-teacher")) {
-    return {
+    const res = {
       allowedTab: "teacher",
       portalRole: "kibar-teacher",
       portalLabel: "Teacher Portal",
       isKibar: true,
     };
+    try { localStorage.setItem(`mauze_allowed_portal_${user.id}`, JSON.stringify(res)); } catch (_) {}
+    return res;
   }
   if (assigned.includes("teacher")) {
-    return {
+    const res = {
       allowedTab: "teacher",
       portalRole: "teacher",
       portalLabel: "Teacher Portal",
       isKibar: false,
     };
+    try { localStorage.setItem(`mauze_allowed_portal_${user.id}`, JSON.stringify(res)); } catch (_) {}
+    return res;
   }
   if (assigned.includes("kibar-admin")) {
-    return {
+    const res = {
       allowedTab: "admin",
       portalRole: "kibar-admin",
       portalLabel: "Admin Portal",
       isKibar: true,
     };
+    try { localStorage.setItem(`mauze_allowed_portal_${user.id}`, JSON.stringify(res)); } catch (_) {}
+    return res;
   }
   if (assigned.includes("admin")) {
-    return {
+    const res = {
       allowedTab: "admin",
       portalRole: "admin",
       portalLabel: "Admin Portal",
       isKibar: false,
     };
+    try { localStorage.setItem(`mauze_allowed_portal_${user.id}`, JSON.stringify(res)); } catch (_) {}
+    return res;
   }
   if (assigned.includes("kibar-student")) {
-    return {
+    const res = {
       allowedTab: "kibar-student",
       portalRole: "kibar-student",
       portalLabel: "Kibar Student Portal",
       isKibar: true,
     };
+    try { localStorage.setItem(`mauze_allowed_portal_${user.id}`, JSON.stringify(res)); } catch (_) {}
+    return res;
   }
   if (assigned.includes("parents")) {
-    return {
+    const res = {
       allowedTab: "parents",
       portalRole: "parents",
       portalLabel: "Atfal Student Portal",
       isKibar: false,
     };
+    try { localStorage.setItem(`mauze_allowed_portal_${user.id}`, JSON.stringify(res)); } catch (_) {}
+    return res;
   }
 
-  // 3. Check kibar_user_portal_access table
+  // 3. Fast Parallel Database Checks (runs all checks concurrently)
   try {
-    let kibarAccess = null;
-    const { data: byId } = await supabase
-      .from("kibar_user_portal_access")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (byId) kibarAccess = byId;
-    else {
-      const { data: byUid } = await supabase
-        .from("kibar_user_portal_access")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (byUid) kibarAccess = byUid;
-      else if (user.email) {
-        const { data: byEmail } = await supabase
+    const checkKibarAccess = async () => {
+      try {
+        const { data } = await supabase
           .from("kibar_user_portal_access")
           .select("*")
-          .eq("email", user.email.toLowerCase().trim())
+          .or(`id.eq.${user.id},user_id.eq.${user.id}${user.email ? `,email.eq.${user.email.toLowerCase().trim()}` : ""}`)
           .maybeSingle();
-        if (byEmail) kibarAccess = byEmail;
-      }
-    }
+        if (data?.is_active && data.portal_role) {
+          const r = data.portal_role;
+          if (r === "kibar-teacher" || r === "teacher") {
+            return {
+              allowedTab: "teacher",
+              portalRole: "kibar-teacher",
+              portalLabel: "Teacher Portal",
+              isKibar: true,
+            };
+          }
+          if (r === "kibar-admin" || r === "admin") {
+            return {
+              allowedTab: "admin",
+              portalRole: "kibar-admin",
+              portalLabel: "Admin Portal",
+              isKibar: true,
+            };
+          }
+          if (r === "kibar-student" || r === "parents") {
+            return {
+              allowedTab: "kibar-student",
+              portalRole: "kibar-student",
+              portalLabel: "Kibar Student Portal",
+              isKibar: true,
+            };
+          }
+        }
+      } catch (_) {}
+      return null;
+    };
 
-    if (kibarAccess?.is_active && kibarAccess.portal_role) {
-      const r = kibarAccess.portal_role;
-      if (r === "kibar-teacher" || r === "teacher") {
-        return {
-          allowedTab: "teacher",
-          portalRole: "kibar-teacher",
-          portalLabel: "Teacher Portal",
-          isKibar: true,
-        };
-      }
-      if (r === "kibar-admin" || r === "admin") {
-        return {
-          allowedTab: "admin",
-          portalRole: "kibar-admin",
-          portalLabel: "Admin Portal",
-          isKibar: true,
-        };
-      }
-      if (r === "kibar-student" || r === "parents") {
-        return {
-          allowedTab: "kibar-student",
-          portalRole: "kibar-student",
-          portalLabel: "Kibar Student Portal",
-          isKibar: true,
-        };
-      }
-    }
-  } catch (_) {}
+    const checkAtfalAccess = async () => {
+      try {
+        const { data } = await supabase
+          .from("user_portal_access")
+          .select("*")
+          .or(`user_id.eq.${user.id},id.eq.${user.id}${user.email ? `,email.eq.${user.email.toLowerCase().trim()}` : ""}`)
+          .maybeSingle();
+        if (data?.is_active && data.portal_role) {
+          const r = data.portal_role;
+          if (r === "teacher" || r === "kibar-teacher") {
+            return {
+              allowedTab: "teacher",
+              portalRole: r === "kibar-teacher" ? "kibar-teacher" : "teacher",
+              portalLabel: "Teacher Portal",
+              isKibar: r === "kibar-teacher",
+            };
+          }
+          if (r === "admin" || r === "kibar-admin") {
+            return {
+              allowedTab: "admin",
+              portalRole: r === "kibar-admin" ? "kibar-admin" : "admin",
+              portalLabel: "Admin Portal",
+              isKibar: r === "kibar-admin",
+            };
+          }
+          if (r === "parents") {
+            return {
+              allowedTab: "parents",
+              portalRole: "parents",
+              portalLabel: "Atfal Student Portal",
+              isKibar: false,
+            };
+          }
+        }
+      } catch (_) {}
+      return null;
+    };
 
-  // 4. Check atfal user_portal_access table
-  try {
-    const { data: atfalAccess } = await supabase
-      .from("user_portal_access")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const checkUsersTable = async () => {
+      try {
+        const { data: uDoc } = await supabase
+          .from("users")
+          .select("portal_role")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (uDoc?.portal_role) {
+          const r = uDoc.portal_role;
+          if (r === "kibar-teacher") return { allowedTab: "teacher", portalRole: "kibar-teacher", portalLabel: "Teacher Portal", isKibar: true };
+          if (r === "teacher") return { allowedTab: "teacher", portalRole: "teacher", portalLabel: "Teacher Portal", isKibar: false };
+          if (r === "kibar-admin") return { allowedTab: "admin", portalRole: "kibar-admin", portalLabel: "Admin Portal", isKibar: true };
+          if (r === "admin") return { allowedTab: "admin", portalRole: "admin", portalLabel: "Admin Portal", isKibar: false };
+          if (r === "kibar-student") return { allowedTab: "kibar-student", portalRole: "kibar-student", portalLabel: "Kibar Student Portal", isKibar: true };
+          if (r === "parents") return { allowedTab: "parents", portalRole: "parents", portalLabel: "Atfal Student Portal", isKibar: false };
+        }
+      } catch (_) {}
+      return null;
+    };
 
-    if (atfalAccess?.is_active && atfalAccess.portal_role) {
-      const r = atfalAccess.portal_role;
-      if (r === "teacher" || r === "kibar-teacher") {
-        return {
-          allowedTab: "teacher",
-          portalRole: r === "kibar-teacher" ? "kibar-teacher" : "teacher",
-          portalLabel: "Teacher Portal",
-          isKibar: r === "kibar-teacher",
-        };
-      }
-      if (r === "admin" || r === "kibar-admin") {
-        return {
-          allowedTab: "admin",
-          portalRole: r === "kibar-admin" ? "kibar-admin" : "admin",
-          portalLabel: "Admin Portal",
-          isKibar: r === "kibar-admin",
-        };
-      }
-      if (r === "parents") {
-        return {
-          allowedTab: "parents",
-          portalRole: "parents",
-          portalLabel: "Atfal Student Portal",
-          isKibar: false,
-        };
-      }
-    }
-  } catch (_) {}
+    const checkProfiles = async () => {
+      try {
+        const [kibarStudent, atfalProfiles] = await Promise.all([
+          findKibarStudentProfile(user.id, user.email).catch(() => null),
+          findParentProfiles(user.id, user.email).catch(() => null),
+        ]);
+        if (kibarStudent) {
+          return {
+            allowedTab: "kibar-student",
+            portalRole: "kibar-student",
+            portalLabel: "Kibar Student Portal",
+            isKibar: true,
+          };
+        }
+        if (atfalProfiles && atfalProfiles.length > 0) {
+          return {
+            allowedTab: "parents",
+            portalRole: "parents",
+            portalLabel: "Atfal Student Portal",
+            isKibar: false,
+          };
+        }
+      } catch (_) {}
+      return null;
+    };
 
-  // 5. Check users table
-  try {
-    const { data: uDoc } = await supabase
-      .from("users")
-      .select("portal_role")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (uDoc?.portal_role) {
-      const r = uDoc.portal_role;
-      if (r === "kibar-teacher")
-        return {
-          allowedTab: "teacher",
-          portalRole: "kibar-teacher",
-          portalLabel: "Teacher Portal",
-          isKibar: true,
-        };
-      if (r === "teacher")
-        return {
-          allowedTab: "teacher",
-          portalRole: "teacher",
-          portalLabel: "Teacher Portal",
-          isKibar: false,
-        };
-      if (r === "kibar-admin")
-        return {
-          allowedTab: "admin",
-          portalRole: "kibar-admin",
-          portalLabel: "Admin Portal",
-          isKibar: true,
-        };
-      if (r === "admin")
-        return {
-          allowedTab: "admin",
-          portalRole: "admin",
-          portalLabel: "Admin Portal",
-          isKibar: false,
-        };
-      if (r === "kibar-student")
-        return {
-          allowedTab: "kibar-student",
-          portalRole: "kibar-student",
-          portalLabel: "Kibar Student Portal",
-          isKibar: true,
-        };
-      if (r === "parents")
-        return {
-          allowedTab: "parents",
-          portalRole: "parents",
-          portalLabel: "Atfal Student Portal",
-          isKibar: false,
-        };
-    }
-  } catch (_) {}
+    const results = await Promise.all([
+      checkKibarAccess(),
+      checkAtfalAccess(),
+      checkUsersTable(),
+      checkProfiles(),
+    ]);
 
-  // 6. Check student profiles
-  try {
-    const kibarStudent = await findKibarStudentProfile(user.id, user.email);
-    if (kibarStudent) {
-      return {
-        allowedTab: "kibar-student",
-        portalRole: "kibar-student",
-        portalLabel: "Kibar Student Portal",
-        isKibar: true,
-      };
-    }
-  } catch (_) {}
-
-  try {
-    const atfalProfiles = await findParentProfiles(user.id, user.email);
-    if (atfalProfiles && atfalProfiles.length > 0) {
-      return {
-        allowedTab: "parents",
-        portalRole: "parents",
-        portalLabel: "Atfal Student Portal",
-        isKibar: false,
-      };
+    const found = results.find(Boolean);
+    if (found) {
+      try { localStorage.setItem(`mauze_allowed_portal_${user.id}`, JSON.stringify(found)); } catch (_) {}
+      return found;
     }
   } catch (_) {}
 
@@ -46139,6 +46135,7 @@ export default function App() {
   );
   const fcmInitKeyRef = useRef(null);
   const isFirstRender = useRef(true);
+  const isLoginSuccessInProgressRef = useRef(false);
   useEffect(() => {
     isFirstRender.current = false;
   }, []);
@@ -47180,6 +47177,12 @@ export default function App() {
 
     async function handleAuthChange(event, session, options = {}) {
       if (!mounted) return;
+
+      // If user is currently logging in via handleLoginSuccess, bypass handleAuthChange
+      // to enter the portal instantly with zero loading flash or duplicate fetches
+      if (isLoginSuccessInProgressRef.current) {
+        return;
+      }
 
       // Determine if the current session matches the cached user auth to enable silent operation
       const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
@@ -49021,9 +49024,10 @@ export default function App() {
     selectedRole,
     rememberMe = true,
   ) => {
+    isLoginSuccessInProgressRef.current = true;
     try {
       // Strict portal check: prevent logging into a portal the user is not assigned to.
-      const allowed = await detectUserAllowedPortal(loggedInUser);
+      const allowed = await detectUserAllowedPortal(loggedInUser, selectedRole);
 
       if (
         allowed &&
@@ -49031,6 +49035,7 @@ export default function App() {
         allowed.allowedTab !== selectedRole
       ) {
         await supabase.auth.signOut();
+        isLoginSuccessInProgressRef.current = false;
         return {
           ok: false,
           message: `Invalid Credentials: This account is assigned to the ${allowed.portalLabel} only. Please select the ${allowed.portalLabel} tab to sign in.`,
@@ -49066,6 +49071,7 @@ export default function App() {
 
       if (!access.ok) {
         await supabase.auth.signOut();
+        isLoginSuccessInProgressRef.current = false;
         return {
           ok: false,
           message:
@@ -49074,12 +49080,16 @@ export default function App() {
         };
       }
 
+      // INSTANT PORTAL ENTRY - NO REFRESHING, NO FULLSCREEN SPINNER
       storeRole(access.role);
       setPortalAccess(access.accessRow || emptyPortalAccess);
       setUser(loggedInUser);
-      loadPortalData(access.role, loggedInUser, access.parentProfile).catch(
-        () => {},
-      );
+      setLoading(false);
+
+      // Silently stream fresh portal data in background without blocking UI
+      loadPortalData(access.role, loggedInUser, access.parentProfile, {
+        silent: true,
+      }).catch(() => {});
 
       if (rememberMe) {
         localStorage.setItem(STORAGE_KEYS.rememberMe, "true");
@@ -49111,9 +49121,10 @@ export default function App() {
             ) {
               storeRole(cached.role || selectedRole);
               setUser(loggedInUser);
-              loadPortalData(cached.role || selectedRole, loggedInUser).catch(
-                () => {},
-              );
+              setLoading(false);
+              loadPortalData(cached.role || selectedRole, loggedInUser, null, {
+                silent: true,
+              }).catch(() => {});
               return { ok: true };
             }
           } catch (_) {}
@@ -49130,6 +49141,10 @@ export default function App() {
         ok: false,
         message: "We could not verify this account for the selected portal.",
       };
+    } finally {
+      setTimeout(() => {
+        isLoginSuccessInProgressRef.current = false;
+      }, 1200);
     }
   };
 
@@ -49176,6 +49191,9 @@ export default function App() {
     localStorage.removeItem("parent-jadwal-tracked-days");
     localStorage.removeItem("parent-quick-action-statuses");
     localStorage.removeItem("mauze-selected-child");
+    if (user?.id) {
+      localStorage.removeItem(`mauze_allowed_portal_${user.id}`);
+    }
     sessionStorage.clear();
 
     if (rememberMe === "true") {

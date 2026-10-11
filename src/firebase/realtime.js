@@ -8,7 +8,7 @@ import {
   deleteDoc,
   doc,
 } from "firebase/firestore";
-import { db, resolveCollectionName } from "./db.js";
+import { db, resolveCollectionName, notifyDataChange } from "./db.js";
 import { firebaseApp } from "./config.js";
 
 // ---------------------------------------------------------------------------
@@ -146,6 +146,9 @@ function createChannel(channelName, channelOptions = {}) {
             const row = rowFromSnap(c.doc);
             cache.set(c.doc.id, row);
             try {
+              notifyDataChange(table, { action: c.type, id: c.doc.id, row });
+            } catch (_) {}
+            try {
               listener.cb({
                 eventType: c.type === "added" ? "INSERT" : "UPDATE",
                 schema: "public",
@@ -157,6 +160,9 @@ function createChannel(channelName, channelOptions = {}) {
           } else if (c.type === "removed") {
             const old = cache.get(c.doc.id) || {};
             cache.delete(c.doc.id);
+            try {
+              notifyDataChange(table, { action: "delete", id: c.doc.id, old });
+            } catch (_) {}
             try {
               listener.cb({ eventType: "DELETE", schema: "public", table, new: null, old });
             } catch (_) {}

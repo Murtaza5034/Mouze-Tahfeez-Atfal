@@ -51,6 +51,18 @@ typography:
     fontWeight: 600
     lineHeight: 1.2
     letterSpacing: "0.04em"
+  caption:
+    fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif"
+    fontSize: "0.75rem"
+    fontWeight: 700
+    lineHeight: 1.3
+    letterSpacing: "0.02em"
+  quranic:
+    fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif"
+    fontSize: "clamp(1.8rem, 4vw, 2.5rem)"
+    fontWeight: 700
+    lineHeight: 2.5
+    letterSpacing: "normal"
 rounded:
   sm: "6px"
   md: "12px"

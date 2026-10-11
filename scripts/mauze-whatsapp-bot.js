@@ -1669,24 +1669,69 @@ export function getFatemiHijriMonth(dateObj = new Date()) {
   }
 }
 
-// In-memory set of sent fee reminder keys for current month
+// In-memory set of sent fee reminder keys for current month (persisted to disk)
 export const sentFeeReminders = new Set();
+
+export function loadSentFeeReminders() {
+  try {
+    const filePath = path.join(AUTH_DIR, 'sent_fee_reminders.json');
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      if (Array.isArray(data)) {
+        data.forEach(k => sentFeeReminders.add(k));
+      }
+    }
+  } catch (_) {}
+}
+
+export function saveSentFeeReminders() {
+  try {
+    if (!fs.existsSync(AUTH_DIR)) {
+      fs.mkdirSync(AUTH_DIR, { recursive: true });
+    }
+    const filePath = path.join(AUTH_DIR, 'sent_fee_reminders.json');
+    fs.writeFileSync(filePath, JSON.stringify(Array.from(sentFeeReminders)), 'utf8');
+  } catch (_) {}
+}
+
+loadSentFeeReminders();
+
+/**
+ * Formats official Monthly Hub Raqam tuition fee reminder message.
+ */
+export function formatFeeReminderMessage(studentName, its, hijri) {
+  const payUrl = 'https://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT';
+  return `💰 *HUB RAQAM - MONTHLY FEE*\n\n` +
+    `Salam Jameel,\n` +
+    `Respected Parent,\n\n` +
+    `This is regarding the monthly Mauze Tahfeez Hub Raqam for *${hijri.nameEn} ${hijri.year}*:\n` +
+    `👤 Student: *${studentName}*\n` +
+    `🆔 ITS: \`${its || '—'}\`\n\n` +
+    `Kindly complete the payment online via the official Mahad al Zahra portal:\n` +
+    `👉 *PAY NOW:*\n` +
+    `💳 ${payUrl}\n\n` +
+    `After payment, please preserve your transaction receipt for your records.\n\n` +
+    `ℹ️ _Note: If your payment is already completed, kindly ignore this automated reminder message. Thank you for your support._\n\n` +
+    `💬 *Type 1 (Result Card) • 2 (Hazri) • 3 (Leave Status) • 4 (League Points)*\n\n` +
+    `Regards,\n*Mauze Tahfeez - Galiakot*`;
+}
 
 /**
  * Sends Hub Raqam tuition fee reminder with exact official Pay Now link.
- * Automatically runs on Fatemi Hijri month days 27, 28, 29, 30.
+ * Automatically runs strictly on Fatemi Hijri day 27 (once per month).
  */
 export async function checkAndSendFatemiFeeReminders(options = {}) {
   const force = !!options.force;
   const targetStudentId = options.studentId ? String(options.studentId).trim() : null;
   const hijri = getFatemiHijriMonth();
-  const isMonthEnd = force || (hijri.date >= 27);
-  if (!isMonthEnd) {
-    return { sent: 0, reason: `Not Fatemi month end (Day ${hijri.date}/${hijri.monthLen})` };
+  
+  // Strictly trigger on the 27th day of every Fatemi Hijri month
+  const isScheduledDay = force || (hijri.date === 27);
+  if (!isScheduledDay) {
+    return { sent: 0, reason: `Fee reminder runs strictly on Fatemi Hijri 27th (Current day: ${hijri.date} ${hijri.nameEn})` };
   }
 
   let sentCount = 0;
-  const payUrl = 'https://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT';
 
   // 1. Dispatch to linked WhatsApp subscribers
   for (const [phoneOrLid, rec] of linkedWASubscribersCache.entries()) {
@@ -1705,26 +1750,16 @@ export async function checkAndSendFatemiFeeReminders(options = {}) {
       continue;
     }
 
-    const messageText = `💰 *HUB RAQAM - MONTHLY FEE*\n\n` +
-      `Salam Jameel,\n` +
-      `Respected Parent,\n\n` +
-      `This is regarding the monthly Mauze Tahfeez Hub Raqam for *${hijri.nameEn} ${hijri.year}*:\n` +
-      `👤 Student: *${studentName}*\n` +
-      `🆔 ITS: \`${its || '—'}\`\n\n` +
-      `Kindly complete the payment online via the official Mahad al Zahra portal:\n` +
-      `👉 *PAY NOW:*\n` +
-      `💳 ${payUrl}\n\n` +
-      `After payment, please preserve your transaction receipt for your records.\n\n` +
-      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 1 (Result Card) • 2 (Hazri) • 3 (Leave Status) • 4 (League Points)*`;
+    const messageText = formatFeeReminderMessage(studentName, its, hijri);
 
     const jid = formatTargetJid(phoneOrLid);
     if (jid && sock && baileysStatus === 'CONNECTED') {
       try {
         await sendWhatsAppMessage(jid, { text: messageText }, s.phone || phoneOrLid);
         sentFeeReminders.add(reminderKey);
+        saveSentFeeReminders();
         sentCount++;
-        console.log(`[FEE-REMINDER] 💰 Sent Hub Raqam fee reminder to ${jid} for ${studentName}`);
+        console.log(`[FEE-REMINDER] 💰 Sent Hub Raqam fee reminder on 27th to ${jid} for ${studentName}`);
       } catch (err) {
         console.warn(`[FEE-REMINDER-ERR] Failed to send to ${jid}:`, err.message);
       }
@@ -1748,26 +1783,16 @@ export async function checkAndSendFatemiFeeReminders(options = {}) {
       continue;
     }
 
-    const messageText = `💰 *HUB RAQAM - MONTHLY FEE*\n\n` +
-      `Salam Jameel,\n` +
-      `Respected Parent,\n\n` +
-      `This is regarding the monthly Mauze Tahfeez Hub Raqam for *${hijri.nameEn} ${hijri.year}*:\n` +
-      `👤 Student: *${studentName}*\n` +
-      `🆔 ITS: \`${its || '—'}\`\n\n` +
-      `Kindly complete the payment online via the official Mahad al Zahra portal:\n` +
-      `👉 *PAY NOW:*\n` +
-      `💳 ${payUrl}\n\n` +
-      `After payment, please preserve your transaction receipt for your records.\n\n` +
-      `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-      `💬 *Type 1 (Result Card) • 2 (Hazri) • 3 (Leave Status) • 4 (League Points)*`;
+    const messageText = formatFeeReminderMessage(studentName, its, hijri);
 
     const jid = formatTargetJid(sPhone);
     if (jid && sock && baileysStatus === 'CONNECTED') {
       try {
         await sendWhatsAppMessage(jid, { text: messageText }, sPhone);
         sentFeeReminders.add(reminderKey);
+        saveSentFeeReminders();
         sentCount++;
-        console.log(`[FEE-REMINDER] 💰 Sent Hub Raqam fee reminder to roster parent ${jid} for ${studentName}`);
+        console.log(`[FEE-REMINDER] 💰 Sent Hub Raqam fee reminder on 27th to roster parent ${jid} for ${studentName}`);
       } catch (err) {
         console.warn(`[FEE-REMINDER-ERR] Failed to send to ${jid}:`, err.message);
       }
@@ -4331,20 +4356,8 @@ export async function handleIncomingWhatsAppMessage(msg) {
 
   if (cleanCmd.includes('fee') || cleanCmd.includes('hub')) {
     const hijriNow = getFatemiHijriMonth();
-    await sendWhatsAppMessage(remoteJid, {
-      text: `💰 *HUB RAQAM - MONTHLY FEE*\n\n` +
-        `Salam Jameel,\n` +
-        `Respected Parent,\n\n` +
-        `This is regarding the monthly Mauze Tahfeez Hub Raqam for *${hijriNow.nameEn} ${hijriNow.year}*:\n` +
-        `👤 Student: *${student.name}*\n` +
-        `🆔 ITS: \`${student.its || '—'}\`\n\n` +
-        `Kindly complete the payment online via the official Mahad al Zahra portal:\n` +
-        `👉 *PAY NOW:*\n` +
-        `💳 https://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT\n\n` +
-        `After payment, please preserve your transaction receipt for your records.\n\n` +
-        `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-        `💬 *Type 1 (Result Card) • 2 (Hazri) • 3 (Leave Status) • 4 (League Points)*`
-    }, senderPhone);
+    const msgText = formatFeeReminderMessage(student.name, student.its, hijriNow);
+    await sendWhatsAppMessage(remoteJid, { text: msgText }, senderPhone);
     return;
   }
 
@@ -6480,12 +6493,12 @@ export function startWhatsAppBotEngine() {
     console.log(`🌐 Live Dashboard  : http://0.0.0.0:${primaryPort}`);
     console.log(`======================================================\n`);
 
-    // Schedule periodic Fatemi month-end fee reminder check (every 12 hours)
+    // Schedule Fatemi 27th monthly fee reminder check (hourly check; triggers once strictly on 27th)
     setInterval(() => {
       checkAndSendFatemiFeeReminders({ force: false }).catch((err) => {
         console.warn('[FEE-CHECK-ERR] Error checking Fatemi fee reminders:', err.message);
       });
-    }, 12 * 60 * 60 * 1000);
+    }, 60 * 60 * 1000);
 
     // Schedule exact Monday-to-Saturday Atfal Teacher Reminders (checked every 30 seconds):
     // 1. 4:25 PM IST -> Teacher Self-Attendance Reminder
