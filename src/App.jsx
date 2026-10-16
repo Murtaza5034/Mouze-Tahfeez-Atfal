@@ -163,6 +163,7 @@ import MarhalaMonthlyPage from "./components/MarhalaMonthlyPage";
 import IkhtebarMushaf from "./components/IkhtebarMushaf";
 import QuranDirectAccessCard from "./components/QuranDirectAccessCard";
 import WhatsAppBotControlCard from "./components/WhatsAppBotControlCard";
+import WhatsAppBotAdminPage from "./components/WhatsAppBotAdminPage";
 import AmazonBottomNav from "./components/AmazonBottomNav";
 import {
   calculateMarhalaRanks,
@@ -867,6 +868,20 @@ const FONT_FACE_CSS = makeFontUrlsAbsolute(`
   font-display: swap;
 }
 @font-face {
+  font-family: 'Al-Kanz';
+  src: url('/fonts/al-kanz.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Al-Kanz';
+  src: url('/fonts/al-kanz.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
   font-family: 'Qilka-Bold';
   src: url('/Qilka-Bold.otf') format('opentype');
   font-weight: bold;
@@ -921,10 +936,16 @@ const loadCustomFontsForCanvas = async () => {
     for (const { family, sources } of fontUrls) {
       const testStr = "abcdefghijklmnopqrstuvwxyz0123456789";
       if (!document.fonts.check(`1em "${family}"`, testStr)) {
-        const absoluteSources = sources.map((s) => makeFontSrcAbsolute(s));
         const ff = new FontFace(family, absoluteSources.join(", "));
         await ff.load();
         document.fonts.add(ff);
+        if (family === "Al-Kanz") {
+          try {
+            const ffBold = new FontFace(family, absoluteSources.join(", "), { weight: "bold" });
+            await ffBold.load();
+            document.fonts.add(ffBold);
+          } catch (_) {}
+        }
       }
     }
 
@@ -1460,6 +1481,7 @@ const NAV_ICONS = {
   "Teacher Attendance Settings": MapPin,
   "Jadwal Settings": Calendar,
   "Global Settings": Settings,
+  "WhatsApp Bot": MessageCircle,
   Messages: MessageCircle,
   "Email Settings": Mail,
   "Rank Preview": TrendingUp,
@@ -3547,15 +3569,429 @@ function getFatemiInfo(dateStr) {
   }
 }
 
-async function findPortalAccess(userId) {
-  const { data, error } = await supabase
-    .from("user_portal_access")
-    .select("*")
-    .eq("id", userId)
-    .maybeSingle();
+function isTaherAdminUser(userOrEmail, userId = null) {
+  if (!userOrEmail && !userId) return false;
+  const email = (
+    typeof userOrEmail === "string"
+      ? userOrEmail
+      : userOrEmail?.email || ""
+  ).trim().toLowerCase();
+  const id = String(
+    userId || (typeof userOrEmail === "object" ? userOrEmail?.id || userOrEmail?.uid || userOrEmail?.userId : "") || ""
+  ).trim().toLowerCase();
 
-  if (error) {
-    throw error;
+  return (
+    email === "taher.rawat@mahdalzahra.com" ||
+    email === "taher.rawat@mahadalzahra.com" ||
+    email === "taherrawat786@gmail.com" ||
+    email === "taherrawat786@gamil.com" ||
+    email.includes("taher.rawat") ||
+    email.includes("taherrawat") ||
+    id === "47nvlyt52af1ezxydg89yskxhsu2" ||
+    id === "ba9ad9db-de5c-4986-a746-1e83b7165d21" ||
+    id === "ion0uvocjmpvajeftxdrgpmcqbf2"
+  );
+}
+
+// Master directory of all verified teachers in Mauze Tahfeez
+const TEACHER_DIRECTORY = [
+  {
+    email: "ychikhly156@gmail.com",
+    name: "Janab Mulla Yusuf bhai Chikli",
+    phone: "+91 63675 84948",
+    teacherId: "d75139d2-adf6-475d-86f6-7b27ce8e4779",
+    userId: "3f211ebf-d6d2-460c-8585-4fc08b06cec0",
+    role: "teacher",
+    teacherRole: "muhaffiz",
+    gender: "male",
+  },
+  {
+    email: "zahabiyarampura6@gmail.com",
+    name: "Zahabiyah M.Moiz bhai Rampurawala",
+    phone: "+918233980052",
+    teacherId: "beaf8929-3bdb-4b05-890d-a329dd54adda",
+    userId: "e4a06a4c-e574-4f8a-b392-357a26375f54",
+    role: "teacher",
+    teacherRole: "muhaffiz",
+    gender: "female",
+  },
+  {
+    email: "mustafamanpur1@gmail.com",
+    name: "Janab Mustafa bhai Manpurwala",
+    phone: "+91 78519 14045",
+    teacherId: "3e4ed894-8538-431c-a935-43e93140d29a",
+    userId: "daf8a90a-37a0-47f5-8702-79c5a3f22a7b",
+    role: "teacher",
+    teacherRole: "muhaffiz",
+    gender: "male",
+  },
+  {
+    email: "taher.rawat@mahdalzahra.com",
+    name: "Janab Mulla Taher bhai Rawat",
+    phone: "+91 70215 59548",
+    teacherId: "47NvlYT52Af1EZXydG89ysKxHsu2",
+    userId: "47NvlYT52Af1EZXydG89ysKxHsu2",
+    role: "admin",
+    teacherRole: "masool",
+    gender: "male",
+  },
+  {
+    email: "taher.rawat@mahadalzahra.com",
+    name: "Janab Mulla Taher bhai Rawat",
+    phone: "+91 70215 59548",
+    teacherId: "47NvlYT52Af1EZXydG89ysKxHsu2",
+    userId: "47NvlYT52Af1EZXydG89ysKxHsu2",
+    role: "admin",
+    teacherRole: "masool",
+    gender: "male",
+  },
+  {
+    email: "taherrawat786@gmail.com",
+    name: "Janab Mulla Taher bhai Rawat",
+    phone: "+91 70215 59548",
+    teacherId: "6f1a88ca-c29a-413d-aedb-2d8af9ec9c8d",
+    userId: "ba9ad9db-de5c-4986-a746-1e83b7165d21",
+    role: "admin",
+    teacherRole: "masool",
+    gender: "male",
+  },
+  {
+    email: "taherrawat786@gamil.com",
+    name: "Janab Mulla Taher bhai Rawat",
+    phone: "+91 70215 59548",
+    teacherId: "ION0UvOCJmPVAJeFdXDrGPmcqbf2",
+    userId: "ION0UvOCJmPVAJeFdXDrGPmcqbf2",
+    role: "admin",
+    teacherRole: "masool",
+    gender: "male",
+  },
+  {
+    email: "321hatim@gmail.com",
+    name: "Janab Hatim Bhai Mithai",
+    phone: "+91 73874 97253",
+    teacherId: "3bd41526-9a5e-4c88-887e-97b0d9da09f9",
+    userId: "5bcc74cc-5cd5-4695-a607-36ba65c757e7",
+    role: "teacher",
+    teacherRole: "muhaffiz",
+    gender: "male",
+  },
+  {
+    email: "husain.kheroda@mahadalzahra.com",
+    name: "Janab Mulla Husain Bhai Kherodawala",
+    phone: "+919967378653",
+    teacherId: "2058c589-9e41-4cc1-b4ea-ec3af606c91a",
+    userId: "f139bff5-780e-4dfa-bde1-3570b1f32467",
+    role: "teacher",
+    teacherRole: "muhaffiz",
+    gender: "male",
+  },
+  {
+    email: "moiz.nihal@mahadalzahra.com",
+    name: "Janab Mulla Moiz bhai Nihal",
+    phone: "+91 95103 66009",
+    teacherId: "927792f0-d57d-4062-a2cc-0cd421c17d7e",
+    userId: "a3213925-ef96-4c76-bc43-da6c31b78775",
+    role: "teacher",
+    teacherRole: "muhaffiz",
+    gender: "male",
+  },
+  {
+    email: "mansoor.taskeen@mahadalzahra.com",
+    name: "Janab Mansoor bhai Taskeen",
+    phone: "+918141745352",
+    teacherId: "d08cf3fb-a217-4388-bf5d-4aa33e74a85d",
+    userId: "a9bdb9ab-7636-4106-97e1-fe4a23c8449e",
+    role: "teacher",
+    teacherRole: "muhaffiz",
+    gender: "male",
+  },
+  {
+    email: "ruqaiyahbadnagar553@gmail.com",
+    name: "Ruqaiyah ben Badnagarwala.",
+    phone: "+919116555327",
+    teacherId: "d3836ad9-5ee3-4a7f-8daf-7648fa1d6e31",
+    userId: "c271d9ca-30f5-483e-96a0-1e5b487571b8",
+    role: "teacher",
+    teacherRole: "muhaffiz",
+    gender: "female",
+  },
+  {
+    email: "murtaza.mohammed.hamid@mahadalzahra.com",
+    name: "Janab Mulla Murtaza bhai Hamid",
+    phone: "+916375250267",
+    teacherId: "d3dc442f-ffe5-41a5-b4ee-4cda4212f2f4",
+    userId: "341cd4f7-8e45-4a26-a570-77755a90a42c",
+    role: "teacher",
+    teacherRole: "muhaffiz",
+    gender: "male",
+  },
+  {
+    email: "saifuddin5287@gmail.com",
+    name: "Fatema bai Husain bhai Patan",
+    phone: "+91 91666 21673",
+    teacherId: "e26fbf21-4f5a-4e9c-bad8-17d8d692aa25",
+    userId: "7dd81983-f48b-4a2a-a437-48de07ef60ef",
+    role: "teacher",
+    teacherRole: "muhaffiz",
+    gender: "female",
+  },
+  {
+    email: "batool5152@yahoo.com",
+    name: "Batul Ben Gheewala",
+    phone: "+91 96100 31332",
+    teacherId: "8ba80c96-ac60-43a9-8f71-016075789a1d",
+    userId: "8e2b063e-e5bc-4586-960c-b59e1638ab90",
+    role: "teacher",
+    teacherRole: "muhaffiz",
+    gender: "female",
+  },
+  {
+    email: "tmjiger@gmail.com",
+    name: "Janab Mulla Taher bhai Jigar",
+    phone: "",
+    teacherId: "kibar-taher-jigar",
+    userId: "kibar-taher-jigar",
+    role: "kibar-teacher",
+    teacherRole: "muhaffiz",
+    gender: "male",
+  },
+  {
+    email: "c29eb4b4-bdfd-4021-beac-9099e8a11fcc",
+    name: "Mauze Tahfeez Atfal (Helpline)",
+    phone: "+91 81079 25353",
+    teacherId: "c29eb4b4-bdfd-4021-beac-9099e8a11fcc",
+    userId: "5a966b2c-1ace-424a-ba19-e5c5c3e7648b",
+    role: "teacher",
+    teacherRole: "musaid",
+    gender: "male",
+  },
+];
+
+function isTeacherOrStaffProfile(p, currentTeacherProfiles = []) {
+  if (!p || typeof p !== "object") return false;
+
+  const role = String(p.portal_role || p.role || p.teacher_role || "").toLowerCase().trim();
+  if (
+    role === "teacher" ||
+    role === "kibar-teacher" ||
+    role === "admin" ||
+    role === "kibar-admin" ||
+    role === "masool" ||
+    role === "muhaffiz" ||
+    role === "musaid"
+  ) {
+    return true;
+  }
+  if (p.is_teacher === true) return true;
+
+  const rawSid = String(p.student_id || p.id || p.user_id || "").toLowerCase().trim();
+  const rawEmail = String(p.email || p.parent_email || "").toLowerCase().trim();
+  const rawName = normalizeText(p.full_name || p.name || "");
+
+  if (
+    rawName.includes("demo teacher") ||
+    rawName.includes("helpline") ||
+    rawName.includes("developer admin") ||
+    rawName.includes("taher rawat") ||
+    rawName.includes("taher bhai rawat") ||
+    isTaherAdminUser(rawEmail, rawSid) ||
+    isTaherAdminUser(p)
+  ) {
+    return true;
+  }
+
+  if (rawSid) {
+    if (
+      TEACHER_DIRECTORY.some(
+        (t) =>
+          (t.teacherId && String(t.teacherId).toLowerCase().trim() === rawSid) ||
+          (t.userId && String(t.userId).toLowerCase().trim() === rawSid),
+      )
+    )
+      return true;
+    if (
+      Array.isArray(currentTeacherProfiles) &&
+      currentTeacherProfiles.some(
+        (t) =>
+          (t.id && String(t.id).toLowerCase().trim() === rawSid) ||
+          (t.user_id && String(t.user_id).toLowerCase().trim() === rawSid) ||
+          (t.teacherId && String(t.teacherId).toLowerCase().trim() === rawSid),
+      )
+    )
+      return true;
+  }
+
+  if (rawEmail) {
+    if (
+      TEACHER_DIRECTORY.some(
+        (t) => t.email && String(t.email).toLowerCase().trim() === rawEmail,
+      )
+    )
+      return true;
+    if (
+      Array.isArray(currentTeacherProfiles) &&
+      currentTeacherProfiles.some(
+        (t) => t.email && String(t.email).toLowerCase().trim() === rawEmail,
+      )
+    )
+      return true;
+  }
+
+  if (rawName) {
+    const stripHonorifics = (str) =>
+      normalizeText(str)
+        .replace(/\b(janab|mulla|bhai|ben|bai|shaikh|m)\b/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const strippedRaw = stripHonorifics(rawName);
+
+    const isMatchName = (target) => {
+      if (!target) return false;
+      const normTarget = normalizeText(target);
+      if (rawName === normTarget) return true;
+      const strippedTarget = stripHonorifics(target);
+      if (
+        strippedRaw &&
+        strippedTarget &&
+        strippedRaw.length > 3 &&
+        strippedTarget.length > 3 &&
+        (strippedRaw === strippedTarget ||
+          strippedRaw.includes(strippedTarget) ||
+          strippedTarget.includes(strippedRaw))
+      ) {
+        return true;
+      }
+      return false;
+    };
+
+    if (TEACHER_DIRECTORY.some((t) => isMatchName(t.name))) return true;
+    if (
+      Array.isArray(currentTeacherProfiles) &&
+      currentTeacherProfiles.some((t) => isMatchName(t.full_name || t.name))
+    )
+      return true;
+  }
+
+  return false;
+}
+
+async function findPortalAccess(userId, email = null) {
+  const normEmail = (email || "").trim().toLowerCase();
+  const normId = userId ? String(userId).trim() : null;
+
+  if (isTaherAdminUser(normEmail, normId)) {
+    return {
+      id: userId || "47NvlYT52Af1EZXydG89ysKxHsu2",
+      user_id: userId || "47NvlYT52Af1EZXydG89ysKxHsu2",
+      email: normEmail || "taher.rawat@mahadalzahra.com",
+      full_name: "Janab Mulla Taher bhai Rawat",
+      portal_role: "admin",
+      is_active: true,
+    };
+  }
+
+  // 1. Instant check against TEACHER_DIRECTORY (0 network delay)
+  const knownTeacher = TEACHER_DIRECTORY.find(
+    (t) =>
+      (normEmail && t.email && t.email.toLowerCase() === normEmail) ||
+      (normId && (String(t.userId).toLowerCase() === normId.toLowerCase() || String(t.teacherId).toLowerCase() === normId.toLowerCase())),
+  );
+
+  let data = null;
+
+  // 2. Check user_portal_access and kibar_user_portal_access
+  try {
+    if (normId) {
+      const { data: byId } = await supabase
+        .from("user_portal_access")
+        .select("*")
+        .eq("id", normId)
+        .maybeSingle();
+      if (byId) data = byId;
+      if (!data) {
+        const { data: byUserId } = await supabase
+          .from("user_portal_access")
+          .select("*")
+          .eq("user_id", normId)
+          .maybeSingle();
+        if (byUserId) data = byUserId;
+      }
+      if (!data) {
+        const { data: byKibarId } = await supabase
+          .from("kibar_user_portal_access")
+          .select("*")
+          .or(`id.eq.${normId},user_id.eq.${normId}`)
+          .maybeSingle();
+        if (byKibarId) data = byKibarId;
+      }
+    }
+    if (!data && normEmail) {
+      const { data: byEmail } = await supabase
+        .from("user_portal_access")
+        .select("*")
+        .eq("email", normEmail)
+        .maybeSingle();
+      if (byEmail) data = byEmail;
+      if (!data) {
+        const { data: byKibarEmail } = await supabase
+          .from("kibar_user_portal_access")
+          .select("*")
+          .eq("email", normEmail)
+          .maybeSingle();
+        if (byKibarEmail) data = byKibarEmail;
+      }
+    }
+  } catch (_) {}
+
+  // 3. Check teacher_profiles and kibar_teacher_profiles in Firestore
+  if (!data && (normEmail || normId)) {
+    try {
+      const queries = [];
+      if (normEmail) {
+        queries.push(
+          supabase.from("teacher_profiles").select("*").eq("email", normEmail).maybeSingle(),
+          supabase.from("kibar_teacher_profiles").select("*").eq("email", normEmail).maybeSingle()
+        );
+      }
+      if (normId) {
+        queries.push(
+          supabase.from("teacher_profiles").select("*").or(`id.eq.${normId},user_id.eq.${normId}`).maybeSingle(),
+          supabase.from("kibar_teacher_profiles").select("*").or(`id.eq.${normId},user_id.eq.${normId}`).maybeSingle()
+        );
+      }
+      const results = await Promise.all(queries.map(q => q.catch(() => ({ data: null }))));
+      const tpMatch = results.find(r => r?.data && r.data.is_active !== false)?.data;
+      if (tpMatch) {
+        const isKibar = tpMatch.section === "kibar" || (tpMatch.teacher_role && tpMatch.teacher_role.includes("kibar"));
+        data = {
+          id: tpMatch.id || normId,
+          user_id: tpMatch.user_id || normId,
+          email: tpMatch.email || normEmail,
+          full_name: tpMatch.full_name || tpMatch.name,
+          portal_role: isKibar
+            ? "kibar-teacher"
+            : (tpMatch.teacher_role === "masool" || tpMatch.teacher_role === "admin" ? "admin" : "teacher"),
+          is_active: true,
+          salary_per_minute: tpMatch.salary_per_minute || 2.3,
+          show_salary_card: tpMatch.show_salary_card ?? true,
+        };
+      }
+    } catch (_) {}
+  }
+
+  // 4. Fallback to verified TEACHER_DIRECTORY
+  if (!data && knownTeacher) {
+    data = {
+      id: knownTeacher.teacherId || normId,
+      user_id: knownTeacher.userId || normId,
+      email: knownTeacher.email,
+      full_name: knownTeacher.name,
+      portal_role: knownTeacher.role,
+      is_active: true,
+      salary_per_minute: 2.3,
+      show_salary_card: true,
+    };
   }
 
   return data || null;
@@ -3596,6 +4032,15 @@ function formatRoleList(roles) {
 }
 
 async function findParentProfiles(userId, email = null) {
+  const normEmail = (email || "").trim().toLowerCase();
+  const normId = userId ? String(userId).trim().toLowerCase() : "";
+  if (
+    isTaherAdminUser(normEmail, normId) ||
+    normEmail === "mh.developer53@gmail.com"
+  ) {
+    return [];
+  }
+
   let data1 = [];
   let data2 = [];
 
@@ -3656,6 +4101,15 @@ async function findParentProfiles(userId, email = null) {
 // Calls the scoped SECURITY DEFINER RPC, which filters server-side to THIS parent
 // only (by user id or email) — never downloads the whole table.
 async function findParentProfilesFallback(userId, email = null) {
+  const normEmail = (email || "").trim().toLowerCase();
+  const normId = userId ? String(userId).trim().toLowerCase() : "";
+  if (
+    isTaherAdminUser(normEmail, normId) ||
+    normEmail === "mh.developer53@gmail.com"
+  ) {
+    return [];
+  }
+
   // Preferred: the scoped SECURITY DEFINER RPC (filters server-side to this
   // parent only). If the function is not deployed yet (older DB), fall back to
   // the legacy full-table RPC and filter client-side so parents never see an
@@ -3910,21 +4364,19 @@ let portalLoadPending = false;
 async function detectUserAllowedPortal(user, preferredTab = null) {
   if (!user) return null;
   const normEmail = (user?.email || "").trim().toLowerCase();
+  const normId = user?.id ? String(user.id).toLowerCase().trim() : "";
 
-  // 0. Instant Cache Lookup (< 0.1ms)
-  try {
-    const cachedRoleStr = localStorage.getItem(`mauze_allowed_portal_${user.id}`);
-    if (cachedRoleStr) {
-      const parsed = JSON.parse(cachedRoleStr);
-      if (parsed?.allowedTab) {
-        if (!preferredTab || parsed.allowedTab === preferredTab) {
-          return parsed;
-        }
-      }
-    }
-  } catch (_) {}
-
-  // 1. Explicit master cases
+  // 0. Explicit master cases (MUST run FIRST so stale cache cannot override master roles)
+  if (isTaherAdminUser(normEmail, normId)) {
+    const res = {
+      allowedTab: "admin",
+      portalRole: "admin",
+      portalLabel: "Admin Portal",
+      isKibar: false,
+    };
+    try { localStorage.setItem(`mauze_allowed_portal_${user.id}`, JSON.stringify(res)); } catch (_) {}
+    return res;
+  }
   if (normEmail === "tmjiger@gmail.com") {
     const res = {
       allowedTab: "teacher",
@@ -3941,6 +4393,45 @@ async function detectUserAllowedPortal(user, preferredTab = null) {
       portalRole: "admin",
       portalLabel: "Admin Portal",
       isKibar: false,
+    };
+    try { localStorage.setItem(`mauze_allowed_portal_${user.id}`, JSON.stringify(res)); } catch (_) {}
+    return res;
+  }
+
+  // 1. Instant Cache Lookup (< 0.1ms) - only if matching preferredTab
+  try {
+    const cachedRoleStr = localStorage.getItem(`mauze_allowed_portal_${user.id}`);
+    if (cachedRoleStr) {
+      const parsed = JSON.parse(cachedRoleStr);
+      if (parsed?.allowedTab) {
+        if (!preferredTab || parsed.allowedTab === preferredTab) {
+          return parsed;
+        }
+      }
+    }
+  } catch (_) {}
+
+  // 1.5. Master Teacher Directory check (Instant, 0 network calls)
+  const knownTeacher = TEACHER_DIRECTORY.find(
+    (t) =>
+      (normEmail && t.email && t.email.toLowerCase().trim() === normEmail) ||
+      (normId && (
+        (t.userId && String(t.userId).toLowerCase().trim() === normId) ||
+        (t.teacherId && String(t.teacherId).toLowerCase().trim() === normId)
+      )),
+  );
+  if (knownTeacher) {
+    const isKibar = knownTeacher.role === "kibar-teacher";
+    const isAdmin = knownTeacher.role === "admin";
+    const res = {
+      allowedTab: isAdmin
+        ? (preferredTab === "teacher" ? "teacher" : "admin")
+        : "teacher",
+      portalRole: knownTeacher.role,
+      portalLabel: isAdmin
+        ? (preferredTab === "teacher" ? "Teacher Portal" : "Admin Portal")
+        : "Teacher Portal",
+      isKibar,
     };
     try { localStorage.setItem(`mauze_allowed_portal_${user.id}`, JSON.stringify(res)); } catch (_) {}
     return res;
@@ -3998,7 +4489,7 @@ async function detectUserAllowedPortal(user, preferredTab = null) {
     try { localStorage.setItem(`mauze_allowed_portal_${user.id}`, JSON.stringify(res)); } catch (_) {}
     return res;
   }
-  if (assigned.includes("parents")) {
+  if (assigned.includes("parents") && preferredTab !== "teacher" && preferredTab !== "admin") {
     const res = {
       allowedTab: "parents",
       portalRole: "parents",
@@ -4008,6 +4499,27 @@ async function detectUserAllowedPortal(user, preferredTab = null) {
     try { localStorage.setItem(`mauze_allowed_portal_${user.id}`, JSON.stringify(res)); } catch (_) {}
     return res;
   }
+
+  // 2.5 Quick check against findPortalAccess (checks teacher_profiles in Firestore!)
+  try {
+    const directAccess = await findPortalAccess(user.id, normEmail);
+    if (directAccess && directAccess.is_active !== false) {
+      const r = directAccess.portal_role || "teacher";
+      const isKibar = r.includes("kibar");
+      const isAdmin = r.includes("admin");
+      const isTeacherRole = r.includes("teacher") || isAdmin;
+      if (isTeacherRole) {
+        const res = {
+          allowedTab: isAdmin ? (preferredTab === "teacher" ? "teacher" : "admin") : "teacher",
+          portalRole: r,
+          portalLabel: isAdmin ? (preferredTab === "teacher" ? "Teacher Portal" : "Admin Portal") : "Teacher Portal",
+          isKibar,
+        };
+        try { localStorage.setItem(`mauze_allowed_portal_${user.id}`, JSON.stringify(res)); } catch (_) {}
+        return res;
+      }
+    }
+  } catch (_) {}
 
   // 3. Fast Parallel Database Checks (runs all checks concurrently)
   try {
@@ -4108,6 +4620,8 @@ async function detectUserAllowedPortal(user, preferredTab = null) {
     };
 
     const checkProfiles = async () => {
+      // If user selected teacher/admin tab, do not prematurely claim them as a student
+      if (preferredTab === "teacher" || preferredTab === "admin") return null;
       try {
         const [kibarStudent, atfalProfiles] = await Promise.all([
           findKibarStudentProfile(user.id, user.email).catch(() => null),
@@ -4153,7 +4667,29 @@ async function detectUserAllowedPortal(user, preferredTab = null) {
 async function authorizePortalAccess(user, requestedRole) {
   let finalRole = requestedRole;
 
-  if (user?.email?.toLowerCase() === "tmjiger@gmail.com") {
+  const userEmail = (user?.email || "").trim().toLowerCase();
+  const userIdNorm = user?.id ? String(user.id).trim().toLowerCase() : "";
+
+  // Dedicated Admin Master Account: taher.rawat has a role of admin only!
+  if (isTaherAdminUser(userEmail, userIdNorm)) {
+    setSectionScope("atfal");
+    return {
+      ok: true,
+      role: "admin",
+      assignedRoles: ["admin"],
+      parentProfile: null,
+      accessRow: {
+        id: user.id || "47NvlYT52Af1EZXydG89ysKxHsu2",
+        user_id: user.id || "47NvlYT52Af1EZXydG89ysKxHsu2",
+        email: user.email || "taher.rawat@mahadalzahra.com",
+        full_name: "Janab Mulla Taher bhai Rawat",
+        portal_role: "admin",
+        is_active: true,
+      },
+    };
+  }
+
+  if (userEmail === "tmjiger@gmail.com") {
     if (requestedRole === "teacher" || requestedRole === "kibar-teacher") {
       finalRole = "kibar-teacher";
     }
@@ -4202,7 +4738,7 @@ async function authorizePortalAccess(user, requestedRole) {
   }
 
   setSectionScope(SECTION_FOR_ROLE(finalRole));
-  let tableAccess = await findPortalAccess(user.id);
+  let tableAccess = await findPortalAccess(user.id, user.email);
   // Always also check kibar_user_portal_access — a kibar-teacher may have no atfal row.
   // If tableAccess is null OR if the atfal row doesn't match a kibar role, look in kibar table.
   if (
@@ -4302,13 +4838,70 @@ async function authorizePortalAccess(user, requestedRole) {
     };
   }
 
-  if (tableAccess?.is_active && tableAccess.portal_role === finalRole) {
+  if (tableAccess?.is_active && (tableAccess.portal_role === finalRole || (finalRole === "teacher" && tableAccess.portal_role === "kibar-teacher"))) {
+    const activeRole = tableAccess.portal_role || finalRole;
+    if (user?.id) {
+      supabase.from("users").upsert({
+        id: user.id,
+        email: user.email,
+        full_name: tableAccess.full_name || guessTeacherIdentity(user, tableAccess),
+        portal_role: activeRole,
+        is_active: true,
+      }, { onConflict: "id" }).catch(() => {});
+    }
     return {
       ok: true,
-      role: finalRole,
-      assignedRoles: [finalRole],
+      role: activeRole,
+      assignedRoles: [activeRole],
       parentProfile: null,
       accessRow: tableAccess,
+    };
+  }
+
+  // Fallback for verified teachers
+  const knownTeacherMatch = TEACHER_DIRECTORY.find(
+    (t) =>
+      (user?.email && t.email.toLowerCase() === user.email.trim().toLowerCase()) ||
+      (user?.id && (t.userId === user.id || t.teacherId === user.id)),
+  );
+  if (
+    (finalRole === "teacher" || finalRole === "kibar-teacher") &&
+    knownTeacherMatch
+  ) {
+    const matchedRole = knownTeacherMatch.role === "admin" ? "teacher" : knownTeacherMatch.role;
+    const accessRow = {
+      id: knownTeacherMatch.teacherId || user.id,
+      user_id: knownTeacherMatch.userId || user.id,
+      email: knownTeacherMatch.email,
+      full_name: knownTeacherMatch.name,
+      portal_role: matchedRole,
+      is_active: true,
+      salary_per_minute: 2.3,
+      show_salary_card: true,
+    };
+    if (user?.id) {
+      supabase.from("users").upsert({
+        id: user.id,
+        email: user.email,
+        full_name: knownTeacherMatch.name,
+        portal_role: matchedRole,
+        is_active: true,
+      }, { onConflict: "id" }).catch(() => {});
+      supabase.from("user_portal_access").upsert({
+        id: user.id,
+        user_id: user.id,
+        email: user.email,
+        full_name: knownTeacherMatch.name,
+        portal_role: matchedRole,
+        is_active: true,
+      }, { onConflict: "id" }).catch(() => {});
+    }
+    return {
+      ok: true,
+      role: matchedRole,
+      assignedRoles: [matchedRole],
+      parentProfile: null,
+      accessRow,
     };
   }
 
@@ -4533,6 +5126,22 @@ async function resolveInitialPortal(user, preferredRole) {
       localStorage.getItem("mauze-portal-role");
   } catch (_) {}
 
+  const normEmail = (user?.email || "").trim().toLowerCase();
+  const normId = user?.id ? String(user.id).trim().toLowerCase() : "";
+
+  // 0. Dedicated Admin Master Accounts: taher.rawat has a role of admin only!
+  if (
+    isTaherAdminUser(normEmail, normId) ||
+    normEmail === "mh.developer53@gmail.com"
+  ) {
+    setSectionScope("atfal");
+    const access = await authorizePortalAccess(user, "admin");
+    if (access.ok) return access;
+  }
+
+  // 1. Move candidateRole declaration UP so it can safely be used in knownT check without ReferenceError!
+  let candidateRole = preferredRole || storedRole;
+
   // 0. ALWAYS check assigned roles from metadata FIRST — kibar-teacher and kibar-admin
   //    must NEVER be overridden by a stored "parents" default role.
   if (
@@ -4549,8 +5158,19 @@ async function resolveInitialPortal(user, preferredRole) {
     if (access.ok) return access;
   }
 
-  // 1. If preferredRole or storedRole is specified, try that first:
-  let candidateRole = preferredRole || storedRole;
+  // 0.5. Check TEACHER_DIRECTORY or teacher_profiles FIRST — teachers must never resolve to parents
+  const knownT = TEACHER_DIRECTORY.find(
+    (t) =>
+      (user?.email && t.email?.toLowerCase().trim() === user.email.toLowerCase().trim()) ||
+      (user?.id && (String(t.userId).toLowerCase() === String(user.id).toLowerCase() || String(t.teacherId).toLowerCase() === String(user.id).toLowerCase()))
+  );
+  if (knownT) {
+    const isKibar = knownT.role === "kibar-teacher";
+    const targetRole = isKibar ? "kibar-teacher" : (knownT.role === "admin" ? (candidateRole === "teacher" ? "teacher" : "admin") : "teacher");
+    setSectionScope(isKibar ? "kibar" : "atfal");
+    const tAccess = await authorizePortalAccess(user, targetRole);
+    if (tAccess.ok) return tAccess;
+  }
 
   if (candidateRole === "teacher" && assigned.includes("kibar-teacher")) {
     candidateRole = "kibar-teacher";
@@ -4589,7 +5209,7 @@ async function resolveInitialPortal(user, preferredRole) {
       }
     }
 
-    const atfalAccess = await findPortalAccess(user.id);
+    const atfalAccess = await findPortalAccess(user.id, user.email);
     if (atfalAccess?.is_active && atfalAccess.portal_role) {
       const access = await authorizePortalAccess(user, atfalAccess.portal_role);
       if (access.ok) return access;
@@ -4611,11 +5231,19 @@ async function resolveInitialPortal(user, preferredRole) {
     if (access.ok) return access;
   }
 
-  // 4. Try parents (Atfal)
+  // 4. Try teacher (Atfal & Kibar) BEFORE parents
+  const teacherAccess = await authorizePortalAccess(user, "teacher");
+  if (teacherAccess.ok) return teacherAccess;
+
+  // 5. Try admin (Atfal)
+  const adminAccess = await authorizePortalAccess(user, "admin");
+  if (adminAccess.ok) return adminAccess;
+
+  // 6. Try parents (Atfal)
   const parentAccess = await authorizePortalAccess(user, "parents");
   if (parentAccess.ok) return parentAccess;
 
-  // 5. Try kibar-student ONLY if user has a kibar student profile
+  // 7. Try kibar-student ONLY if user has a kibar student profile
   try {
     const kibarProfile = await findKibarStudentProfile(user.id, user.email);
     if (kibarProfile) {
@@ -4623,14 +5251,6 @@ async function resolveInitialPortal(user, preferredRole) {
       if (kibarAccess.ok) return kibarAccess;
     }
   } catch (_) {}
-
-  // 6. Try teacher (Atfal)
-  const teacherAccess = await authorizePortalAccess(user, "teacher");
-  if (teacherAccess.ok) return teacherAccess;
-
-  // 7. Try admin (Atfal)
-  const adminAccess = await authorizePortalAccess(user, "admin");
-  if (adminAccess.ok) return adminAccess;
 
   return {
     ok: false,
@@ -4640,6 +5260,14 @@ async function resolveInitialPortal(user, preferredRole) {
 
 function guessTeacherIdentity(user, portalAccess = null) {
   if (portalAccess?.full_name) return portalAccess.full_name;
+
+  const userEmail = (user?.email || "").trim().toLowerCase();
+  const known = TEACHER_DIRECTORY.find(
+    (t) =>
+      (userEmail && t.email.toLowerCase() === userEmail) ||
+      (user?.id && (t.userId === user.id || t.teacherId === user.id)),
+  );
+  if (known) return known.name;
 
   const metadataName =
     user?.user_metadata?.teacher_name ||
@@ -4964,26 +5592,19 @@ function buildStudents(
     if (role === "parents") return true;
     return false;
   };
-  let profiles = childProfiles || [];
+  let profiles = (childProfiles || []).filter((p) => {
+    if (!p) return false;
+    if (isTeacherOrStaffProfile(p, teacherProfiles)) return false;
+    const nm = normalizeText(p.full_name || p.name || "");
+    if (nm.includes("demo student")) return false;
+    return true;
+  });
   let results = weeklyResults || [];
   if (section === "atfal") {
-    profiles = profiles.filter((p) => {
-      if (!p) return false;
-      if (isKibarDoc(p)) return false;
-      const nm = normalizeText(p.full_name || p.name || "");
-      if (nm.includes("demo student")) return false;
-      if (nm === "janab mulla murtaza bhai hamid") return false;
-      return true;
-    });
+    profiles = profiles.filter((p) => !isKibarDoc(p));
     results = results.filter((r) => !isKibarDoc(r));
   } else if (section === "kibar") {
-    profiles = profiles.filter((p) => {
-      if (!p) return false;
-      if (isAtfalDoc(p)) return false;
-      const nm = normalizeText(p.full_name || p.name || "");
-      if (nm.includes("demo student")) return false;
-      return true;
-    });
+    profiles = profiles.filter((p) => !isAtfalDoc(p));
     results = results.filter((r) => !isAtfalDoc(r));
   }
   const resultsByWeek = {};
@@ -5123,6 +5744,29 @@ function buildStudents(
         ...existing,
         student_id: existing.student_id || profile.student_id,
         its: existing.its || profile.its,
+        // Photo: keep whichever doc carries a real picture (either side).
+        photo_url:
+          existing.photo_url ||
+          profile.photo_url ||
+          existing.photoUrl ||
+          profile.photoUrl ||
+          existing.avatar_url ||
+          profile.avatar_url ||
+          existing.photo ||
+          profile.photo ||
+          null,
+        avatar_url:
+          existing.avatar_url ||
+          profile.avatar_url ||
+          existing.photo_url ||
+          profile.photo_url ||
+          null,
+        photo:
+          existing.photo ||
+          profile.photo ||
+          existing.photo_url ||
+          profile.photo_url ||
+          null,
         teacher_id:
           existing.teacher_id ||
           profile.teacher_id ||
@@ -5334,7 +5978,7 @@ function buildStudents(
     return nameA.localeCompare(nameB);
   });
 
-  return builtStudents;
+  return builtStudents.filter((s) => !isTeacherOrStaffProfile(s, teacherProfiles));
 }
 
 const recalculateComputedRanks = (students) => {
@@ -5424,24 +6068,71 @@ class PortalErrorBoundary extends React.Component {
           <p style={{ color: "#999", fontSize: "0.85rem" }}>
             {this.state.error?.message || "Unknown error"}
           </p>
-          <button
-            onClick={() => {
-              this.setState({ hasError: false, error: null });
-              window.location.reload();
-            }}
-            style={{
-              marginTop: "20px",
-              padding: "10px 24px",
-              background: "#3498db",
-              color: "white",
-              border: "none",
-              borderRadius: "8px",
-              cursor: "pointer",
-              fontSize: "1rem",
-            }}
-          >
-            Refresh Page
-          </button>
+          <div style={{ display: "flex", gap: "12px", justifyContent: "center", marginTop: "20px", flexWrap: "wrap" }}>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                window.location.reload();
+              }}
+              style={{
+                padding: "10px 20px",
+                background: "#0d9488",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontSize: "0.95rem",
+                fontWeight: 600,
+              }}
+            >
+              Refresh Page
+            </button>
+            <button
+              onClick={() => {
+                try {
+                  localStorage.removeItem("mauze_portal_cache");
+                  sessionStorage.clear();
+                } catch (_) {}
+                this.setState({ hasError: false, error: null });
+                window.location.reload();
+              }}
+              style={{
+                padding: "10px 20px",
+                background: "#f3f4f6",
+                color: "#374151",
+                border: "1px solid #d1d5db",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontSize: "0.95rem",
+                fontWeight: 500,
+              }}
+            >
+              Clear Cache & Reload
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  localStorage.removeItem("mauze_portal_cache");
+                  localStorage.removeItem("mauze_session_role");
+                  sessionStorage.clear();
+                  await supabase.auth.signOut();
+                } catch (_) {}
+                window.location.href = "/";
+              }}
+              style={{
+                padding: "10px 20px",
+                background: "#fee2e2",
+                color: "#b91c1c",
+                border: "1px solid #fca5a5",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontSize: "0.95rem",
+                fontWeight: 500,
+              }}
+            >
+              Log Out & Return to Login
+            </button>
+          </div>
         </div>
       );
     }
@@ -5699,7 +6390,7 @@ function DatePicker({ value, onChange, disabled = false }) {
           <span
             style={{
               fontSize: "1rem",
-              fontFamily: "'Kanz al Marjaan', serif",
+              fontFamily: "'Al-Kanz'",
               color: "var(--primary-gold)",
               direction: "rtl",
             }}
@@ -5711,6 +6402,44 @@ function DatePicker({ value, onChange, disabled = false }) {
     </div>
   );
 }
+
+/* ── Parents-portal Tahfeez report: render the English transliteration
+   headings in Arabic script so they display in proper Al-Kanz glyphs.
+   Al-Kanz has no calligraphic Latin glyphs (its Latin is plain serif),
+   so Arabic script is the only way to get true Al-Kanz rendering.
+   Unknown/custom headings fall back to the raw text untouched. ── */
+const KANZ_REPORT_HEADINGS = {
+  murajah: "مراجعة",
+  murajazah: "مراجعة",
+  juzhali: "جزء حالي",
+  takhteet: "تخطيط",
+  jadeed: "جديد",
+  attendance: "حاضري",
+  matrookah: "متروكة",
+  zaeefah: "ضعيفة",
+  daeefah: "ضعيفة",
+  wusool: "وصول الى الان",
+  wusoolsection: "وصول الى الان",
+  wusooljuz: "الجزء",
+  wusoolpage: "صفه",
+  nextweekjuz: "الجزء",
+  nextweekpage: "صفه",
+  itsjuz: "الجزء",
+  itspage: "صفه",
+  istifadahjuz: "الجزء",
+  istifadahpage: "صفه",
+};
+
+const toKanzReportHeading = (text) => {
+  const raw = String(text ?? "");
+  // Parents-portal progress card: if admin already typed Arabic in Report
+  // Settings, render that exact value untouched (no override).
+  if (/[\u0600-\u06FF]/.test(raw)) return raw;
+  const key = raw
+    .toLowerCase()
+    .replace(/[\s\-_]+/g, "");
+  return KANZ_REPORT_HEADINGS[key] || text;
+};
 
 function AttendanceCard({ count, total = 6, heading = "Attendance" }) {
   const stars = Array.from({ length: total }, (_, i) => i < Number(count || 0));
@@ -5733,17 +6462,17 @@ function AttendanceCard({ count, total = 6, heading = "Attendance" }) {
           className="attendance-rating-text"
           dir="rtl"
           style={{
-            fontFamily: "'Kanz al Marjaan', serif",
+            fontFamily: "'Al-Kanz','Kanz al Marjaan',serif",
             letterSpacing: "normal",
           }}
         >
-          {heading}
+          {toKanzReportHeading(heading)}
         </h4>
         <p
           className="attendance-sub-label kanz-font"
-          style={{ textAlign: "center", fontSize: "11px" }}
+          style={{ textAlign: "center", fontSize: "11px", fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
         >
-          {toArabicDigits(count || 0)} out of {toArabicDigits(total)} {heading}
+          {toArabicDigits(count || 0)} من {toArabicDigits(total)}
         </p>
       </div>
     </div>
@@ -5758,7 +6487,7 @@ function JadeedPagesCard({
 }) {
   const unitLabel = String(unit || "").startsWith("سطر")
     ? "جملة سطر"
-    : "جملة صــ";
+    : "جملة صفحة";
   return (
     <div className="jadeed-pages-card card-appear">
       <div className="attendance-lighting" />
@@ -5791,7 +6520,7 @@ function JadeedPagesCard({
         className="attendance-rating-text arabic-kanz"
         dir="rtl"
         style={{
-          fontFamily: "'Kanz al Marjaan', serif",
+          fontFamily: "'Al-Kanz','Kanz al Marjaan',serif",
           fontSize: "1.6rem",
           marginTop: "8px",
           color: "var(--deep-brown)",
@@ -5858,6 +6587,14 @@ function TahfeezReportCard({
   const hWusool = report.wusool_heading;
   const hNext = report.next_week_heading;
   const hIstifadah = report.istifadah_heading;
+  /* Footer labels heading-wise same as Report Settings:
+     - If settings textbox has Arabic (e.g. وصول الى الان, الجزء, صفه),
+       render that exact value in Al-Kanz.
+     - If settings still has English default (e.g. Wusool, Wusool Juz),
+       map to concise Arabic (وصول الى الان, الجزء, صفه).
+     - Next Week Target / Target Till stay English exactly as typed
+       (no mapping entries), so they render same as settings. */
+  const footerLabel = (val) => toKanzReportHeading(val);
   const progressCardBackground = report.progress_card_background_url || "";
   const progressCardOverlayOpacity = Math.min(
     Math.max(Number(report.progress_card_overlay_opacity ?? 0.82), 0),
@@ -6096,7 +6833,7 @@ function TahfeezReportCard({
                     fontSize: "1.4rem",
                     color: "var(--deep-brown)",
                     fontWeight: "bold",
-                    fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif",
+                    fontFamily: "'Al-Kanz','Kanz al Marjaan',serif",
                   }}
                 >
                   {student?.arabic_name
@@ -6133,7 +6870,7 @@ function TahfeezReportCard({
               <span className="meta-label child-hood-font">Month:</span>
               <span
                 className="meta-val arabic-kanz"
-                style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+                style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
               >
                 {displayMonthName}
               </span>
@@ -6148,7 +6885,7 @@ function TahfeezReportCard({
             </span>
             <span
               className="jumla-label arabic-kanz"
-              style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+              style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
             >
               {report.jumla_heading}
             </span>
@@ -6198,9 +6935,9 @@ function TahfeezReportCard({
               <div key={item.label} className="score-row" dir="rtl">
                 <span
                   className="arabic-label kanz-font"
-                  style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+                  style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
                 >
-                  {item.label} :
+                  {toKanzReportHeading(item.label)} :
                 </span>
                 <span
                   className="score-val"
@@ -6294,6 +7031,7 @@ function TahfeezReportCard({
                     color: "#777",
                     fontWeight: 600,
                     marginTop: "4px",
+                    fontFamily: "'Al-Kanz','Kanz al Marjaan',serif",
                   }}
                   className="kanz-font"
                 >
@@ -6313,17 +7051,17 @@ function TahfeezReportCard({
                 fontSize: "1.4rem",
                 color: "var(--deep-brown)",
                 letterSpacing: "normal",
-                fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif",
+                fontFamily: "'Al-Kanz','Kanz al Marjaan',serif",
               }}
             >
-              {hWusool}
+              {footerLabel(hWusool)}
             </h5>
             <p dir="rtl">
               <span
                 className="arabic-kanz"
-                style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+                style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
               >
-                {report.wusool_juz_heading} :
+                {footerLabel(report.wusool_juz_heading)} :
               </span>{" "}
               <span className="kanz-font">
                 {toArabicDigits(weeklyResult?.wusool_juz || "-")}
@@ -6332,13 +7070,13 @@ function TahfeezReportCard({
             <p dir="rtl">
               <span
                 className="arabic-kanz"
-                style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+                style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
               >
                 سورة :
               </span>{" "}
               <span
                 className="arabic-kanz"
-                style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+                style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
               >
                 {weeklyResult?.wusool_surah || "-"}
               </span>
@@ -6346,9 +7084,9 @@ function TahfeezReportCard({
             <p dir="rtl">
               <span
                 className="arabic-kanz"
-                style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+                style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
               >
-                {report.wusool_page_heading} :
+                {footerLabel(report.wusool_page_heading)} :
               </span>{" "}
               <span className="kanz-font">
                 {toArabicDigits(weeklyResult?.wusool_page || "-")}
@@ -6362,9 +7100,9 @@ function TahfeezReportCard({
               </span>
               <span
                 className="note-label arabic-kanz"
-                style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+                style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
               >
-                {report.matrookah_heading} :
+                {footerLabel(report.matrookah_heading)} :
               </span>
             </div>
             <div className="note-item-row">
@@ -6373,20 +7111,31 @@ function TahfeezReportCard({
               </span>
               <span
                 className="note-label arabic-kanz"
-                style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+                style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
               >
-                {report.daeefah_heading} :
+                {footerLabel(report.daeefah_heading)} :
               </span>
             </div>
           </div>
           <div className="target-box">
-            <h5 className="child-hood-font">{hNext}</h5>
+            <h5
+              className="arabic-kanz"
+              dir="rtl"
+              style={{
+                fontSize: "1.4rem",
+                color: "var(--deep-brown)",
+                letterSpacing: "normal",
+                fontFamily: "'Al-Kanz','Kanz al Marjaan',serif",
+              }}
+            >
+              {footerLabel(hNext)}
+            </h5>
             <p dir="rtl">
               <span
                 className="arabic-kanz"
-                style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+                style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
               >
-                {report.next_week_juz_heading} :
+                {footerLabel(report.next_week_juz_heading)} :
               </span>{" "}
               <span className="kanz-font">
                 {toArabicDigits(weeklyResult?.next_week_juz || "-")}
@@ -6395,13 +7144,13 @@ function TahfeezReportCard({
             <p dir="rtl">
               <span
                 className="arabic-kanz"
-                style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+                style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
               >
                 سورة :
               </span>{" "}
               <span
                 className="arabic-kanz"
-                style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+                style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
               >
                 {weeklyResult?.next_week_surah || "-"}
               </span>
@@ -6409,9 +7158,9 @@ function TahfeezReportCard({
             <p dir="rtl">
               <span
                 className="arabic-kanz"
-                style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+                style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
               >
-                {report.next_week_page_heading} :
+                {footerLabel(report.next_week_page_heading)} :
               </span>{" "}
               <span className="kanz-font">
                 {toArabicDigits(weeklyResult?.next_week_page || "-")}
@@ -6419,13 +7168,24 @@ function TahfeezReportCard({
             </p>
           </div>
           <div className="target-box highlight">
-            <h5 className="child-hood-font">{hIstifadah}</h5>
+            <h5
+              className="arabic-kanz"
+              dir="rtl"
+              style={{
+                fontSize: "1.4rem",
+                color: "var(--deep-brown)",
+                letterSpacing: "normal",
+                fontFamily: "'Al-Kanz','Kanz al Marjaan',serif",
+              }}
+            >
+              {footerLabel(hIstifadah)}
+            </h5>
             <p dir="rtl">
               <span
                 className="arabic-kanz"
-                style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+                style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
               >
-                {report.istifadah_juz_heading} :
+                {footerLabel(report.istifadah_juz_heading)} :
               </span>{" "}
               <span className="kanz-font">
                 {toArabicDigits(weeklyResult?.istifadah_juz || "-")}
@@ -6434,13 +7194,13 @@ function TahfeezReportCard({
             <p dir="rtl">
               <span
                 className="arabic-kanz"
-                style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+                style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
               >
                 سورة :
               </span>{" "}
               <span
                 className="arabic-kanz"
-                style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+                style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
               >
                 {weeklyResult?.istifadah_surah || "-"}
               </span>
@@ -6448,9 +7208,9 @@ function TahfeezReportCard({
             <p dir="rtl">
               <span
                 className="arabic-kanz"
-                style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
+                style={{ fontFamily: "'Al-Kanz','Kanz al Marjaan',serif" }}
               >
-                {report.istifadah_page_heading} :
+                {footerLabel(report.istifadah_page_heading)} :
               </span>{" "}
               <span className="kanz-font">
                 {toArabicDigits(weeklyResult?.istifadah_page || "-")}
@@ -15123,23 +15883,48 @@ function ParentPortal({
                           </p>
                         </div>
                         {finalRoleTeachers.map((t) => {
-                          const rawWa = t.whatsapp_number || "";
+                          const matchedProfile = combinedTeachers.find(
+                            (p) =>
+                              (t.user_id && p.user_id === t.user_id) ||
+                              (t.id && p.id === t.id) ||
+                              (t.full_name &&
+                                normalizeText(p.full_name) ===
+                                  normalizeText(t.full_name)),
+                          );
+                          const rawWa =
+                            t.whatsapp_number ||
+                            matchedProfile?.whatsapp_number ||
+                            t.phone_number ||
+                            matchedProfile?.phone_number ||
+                            "";
                           const wa = rawWa
                             .split("")
                             .filter((c) => "0123456789".includes(c))
                             .join("");
+                          const phone =
+                            t.phone_number ||
+                            matchedProfile?.phone_number ||
+                            t.phone ||
+                            rawWa ||
+                            "";
                           const photo = cleanPhotoUrl(
                             t.photo_url ||
                               t.photoUrl ||
                               t.avatar_url ||
                               t.photo ||
+                              matchedProfile?.photo_url ||
+                              matchedProfile?.photoUrl ||
+                              matchedProfile?.avatar_url ||
                               (typeof localStorage !== "undefined" &&
-                              (t.user_id || t.id)
+                              (t.user_id ||
+                                t.id ||
+                                matchedProfile?.id ||
+                                matchedProfile?.user_id)
                                 ? localStorage.getItem(
-                                    `mauze_teacher_photo_${t.user_id || t.id}`,
+                                    `mauze_teacher_photo_${t.user_id || t.id || matchedProfile?.id || matchedProfile?.user_id}`,
                                   ) ||
                                   localStorage.getItem(
-                                    `mauze_photo_${t.user_id || t.id}`,
+                                    `mauze_photo_${t.user_id || t.id || matchedProfile?.id || matchedProfile?.user_id}`,
                                   )
                                 : "") ||
                               "",
@@ -20062,6 +20847,9 @@ function AdminPortal({
   const registryFormRef = useRef(null);
   const studentPhotoInputRef = useRef(null);
   const assignmentPhotoInputRef = useRef(null);
+  // Holds the most recently uploaded assignment-hub photo URL so the Assign
+  // submit can use it even if the student dropdown re-fills the text input.
+  const assignmentUploadedPhotoRef = useRef("");
   const [assignModal, setAssignModal] = useState(null);
   const [assigning, setAssigning] = useState(false);
   const [reportSettingsSaved, setReportSettingsSaved] = useState(false);
@@ -20264,6 +21052,7 @@ function AdminPortal({
     try {
       const result = await onAssignChild(data);
       if (result && result.ok) {
+        assignmentUploadedPhotoRef.current = "";
         setAssignModal({
           type: "success",
           title: "Assigned Successfully",
@@ -20324,19 +21113,23 @@ function AdminPortal({
     if (!file) return;
     setUploadingStudentRegistryPhoto(true);
     try {
-      const fileExt = file.name.split(".").pop();
+      const fileExt = (file.name.split(".").pop() || "jpg").split("?")[0];
       const fileName = `student-photos/${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-      const { error } = await supabase.storage
+      const { data: uploadData, error } = await supabase.storage
         .from("teacher_photos")
-        .upload(fileName, file);
+        .upload(fileName, file, { contentType: file.type || undefined, upsert: true });
       if (error) throw error;
-      const { data: publicUrlData } = await supabase.storage
-        .from("teacher_photos")
-        .getPublicUrl(fileName);
+      let uploadedUrl = uploadData?.publicUrl || uploadData?.path || "";
+      if (!uploadedUrl || (!String(uploadedUrl).startsWith("http") && !String(uploadedUrl).startsWith("data:"))) {
+        const { data: publicUrlData } = await supabase.storage
+          .from("teacher_photos")
+          .getPublicUrl(uploadedUrl || fileName);
+        uploadedUrl = publicUrlData?.publicUrl || uploadedUrl;
+      }
       const input = document.querySelector(
         'form.stack-form input[name="photo_url"]',
       );
-      if (input) input.value = publicUrlData.publicUrl;
+      if (input) input.value = uploadedUrl;
       onShowAction("success", "Photo uploaded!");
     } catch (err) {
       onShowAction("error", "Upload failed: " + err.message);
@@ -20351,18 +21144,36 @@ function AdminPortal({
     if (!file) return;
     setUploadingAssignmentPhoto(true);
     try {
-      const fileExt = file.name.split(".").pop();
+      const fileExt = (file.name.split(".").pop() || "jpg").split("?")[0];
       const fileName = `student-photos/${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-      const { error } = await supabase.storage
+      const { data: uploadData, error } = await supabase.storage
         .from("teacher_photos")
-        .upload(fileName, file);
+        .upload(fileName, file, { contentType: file.type || undefined, upsert: true });
       if (error) throw error;
-      const { data: publicUrlData } = await supabase.storage
-        .from("teacher_photos")
-        .getPublicUrl(fileName);
+      let uploadedUrl = uploadData?.publicUrl || uploadData?.path || "";
+      if (!uploadedUrl || (!String(uploadedUrl).startsWith("http") && !String(uploadedUrl).startsWith("data:"))) {
+        const { data: publicUrlData } = await supabase.storage
+          .from("teacher_photos")
+          .getPublicUrl(uploadedUrl || fileName);
+        uploadedUrl = publicUrlData?.publicUrl || uploadedUrl;
+      }
+      if (!uploadedUrl) throw new Error("Could not resolve uploaded photo URL.");
+      // Remember for the Assign submit (dropdown changes re-fill the input).
+      assignmentUploadedPhotoRef.current = uploadedUrl;
       const form = document.querySelector(".assignment-form-complex form");
       if (form && form.photo_url)
-        form.photo_url.value = publicUrlData.publicUrl;
+        form.photo_url.value = uploadedUrl;
+      // Instant local sync so every StudentAvatar shows it even before Assign.
+      try {
+        const selId = String(registryStudentId || "").trim();
+        if (uploadedUrl && (!uploadedUrl.startsWith("data:") || uploadedUrl.length < 50000)) {
+          if (selId) {
+            localStorage.setItem(`mauze_student_photo_${selId}`, uploadedUrl);
+            localStorage.setItem(`mauze_photo_${selId}`, uploadedUrl);
+          }
+          localStorage.setItem("activeChildPhoto", uploadedUrl);
+        }
+      } catch (_) {}
       onShowAction("success", "Photo uploaded!");
     } catch (err) {
       onShowAction("error", "Upload failed: " + err.message);
@@ -21115,6 +21926,7 @@ function AdminPortal({
     "Attendance Tracking",
     "Online Tahfeez Tracking",
     "Help Management",
+    "WhatsApp Bot",
     "Global Settings",
     "Email Settings",
     "App Update",
@@ -21133,7 +21945,8 @@ function AdminPortal({
 
   const userAssignedRoles = user ? getAssignedRoles(user) : [];
   const isSuperAdmin =
-    user?.email?.toLowerCase() === "mh.developer53@gmail.com";
+    user?.email?.toLowerCase() === "mh.developer53@gmail.com" ||
+    isTaherAdminUser(user);
   const isKibarTeacherUser =
     !isSuperAdmin &&
     (userAssignedRoles.includes("kibar-teacher") ||
@@ -28479,6 +29292,7 @@ function AdminPortal({
                   className="stack-form"
                   onSubmit={(e) => {
                     e.preventDefault();
+                    const typedPhoto = e.target.photo_url?.value;
                     const data = {
                       student_id: e.target.student_id.value,
                       teacher_id: e.target.teacher_id.value,
@@ -28487,7 +29301,10 @@ function AdminPortal({
                       arabic_name: e.target.arabic_name?.value,
                       juz: e.target.juz?.value,
                       surat: e.target.surat?.value,
-                      photo_url: e.target.photo_url?.value,
+                      photo_url:
+                        (typedPhoto && String(typedPhoto).trim()) ||
+                        assignmentUploadedPhotoRef.current ||
+                        "",
                       group_name: e.target.group_name?.value,
                       its: e.target.its?.value,
                       whatsapp_number: e.target.whatsapp_number?.value,
@@ -28535,7 +29352,12 @@ function AdminPortal({
                                   ? s.hifz.surat
                                   : "");
                             if (form.photo_url)
-                              form.photo_url.value = s.photoUrl || "";
+                              form.photo_url.value =
+                                s.photoUrl ||
+                                s.photo_url ||
+                                s.avatar_url ||
+                                s.photo ||
+                                "";
                             if (form.its)
                               form.its.value =
                                 s.its === "..." ? "" : s.its || "";
@@ -33245,556 +34067,51 @@ function AdminPortal({
                 </form>
               </section>
 
-              {/* WhatsApp Bot Live Control, Diagnostic & Master ON/OFF Switch */}
-              <WhatsAppBotControlCard
-                whatsappConfig={whatsappConfig}
-                onUpdateWhatsappConfig={onUpdateWhatsappConfig}
-                onShowAction={onShowAction}
-              />
-
-              {/* WhatsApp Integration Configuration Section */}
+              {/* WhatsApp Bot Settings have been shifted to dedicated WhatsApp Bot page */}
               <section
                 className="form-card card-appear"
-                style={{ marginTop: "20px" }}
+                style={{
+                  border: "1px solid rgba(37, 211, 102, 0.35)",
+                  background: "linear-gradient(135deg, rgba(37, 211, 102, 0.08) 0%, rgba(212, 175, 55, 0.06) 100%)",
+                }}
               >
-                <div className="card-headline">
-                  <MessageCircle size={18} />
-                  <h3>WhatsApp Integration</h3>
-                </div>
-                <form
-                  className="stack-form"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const formData = new FormData(e.target);
-                    const updates = {
-                      enabled: formData.get("wa_enabled") === "true",
-                      provider: formData.get("wa_provider"),
-                      api_url: formData.get("wa_api_url"),
-                      api_token: formData.get("wa_api_token"),
-                      account_sid: formData.get("wa_account_sid"),
-                      from_number: formData.get("wa_from_number"),
-                      message_template: formData.get("wa_message_template"),
-                      auto_send_on_publish:
-                        formData.get("wa_auto_send_on_publish") === "true",
-                    };
-                    onUpdateWhatsappConfig(updates);
-                  }}
-                >
-                  <div className="form-grid">
-                    <label>
-                      <span>Enable WhatsApp Notifications</span>
-                      <select
-                        name="wa_enabled"
-                        defaultValue={String(whatsappConfig?.enabled ?? false)}
-                        className="premium-select"
-                      >
-                        <option value="true">Enabled</option>
-                        <option value="false">Disabled</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>WhatsApp Provider</span>
-                      <select
-                        name="wa_provider"
-                        defaultValue={whatsappConfig?.provider ?? "none"}
-                        className="premium-select"
-                      >
-                        <option value="none">None / Disabled</option>
-                        <option value="mock">
-                          Simulated / Testing Mode (Mock)
-                        </option>
-                        <option value="custom">Custom HTTP Gateway</option>
-                        <option value="twilio">Twilio API</option>
-                        <option value="meta">Meta Cloud API</option>
-                        <option value="openwa">OpenWA (Self-Hosted)</option>
-                        <option value="ultramsg">UltraMsg API (Cloud)</option>
-                      </select>
-                    </label>
-                  </div>
-
-                  <div className="form-grid">
-                    <label>
-                      <span>API URL (Custom Gateway only)</span>
-                      <input
-                        name="wa_api_url"
-                        type="text"
-                        defaultValue={whatsappConfig?.api_url || ""}
-                        placeholder="https://api.ultramsg.com/instanceXXXX/messages/chat"
-                        className="premium-input"
-                      />
-                    </label>
-                    <label>
-                      <span>API Token / Auth Token / Access Token</span>
-                      <input
-                        name="wa_api_token"
-                        type="password"
-                        defaultValue={whatsappConfig?.api_token || ""}
-                        placeholder="Your secret token..."
-                        className="premium-input"
-                      />
-                    </label>
-                  </div>
-
-                  <div className="form-grid">
-                    <label>
-                      <span>Account SID (Twilio only)</span>
-                      <input
-                        name="wa_account_sid"
-                        type="text"
-                        defaultValue={whatsappConfig?.account_sid || ""}
-                        placeholder="ACxxxxxxxxxxxxxx"
-                        className="premium-input"
-                      />
-                    </label>
-                    <label>
-                      <span>From Number / Phone ID (Twilio/Meta/Custom)</span>
-                      <input
-                        name="wa_from_number"
-                        type="text"
-                        defaultValue={whatsappConfig?.from_number || ""}
-                        placeholder="Meta Phone Number ID or sender number"
-                        className="premium-input"
-                      />
-                    </label>
-                  </div>
-
-                  <label>
-                    <span>Message Template</span>
-                    <textarea
-                      name="wa_message_template"
-                      rows={3}
-                      defaultValue={
-                        whatsappConfig?.message_template ||
-                        "🌹 *Afzalus Salaam*\n\nWeekly result for *{{child_name}}* is now live.\n\nMubarak & Shukran.\n\n💬 *Type 2 to ask something to bot*"
-                      }
-                      className="premium-input"
-                      style={{ resize: "vertical" }}
-                    />
-                    <span className="hint-text">
-                      Placeholders: <code>{"{{child_name}}"}</code>,{" "}
-                      <code>{"{{group_name}}"}</code>, <code>{"{{juz}}"}</code>,{" "}
-                      <code>{"{{surat}}"}</code>
-                    </span>
-                  </label>
-
-                  <label>
-                    <span>Auto-send WhatsApp when results go live</span>
-                    <select
-                      name="wa_auto_send_on_publish"
-                      defaultValue={String(
-                        whatsappConfig?.auto_send_on_publish ?? false,
-                      )}
-                      className="premium-select"
-                    >
-                      <option value="true">Enabled</option>
-                      <option value="false">Disabled</option>
-                    </select>
-                    <span className="hint-text">
-                      When enabled, WhatsApp notifications will be automatically
-                      sent to all parents when you publish weekly results.
-                    </span>
-                  </label>
-
-                  <button
-                    type="submit"
-                    className="action-button premium"
-                    style={{ marginTop: "10px" }}
-                  >
-                    Save WhatsApp Settings
-                  </button>
-                </form>
-
-                {/* Send WhatsApp Notifications Button */}
-                <div
-                  style={{
-                    marginTop: "16px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "12px",
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="action-button premium"
-                    onClick={handleSendWhatsApp}
-                    disabled={sendingWhatsApp || !whatsappConfig?.enabled}
-                    style={{
-                      background: !whatsappConfig?.enabled
-                        ? "var(--text-muted)"
-                        : "linear-gradient(135deg, #25D366, #128C7E)",
-                      color: "white",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <MessageCircle size={18} />
-                    {sendingWhatsApp
-                      ? `Sending... (${whatsAppProgress?.current || 0}/${whatsAppProgress?.total || 0})`
-                      : "Send WhatsApp Notifications to Parents"}
-                  </button>
-
-                  {/* WhatsApp Log History */}
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", flexWrap: "wrap" }}>
                   <div
-                    onClick={() => setShowWaLogHistory(!showWaLogHistory)}
                     style={{
-                      cursor: "pointer",
-                      padding: "12px 16px",
-                      borderRadius: "12px",
-                      background: "var(--card-bg)",
-                      border: "1px solid var(--glass-border)",
+                      width: "48px",
+                      height: "48px",
+                      borderRadius: "14px",
+                      background: "linear-gradient(135deg, #25D366, #128C7E)",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "space-between",
-                      transition: "all 0.2s ease",
+                      justifyContent: "center",
+                      color: "#fff",
+                      boxShadow: "0 6px 18px rgba(37, 211, 102, 0.3)",
+                      flexShrink: 0,
                     }}
                   >
-                    <div
+                    <MessageCircle size={24} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: "220px" }}>
+                    <h3 style={{ margin: "0 0 6px", color: "var(--deep-brown)", fontSize: "1.1rem" }}>
+                      WhatsApp Bot Command Center Shifted
+                    </h3>
+                    <p style={{ margin: "0 0 14px", fontSize: "0.85rem", color: "var(--soft-brown)", lineHeight: 1.5 }}>
+                      All WhatsApp Bot controls, Gateway configurations, Master switches, Scheduled Reminders logs, and User Chat benefits have been shifted into the dedicated <strong>WhatsApp Bot</strong> page in the admin portal.
+                    </p>
+                    <button
+                      type="button"
+                      className="action-button premium"
+                      onClick={() => setActivePage("WhatsApp Bot")}
                       style={{
-                        display: "flex",
+                        background: "linear-gradient(135deg, #25D366, #128C7E)",
+                        color: "#fff",
+                        display: "inline-flex",
                         alignItems: "center",
                         gap: "8px",
                       }}
                     >
-                      <MessageCircle
-                        size={16}
-                        style={{ color: "var(--primary-gold)" }}
-                      />
-                      <span
-                        style={{
-                          fontWeight: 600,
-                          color: "var(--deep-brown)",
-                          fontSize: "0.95rem",
-                        }}
-                      >
-                        WhatsApp Log History
-                      </span>
-                      <span
-                        style={{
-                          background:
-                            waPersistentLogs.length > 0
-                              ? "var(--primary-gold)"
-                              : "var(--text-muted)",
-                          color: "white",
-                          borderRadius: "999px",
-                          padding: "2px 10px",
-                          fontSize: "0.75rem",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {waPersistentLogs.length} entries
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                      }}
-                    >
-                      {waPersistentLogs.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            clearWaPersistentLogs();
-                          }}
-                          style={{
-                            background: "none",
-                            border: "1px solid rgba(255,0,0,0.2)",
-                            borderRadius: "8px",
-                            padding: "4px 8px",
-                            cursor: "pointer",
-                            fontSize: "0.75rem",
-                            color: "#e74c3c",
-                            fontWeight: 600,
-                          }}
-                        >
-                          Clear
-                        </button>
-                      )}
-                      <ChevronDown
-                        size={18}
-                        style={{
-                          color: "var(--text-muted)",
-                          transform: showWaLogHistory
-                            ? "rotate(180deg)"
-                            : "rotate(0deg)",
-                          transition: "transform 0.3s ease",
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {showWaLogHistory && (
-                    <div
-                      style={{
-                        padding: "12px",
-                        borderRadius: "12px",
-                        background: "#fcfaf5",
-                        border: "1px solid var(--glass-border)",
-                        maxHeight: "300px",
-                        overflowY: "auto",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "6px",
-                      }}
-                    >
-                      {waPersistentLogs.length === 0 ? (
-                        <div
-                          style={{
-                            textAlign: "center",
-                            padding: "20px",
-                            color: "var(--text-muted)",
-                            fontSize: "0.85rem",
-                          }}
-                        >
-                          No WhatsApp logs yet. Logs appear here when you send
-                          WhatsApp notifications.
-                        </div>
-                      ) : (
-                        [...waPersistentLogs].reverse().map((log, idx) => (
-                          <div
-                            key={log.id || idx}
-                            style={{
-                              padding: "8px 12px",
-                              borderRadius: "10px",
-                              fontSize: "0.82rem",
-                              lineHeight: "1.4",
-                              background:
-                                log.type === "success"
-                                  ? "rgba(37, 211, 102, 0.12)"
-                                  : log.type === "error"
-                                    ? "rgba(231, 76, 60, 0.10)"
-                                    : log.type === "sending"
-                                      ? "rgba(33, 150, 243, 0.10)"
-                                      : "rgba(255, 255, 255, 0.8)",
-                              borderLeft:
-                                "3px solid " +
-                                (log.type === "success"
-                                  ? "#25d366"
-                                  : log.type === "error"
-                                    ? "#e74c3c"
-                                    : log.type === "sending"
-                                      ? "#2196f3"
-                                      : "var(--glass-border)"),
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: "4px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                                flexWrap: "wrap",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontSize: "0.7rem",
-                                  color: "var(--text-muted)",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                {log.time}
-                              </span>
-                              {log.student && (
-                                <span
-                                  style={{
-                                    fontSize: "0.7rem",
-                                    padding: "2px 6px",
-                                    borderRadius: "4px",
-                                    background: "rgba(212, 175, 55, 0.15)",
-                                    color: "var(--primary-gold)",
-                                    fontWeight: 700,
-                                  }}
-                                >
-                                  {log.student}
-                                </span>
-                              )}
-                              {log.phone && (
-                                <span
-                                  style={{
-                                    fontSize: "0.7rem",
-                                    color: "var(--text-muted)",
-                                  }}
-                                >
-                                  {log.phone}
-                                </span>
-                              )}
-                            </div>
-                            <span
-                              style={{
-                                color:
-                                  log.type === "success"
-                                    ? "#1b8c3d"
-                                    : log.type === "error"
-                                      ? "#c0392b"
-                                      : log.type === "sending"
-                                        ? "#1565c0"
-                                        : "var(--deep-brown)",
-                                fontWeight: log.type === "sending" ? 400 : 500,
-                              }}
-                            >
-                              {log.text}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              {/* --- Manual Send WhatsApp Section --- */}
-              <section
-                className="data-card card-appear"
-                style={{ marginTop: "16px" }}
-              >
-                <div
-                  style={{
-                    padding: "16px 18px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "12px",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
-                  >
-                    <Phone size={16} color="#25D366" />
-                    <span
-                      style={{
-                        fontWeight: 600,
-                        fontSize: "0.9rem",
-                        color: "var(--deep-brown)",
-                      }}
-                    >
-                      Send to a specific number
-                    </span>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "8px",
-                    }}
-                  >
-                    <div
-                      style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}
-                    >
-                      <input
-                        type="text"
-                        placeholder="Phone number (e.g. 923001234567)"
-                        value={manualWaPhone}
-                        onChange={(e) =>
-                          setManualWaPhone(
-                            e.target.value.replace(/[^0-9]/g, ""),
-                          )
-                        }
-                        className="premium-input"
-                        style={{ flex: "1", minWidth: "180px" }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Student name (optional)"
-                        value={manualWaStudentName}
-                        onChange={(e) => setManualWaStudentName(e.target.value)}
-                        className="premium-input"
-                        style={{
-                          flex: "0 1 auto",
-                          minWidth: "120px",
-                          maxWidth: "160px",
-                        }}
-                      />
-                    </div>
-                    <textarea
-                      placeholder="Message (leave empty to use the configured template)"
-                      value={manualWaMessage}
-                      onChange={(e) => setManualWaMessage(e.target.value)}
-                      rows={3}
-                      className="premium-input"
-                      style={{
-                        resize: "vertical",
-                        fontFamily: "inherit",
-                        fontSize: "0.85rem",
-                      }}
-                    />
-
-                    {manualWaStatus && (
-                      <div
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: "8px",
-                          fontSize: "0.8rem",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "6px",
-                          background:
-                            manualWaStatus.type === "success"
-                              ? "rgba(37,211,102,0.08)"
-                              : "rgba(192,57,43,0.08)",
-                          border:
-                            "1px solid " +
-                            (manualWaStatus.type === "success"
-                              ? "rgba(37,211,102,0.2)"
-                              : "rgba(192,57,43,0.2)"),
-                          color:
-                            manualWaStatus.type === "success"
-                              ? "#1a8a4a"
-                              : "#c0392b",
-                        }}
-                      >
-                        {manualWaStatus.type === "success" ? (
-                          <CheckCircle size={14} />
-                        ) : (
-                          <AlertCircle size={14} />
-                        )}
-                        {manualWaStatus.text}
-                      </div>
-                    )}
-
-                    <button
-                      type="button"
-                      disabled={manualWaSending || !manualWaPhone}
-                      onClick={handleManualWaSend}
-                      className="action-button premium"
-                      style={{
-                        alignSelf: "flex-start",
-                        background: !manualWaPhone
-                          ? "var(--text-muted)"
-                          : "linear-gradient(135deg, #25D366, #128C7E)",
-                        color: "white",
-                        border: "none",
-                        opacity: manualWaSending ? 0.7 : 1,
-                        cursor: manualWaSending ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      {manualWaSending ? (
-                        <>
-                          <Loader2
-                            size={16}
-                            style={{
-                              marginRight: "6px",
-                              animation: "spin 1s linear infinite",
-                            }}
-                          />{" "}
-                          Sending...
-                        </>
-                      ) : (
-                        <>
-                          <Send size={16} style={{ marginRight: "6px" }} /> Send
-                          WhatsApp
-                        </>
-                      )}
+                      <MessageCircle size={16} /> Open WhatsApp Bot Page &rarr;
                     </button>
                   </div>
                 </div>
@@ -33857,6 +34174,29 @@ function AdminPortal({
                 </div>
               </section>
             </div>
+          ) : activePage === "WhatsApp Bot" ? (
+            <WhatsAppBotAdminPage
+              whatsappConfig={whatsappConfig}
+              onUpdateWhatsappConfig={onUpdateWhatsappConfig}
+              onShowAction={onShowAction || showAction}
+              handleSendWhatsApp={handleSendWhatsApp}
+              sendingWhatsApp={sendingWhatsApp}
+              whatsAppProgress={whatsAppProgress}
+              waPersistentLogs={waPersistentLogs}
+              setWaPersistentLogs={setWaPersistentLogs}
+              clearWaPersistentLogs={clearWaPersistentLogs}
+              manualWaPhone={manualWaPhone}
+              setManualWaPhone={setManualWaPhone}
+              manualWaStudentName={manualWaStudentName}
+              setManualWaStudentName={setManualWaStudentName}
+              manualWaMessage={manualWaMessage}
+              setManualWaMessage={setManualWaMessage}
+              manualWaSending={manualWaSending}
+              manualWaStatus={manualWaStatus}
+              handleManualWaSend={handleManualWaSend}
+              students={students}
+              teachers={typeof teacherProfiles !== "undefined" ? teacherProfiles : []}
+            />
           ) : activePage === "Announcements" ? (
             <div style={{ paddingBottom: "80px" }}>
               <AnnouncementsPage
@@ -46999,6 +47339,9 @@ export default function App() {
         if (!cachedRaw) return null;
         const cached = JSON.parse(cachedRaw);
         if (!cached.userId || !cached.role) return null;
+        if (isTaherAdminUser(cached.email, cached.userId)) {
+          cached.role = "admin";
+        }
 
         setUser({ id: cached.userId, email: cached.email });
         storeRole(cached.role);
@@ -47040,6 +47383,9 @@ export default function App() {
       try {
         const cached = JSON.parse(cachedRaw);
         if (!cached.userId || !cached.role) return false;
+        if (isTaherAdminUser(cached.email, cached.userId)) {
+          cached.role = "admin";
+        }
 
         // Re-authenticate with Supabase if no valid session exists, so subsequent
         // loadPortalData queries (which require RLS auth) don't fail.
@@ -47211,8 +47557,10 @@ export default function App() {
       if (session) {
         setUser(session.user);
         try {
-          const currentStoredRole =
-            window.localStorage.getItem(STORAGE_KEYS.role) || "parents";
+          const isTaher = isTaherAdminUser(session.user);
+          const currentStoredRole = isTaher
+            ? "admin"
+            : (window.localStorage.getItem(STORAGE_KEYS.role) || "parents");
           const access = await resolveInitialPortal(
             session.user,
             currentStoredRole,
@@ -47224,7 +47572,7 @@ export default function App() {
                 "Portal resolution returned non-ok, using currentStoredRole safely:",
                 access?.message,
               );
-              const fallbackRole = currentStoredRole || "parents";
+              const fallbackRole = isTaher ? "admin" : (currentStoredRole || "parents");
               storeRole(fallbackRole);
               setPortalAccess(emptyPortalAccess);
               loadPortalData(fallbackRole, session.user, null, {
@@ -47699,46 +48047,56 @@ export default function App() {
 
         if (!rawProfiles || rawProfiles.length === 0) {
           setNeedsFirstTimeRegistration(false);
-          const autoFullName =
-            currentUser.user_metadata?.full_name ||
-            currentUser.user_metadata?.name ||
-            currentUser.email?.split("@")[0] ||
-            (isKibar ? "Student" : "Child");
-          const autoStudentId =
-            currentUser.user_metadata?.student_id ||
-            currentUser.user_metadata?.its ||
-            currentUser.id;
-          const autoIts =
-            currentUser.user_metadata?.its ||
-            currentUser.user_metadata?.its_number ||
-            null;
+          if (
+            isTeacherOrStaffProfile(currentUser) ||
+            role === "teacher" ||
+            role === "kibar-teacher" ||
+            role === "admin" ||
+            role === "kibar-admin"
+          ) {
+            rawProfiles = [];
+          } else {
+            const autoFullName =
+              currentUser.user_metadata?.full_name ||
+              currentUser.user_metadata?.name ||
+              currentUser.email?.split("@")[0] ||
+              (isKibar ? "Student" : "Child");
+            const autoStudentId =
+              currentUser.user_metadata?.student_id ||
+              currentUser.user_metadata?.its ||
+              currentUser.id;
+            const autoIts =
+              currentUser.user_metadata?.its ||
+              currentUser.user_metadata?.its_number ||
+              null;
 
-          const createdProfile = {
-            id: currentUser.id,
-            user_id: currentUser.id,
-            parent_user_id: currentUser.id,
-            parent_email: currentUser.email || null,
-            name: autoFullName,
-            full_name: autoFullName,
-            arabic_name: currentUser.user_metadata?.arabic_name || null,
-            student_id: autoStudentId,
-            its: autoIts || "...",
-            whatsapp_number:
-              currentUser.user_metadata?.whatsapp_number ||
-              currentUser.user_metadata?.phone ||
-              null,
-            gender: currentUser.user_metadata?.gender || "male",
-            section: isKibar ? "kibar" : "atfal",
-            is_kibar: isKibar,
-            is_active: true,
-          };
-          rawProfiles = [createdProfile];
+            const createdProfile = {
+              id: currentUser.id,
+              user_id: currentUser.id,
+              parent_user_id: currentUser.id,
+              parent_email: currentUser.email || null,
+              name: autoFullName,
+              full_name: autoFullName,
+              arabic_name: currentUser.user_metadata?.arabic_name || null,
+              student_id: autoStudentId,
+              its: autoIts || "...",
+              whatsapp_number:
+                currentUser.user_metadata?.whatsapp_number ||
+                currentUser.user_metadata?.phone ||
+                null,
+              gender: currentUser.user_metadata?.gender || "male",
+              section: isKibar ? "kibar" : "atfal",
+              is_kibar: isKibar,
+              is_active: true,
+            };
+            rawProfiles = [createdProfile];
 
-          // Persist directly to DB table so Admin & Teachers immediately see them in assignment dropdowns
-          supabase
-            .from(targetChildTable)
-            .upsert(createdProfile, { onConflict: "student_id" })
-            .catch(() => {});
+            // Persist directly to DB table so Admin & Teachers immediately see them in assignment dropdowns
+            supabase
+              .from(targetChildTable)
+              .upsert(createdProfile, { onConflict: "student_id" })
+              .catch(() => {});
+          }
         } else {
           setNeedsFirstTimeRegistration(false);
         }
@@ -47901,7 +48259,7 @@ export default function App() {
               return pSec === "kibar" || pRole.includes("kibar") || !pSec;
             }
             if (pSec === "kibar" || pRole.includes("kibar")) return false;
-            if (pem === "tmjiger@gmail.com" || pem === "idrisbiscuit786@gmail.com" || pem === "taherrawat786@gamil.com") return false;
+            if (pem === "tmjiger@gmail.com" || pem === "idrisbiscuit786@gmail.com" || isTaherAdminUser(pem)) return false;
             return true;
           });
           const rawPortalAccess = portalAccessResponse?.data || [];
@@ -48231,7 +48589,7 @@ export default function App() {
                 .select("*")
                 .order("full_name", { ascending: true });
 
-        const [
+        let [
           profilesResponse,
           resultsResponse,
           eventsResponse,
@@ -48245,22 +48603,34 @@ export default function App() {
           supportTicketsResponse,
           parentViewsResponse,
         ] = await Promise.all([
-          profilesPromise,
+          profilesPromise.catch((err) => ({ data: [], error: err })),
           supabase
             .from(isKibarAdmin ? "kibar_weekly_results" : "weekly_results")
             .select("*")
             .order("week_date", { ascending: false })
-            .limit(10000),
+            .limit(10000)
+            .then(
+              (r) => r,
+              () => ({ data: [], error: null }),
+            ),
           supabase
             .from(isKibarAdmin ? "kibar_events" : "events")
             .select("*")
             .order("event_date", { ascending: false })
-            .limit(200),
+            .limit(200)
+            .then(
+              (r) => r,
+              () => ({ data: [], error: null }),
+            ),
           supabase
             .from(isKibarAdmin ? "kibar_schedule" : "schedule")
             .select("*")
             .order("task_time", { ascending: true })
-            .limit(5000),
+            .limit(5000)
+            .then(
+              (r) => r,
+              () => ({ data: [], error: null }),
+            ),
           supabase
             .from(
               isKibarAdmin ? "kibar_user_portal_access" : "user_portal_access",
@@ -48293,13 +48663,25 @@ export default function App() {
           supabase
             .from(isKibarAdmin ? "kibar_teacher_profiles" : "teacher_profiles")
             .select("*")
-            .order("full_name", { ascending: true }),
+            .order("full_name", { ascending: true })
+            .then(
+              (r) => r,
+              () => ({ data: [], error: null }),
+            ),
           supabase
             .from(isKibarAdmin ? "kibar_report_settings" : "report_settings")
-            .select("*"),
+            .select("*")
+            .then(
+              (r) => r,
+              () => ({ data: [], error: null }),
+            ),
           supabase
             .from(isKibarAdmin ? "kibar_jadwal_settings" : "jadwal_settings")
-            .select("*"),
+            .select("*")
+            .then(
+              (r) => r,
+              () => ({ data: [], error: null }),
+            ),
           supabase
             .from(isKibarAdmin ? "kibar_portal_issues" : "portal_issues")
             .select("*")
@@ -48355,16 +48737,22 @@ export default function App() {
 
         // Only profilesResponse is critical; optional queries failing should not block portal loading.
         if (
-          profilesResponse?.error &&
-          (!profilesResponse?.data || profilesResponse.data.length === 0)
+          !profilesResponse?.data ||
+          profilesResponse.data.length === 0
         ) {
-          console.error(
-            "Critical student profiles fetch error:",
-            profilesResponse.error,
+          console.warn(
+            "Student profiles fetch returned empty or had error:",
+            profilesResponse?.error,
           );
-          throw new Error(
-            "Unable to load student profiles. Please check database permissions.",
-          );
+          try {
+            const rawCache = localStorage.getItem("mauze_portal_cache");
+            if (rawCache) {
+              const parsed = JSON.parse(rawCache);
+              if (parsed?.schoolData?.students?.length > 0) {
+                profilesResponse = { data: parsed.schoolData.students, error: null };
+              }
+            }
+          } catch (_) {}
         }
 
         // Enrich teacher profiles with portal-access data (email + salary
@@ -48385,7 +48773,7 @@ export default function App() {
           } else {
             // Strictly Atfal teachers
             if (pSec === "kibar" || pRole.includes("kibar")) continue;
-            if (pem === "tmjiger@gmail.com" || pem === "idrisbiscuit786@gmail.com" || pem === "taherrawat786@gamil.com") continue;
+            if (pem === "tmjiger@gmail.com" || pem === "idrisbiscuit786@gmail.com" || isTaherAdminUser(pem)) continue;
             if (pName.includes("taher bhai jigar") || pName.includes("biscutwala") || pName.includes("biscuitwala") || pName.includes("taher bhai zulfaqar")) continue;
             if (pName === "demo teacher" || pName === "mauze tahfeez atfal (helpline)") continue;
           }
@@ -48427,6 +48815,7 @@ export default function App() {
         const portalAccessData = portalAccessResponse?.data || [];
         portalAccessData.forEach((pa) => {
           if (!pa) return;
+          if (isTeacherOrStaffProfile(pa, enrichedProfiles)) return;
           const r = (pa.portal_role || "").toLowerCase();
           const sec = (pa.section || "").toLowerCase();
           if (isKibarAdmin) {
@@ -48466,6 +48855,8 @@ export default function App() {
             is_kibar_student: isKibarAdmin,
             portal_role: isKibarAdmin ? "kibar-student" : "parents",
           };
+          if (isTeacherOrStaffProfile(synthProfile, enrichedProfiles)) return;
+
           rawProfilesList.push(synthProfile);
           if (paId) existingKeys.add(paId);
           if (paEmail) existingKeys.add(paEmail);
@@ -48595,23 +48986,23 @@ export default function App() {
         try {
           // Store lightweight schoolData metadata in localStorage; large result/schedule
           // datasets are already indexed and persisted in IndexedDB by Firestore.
-          localStorage.setItem(
-            "mauze_portal_cache",
-            JSON.stringify({
-              role,
-              schoolData: {
-                students: (students || []).slice(0, 100),
-                weeklyResults: [],
-                announcements: (eventsResponse.data || []).slice(0, 20),
-                schedule: [],
-                portalAccessList: (resolvedPortalAccess || []).slice(0, 100),
-                teacherProfiles: enrichedProfiles || [],
-                weeklyResultsArchive: [],
-              },
-              parentData: null,
-              _t: Date.now(),
-            }),
-          );
+            localStorage.setItem(
+              "mauze_portal_cache",
+              JSON.stringify({
+                role,
+                schoolData: {
+                  students: (students || []).slice(0, 500),
+                  weeklyResults: (resultsResponse.data || []).slice(0, 200),
+                  announcements: (eventsResponse.data || []).slice(0, 20),
+                  schedule: (scheduleResponse.data || []).slice(0, 200),
+                  portalAccessList: (resolvedPortalAccess || []).slice(0, 500),
+                  teacherProfiles: enrichedProfiles || [],
+                  weeklyResultsArchive: [],
+                },
+                parentData: null,
+                _t: Date.now(),
+              }),
+            );
         } catch (_) {}
 
         if (students.length > 0) {
@@ -48930,7 +49321,8 @@ export default function App() {
     // Strict boundary enforcement:
     const assigned = user ? getAssignedRoles(user) : [];
     const isSuperAdmin =
-      user?.email?.toLowerCase() === "mh.developer53@gmail.com";
+      user?.email?.toLowerCase() === "mh.developer53@gmail.com" ||
+      isTaherAdminUser(user);
 
     if (!isSuperAdmin) {
       if (
@@ -49029,7 +49421,9 @@ export default function App() {
       // Strict portal check: prevent logging into a portal the user is not assigned to.
       const allowed = await detectUserAllowedPortal(loggedInUser, selectedRole);
 
+      const isTaher = isTaherAdminUser(loggedInUser);
       if (
+        !isTaher &&
         allowed &&
         allowed.allowedTab &&
         allowed.allowedTab !== selectedRole
@@ -49044,8 +49438,12 @@ export default function App() {
         };
       }
 
-      let effectiveRole = allowed?.portalRole || selectedRole;
-      if (loggedInUser?.email?.toLowerCase() === "tmjiger@gmail.com") {
+      let effectiveRole = isTaher ? "admin" : (allowed?.portalRole || selectedRole);
+      const userNormEmail = loggedInUser?.email?.toLowerCase() || "";
+      if (isTaher) {
+        effectiveRole = "admin";
+        setSectionScope("atfal");
+      } else if (userNormEmail === "tmjiger@gmail.com") {
         effectiveRole = "kibar-teacher";
         setSectionScope("kibar");
       } else if (allowed?.isKibar) {
@@ -51070,14 +51468,15 @@ export default function App() {
       updatePayload.user_id = updatePayload.parent_user_id;
     }
 
-    // Editable profile fields: apply them whenever they come from the form
+    // Editable profile fields: apply them whenever they come from the form.
+    // NOTE: an empty photo_url means "no change" — never wipe the existing
+    // student photo with null just because the input was left blank.
     const editableFields = {
       full_name,
       arabic_name,
       group_name,
       juz,
       surat,
-      photo_url,
       its,
       whatsapp_number,
       gender,
@@ -51087,6 +51486,23 @@ export default function App() {
       const trimmed = typeof value === "string" ? value.trim() : "";
       updatePayload[key] = trimmed || null;
     });
+    const incomingPhoto =
+      photo_url !== undefined && photo_url !== null
+        ? String(photo_url).trim()
+        : "";
+    const preservedPhoto =
+      incomingPhoto ||
+      existingStudent?.photoUrl ||
+      existingStudent?.photo_url ||
+      existingStudent?.avatar_url ||
+      existingStudent?.photo ||
+      "";
+    if (preservedPhoto) {
+      updatePayload.photo_url = preservedPhoto;
+      updatePayload.avatar_url = preservedPhoto;
+      updatePayload.photo = preservedPhoto;
+      updatePayload.updated_at = new Date().toISOString();
+    }
 
     if (existingStudent) {
       if (!updatePayload.full_name) updatePayload.full_name = existingStudent.full_name || existingStudent.name;
@@ -51167,6 +51583,75 @@ export default function App() {
       };
     }
 
+    // Sync the student photo to every cache + mirror so it appears in all
+    // portals (admin list, teacher group, parent/child profile, leagues).
+    const finalPhoto = String(
+      updatePayload.photo_url || preservedPhoto || "",
+    ).trim();
+    if (finalPhoto) {
+      try {
+        if (!finalPhoto.startsWith("data:") || finalPhoto.length < 50000) {
+          const photoKeys = Array.from(
+            new Set(
+              [
+                student_id,
+                numericStudentId,
+                existingStudent?.student_id,
+                existingStudent?.id,
+                existingStudent?.its,
+                ...(existingStudent?.allIds || []),
+                updatePayload.its,
+                its,
+              ]
+                .filter(Boolean)
+                .map(String),
+            ),
+          );
+          photoKeys.forEach((cid) => {
+            try {
+              localStorage.setItem(`mauze_student_photo_${cid}`, finalPhoto);
+              localStorage.setItem(`mauze_photo_${cid}`, finalPhoto);
+            } catch (_) {}
+          });
+          try {
+            localStorage.setItem("activeChildPhoto", finalPhoto);
+          } catch (_) {}
+        }
+      } catch (_) {}
+      // Firestore direct mirror across candidate doc IDs (merge, never wipe).
+      try {
+        const { doc: fsDoc, setDoc: fsSetDoc } = await import("firebase/firestore");
+        const { db: fsDb } = await import("./firebase/db.js");
+        const mirrorIds = Array.from(
+          new Set(
+            [
+              student_id,
+              numericStudentId,
+              existingStudent?.student_id,
+              existingStudent?.id,
+              existingStudent?.its,
+              ...(existingStudent?.allIds || []),
+            ]
+              .filter(Boolean)
+              .map(String),
+          ),
+        );
+        for (const cid of mirrorIds) {
+          try {
+            await fsSetDoc(
+              fsDoc(fsDb, targetTable, String(cid)),
+              {
+                photo_url: finalPhoto,
+                avatar_url: finalPhoto,
+                photo: finalPhoto,
+              },
+              { merge: true },
+            );
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+
     // Push assignment notifications
     const studentName = full_name || existingStudent?.name || "Child";
 
@@ -51231,9 +51716,10 @@ export default function App() {
                   ? String(group_name || "").trim() || "Ungrouped"
                   : s.groupName,
               photoUrl:
-                photo_url !== undefined
-                  ? String(photo_url || "").trim() || ""
-                  : s.photoUrl,
+                finalPhoto || s.photoUrl || "",
+              photo_url: finalPhoto || s.photo_url || "",
+              avatar_url: finalPhoto || s.avatar_url || "",
+              photo: finalPhoto || s.photo || "",
               whatsapp_number:
                 whatsapp_number !== undefined
                   ? String(whatsapp_number || "").trim() || ""

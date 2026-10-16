@@ -2,6 +2,13 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import App from './App.jsx';
+import { initNativeAppUpdate } from './nativeAppUpdate.js';
+
+// ===== GOOGLE PLAY IN-APP UPDATES =====
+// Android only: asks Google Play (official In-App Updates API) whether a newer
+// release is available for this installation and, if so, opens Google's own
+// update flow. A no-op on web, iOS and sideloaded builds.
+initNativeAppUpdate().catch(() => {});
 
 // ===== SAFE STORAGE & QUOTA DEFENSE SYSTEM =====
 // Protect against QuotaExceededError crashes from Firestore multi-tab state or oversized caches

@@ -75,6 +75,11 @@ export default async function handler(req, res) {
     });
   }
 
+  // 3b. Return empty dispatches array if upstream daemon inactive
+  if (action === "dispatches" || pathname.endsWith("/dispatches") || action === "logs" || pathname.endsWith("/logs")) {
+    return res.status(200).json([]);
+  }
+
   // 4. Default status fallback for cloud / Vercel deployment
   return res.status(200).json({
     online: true,

@@ -1404,5 +1404,421 @@
     "isPermanent": true,
     "verifiedAt": 1791662409594,
     "expiresAt": null
+  },
+  "917023805152": {
+    "phone": "917023805152",
+    "student": {
+      "student_id": "cfd7fb59-e915-4e53-b3da-f32846e27d6f",
+      "name": "Burhanuddin bhai Shabbir bhai Jamali",
+      "arabic_name": "برهان الدين شبير بهائي جمالي",
+      "its": "40184724",
+      "phone": "+917023805152",
+      "email": "",
+      "teacher": "Zahabiyah M.Moiz bhai Rampurawala",
+      "group": "09",
+      "juz": "29",
+      "surat": "التحريم",
+      "weeklyScore": 27,
+      "marhalaRank": "2",
+      "overallRank": "5",
+      "totalJadeed": "0 صفه",
+      "fromDate": "10",
+      "tillDate": "2026-06-10",
+      "status": "Yes",
+      "wusool_page": "558",
+      "totalOutOf": 100,
+      "marhalaTotal": "14",
+      "overallTotal": "40",
+      "marhala": "Marhala Saniyah",
+      "wusoolJuz": "29",
+      "wusoolSurah": "التحريم",
+      "wusoolPage": "اية-٤",
+      "weekDate": "2026-06-10",
+      "murajazah": "12.0",
+      "juz_hali": "10.0",
+      "takhteet": "5.0",
+      "jadeed": "0.0",
+      "latestResult": {
+        "id": "1ba13d5e-5651-4c5d-a7e9-aadb32376494",
+        "student_id": "cfd7fb59-e915-4e53-b3da-f32846e27d6f",
+        "week_date": "2026-06-10",
+        "murajazah": "12.0",
+        "juz_hali": "10.0",
+        "takhteet": "5.0",
+        "jadeed": "0.0",
+        "rank": 14,
+        "total_jadeed_pages": "0",
+        "attendance_count": "4",
+        "wusool_juz": "29",
+        "wusool_page": "اية-٤",
+        "wusool_surah": "التحريم",
+        "total_score": "27.0",
+        "total_jadeed_unit": "صفه",
+        "marhalaRank": 14,
+        "marhalaTotal": 15,
+        "overall_rank": 37,
+        "overallRank": 37,
+        "overallTotal": 40,
+        "marhala": "Marhala Saniyah"
+      }
+    },
+    "verificationType": "same_number",
+    "isPermanent": true,
+    "verifiedAt": 1791780520695,
+    "expiresAt": null
+  },
+  "242425184444562": {
+    "phone": "242425184444562",
+    "student": {
+      "student_id": "cfd7fb59-e915-4e53-b3da-f32846e27d6f",
+      "name": "Burhanuddin bhai Shabbir bhai Jamali",
+      "arabic_name": "برهان الدين شبير بهائي جمالي",
+      "its": "40184724",
+      "phone": "+917023805152",
+      "email": "",
+      "teacher": "Zahabiyah M.Moiz bhai Rampurawala",
+      "group": "09",
+      "juz": "29",
+      "surat": "التحريم",
+      "weeklyScore": 27,
+      "marhalaRank": "2",
+      "overallRank": "5",
+      "totalJadeed": "0 صفه",
+      "fromDate": "10",
+      "tillDate": "2026-06-10",
+      "status": "Yes",
+      "wusool_page": "558",
+      "totalOutOf": 100,
+      "marhalaTotal": "14",
+      "overallTotal": "40",
+      "marhala": "Marhala Saniyah",
+      "wusoolJuz": "29",
+      "wusoolSurah": "التحريم",
+      "wusoolPage": "اية-٤",
+      "weekDate": "2026-06-10",
+      "murajazah": "12.0",
+      "juz_hali": "10.0",
+      "takhteet": "5.0",
+      "jadeed": "0.0",
+      "latestResult": {
+        "id": "1ba13d5e-5651-4c5d-a7e9-aadb32376494",
+        "student_id": "cfd7fb59-e915-4e53-b3da-f32846e27d6f",
+        "week_date": "2026-06-10",
+        "murajazah": "12.0",
+        "juz_hali": "10.0",
+        "takhteet": "5.0",
+        "jadeed": "0.0",
+        "rank": 14,
+        "total_jadeed_pages": "0",
+        "attendance_count": "4",
+        "wusool_juz": "29",
+        "wusool_page": "اية-٤",
+        "wusool_surah": "التحريم",
+        "total_score": "27.0",
+        "total_jadeed_unit": "صفه",
+        "marhalaRank": 14,
+        "marhalaTotal": 15,
+        "overall_rank": 37,
+        "overallRank": 37,
+        "overallTotal": 40,
+        "marhala": "Marhala Saniyah"
+      }
+    },
+    "verificationType": "same_number",
+    "isPermanent": true,
+    "verifiedAt": 1791780520713,
+    "expiresAt": null
+  },
+  "918824499840": {
+    "phone": "918824499840",
+    "student": {
+      "student_id": "7d1a633e-2123-47b4-8267-ecf262857dc3",
+      "id": "7d1a633e-2123-47b4-8267-ecf262857dc3",
+      "name": "Aliasgar Mulla Hatim bhai baravdawala",
+      "arabic_name": "علي اصغر ملا حاتم بهائي براودوالا",
+      "its": "60202336",
+      "phone": "+918824499840",
+      "whatsapp_number": "+918824499840",
+      "email": "farida.chokla@gmail.com",
+      "teacher": "Batul Ben Gheewala",
+      "teacher_id": "8e2b063e-e5bc-4586-960c-b59e1638ab90",
+      "badal_teacher_id": null,
+      "group": "10",
+      "juz": "30",
+      "surat": "الشرح",
+      "is_active": true,
+      "section": "atfal",
+      "photo_url": "https://firebasestorage.googleapis.com/v0/b/mawaid-b929a.firebasestorage.app/o/teacher_photos%2Fstudent-photos%2Fiwgrjy43ssq-1791524572461.jpg?alt=media",
+      "gem_league": {
+        "updated_at": "2026-10-10T11:46:53.994Z",
+        "photo_url": "https://medypnbcsjytbxiwenob.supabase.co/storage/v1/object/public/teacher_photos/student-photos/u8z5p4e4nq-1785236365067.jpg",
+        "year": "1448H",
+        "teacher_name": "Batul Ben Gheewala",
+        "student_name": "Aliasgar Mulla Hatim bhai baravdawala",
+        "teacher_id": "8e2b063e-e5bc-4586-960c-b59e1638ab90",
+        "student_id": "7d1a633e-2123-47b4-8267-ecf262857dc3",
+        "total_yearly_gems": 662,
+        "months": {
+          "rabi1": {
+            "weeks": {
+              "week4": {
+                "activity": 30,
+                "post_it": 28
+              },
+              "week1": {
+                "post_it": 36,
+                "activity": 35
+              },
+              "week3": {
+                "activity": 30,
+                "post_it": 30
+              },
+              "week2": {
+                "post_it": 6,
+                "activity": 7
+              }
+            },
+            "monthly_total": 202
+          },
+          "safar": {
+            "monthly_total": 190,
+            "weeks": {
+              "week2": {
+                "activity": 0,
+                "post_it": 0
+              },
+              "week3": {
+                "activity": 50,
+                "post_it": 50
+              },
+              "week1": {
+                "post_it": 0,
+                "activity": 0
+              },
+              "week4": {
+                "post_it": 45,
+                "activity": 45
+              }
+            }
+          },
+          "rabi2": {
+            "monthly_total": 270,
+            "weeks": {
+              "week4": {
+                "post_it": 35,
+                "activity": 35
+              },
+              "week1": {
+                "activity": 35,
+                "post_it": 35
+              },
+              "week3": {
+                "activity": 30,
+                "post_it": 35
+              },
+              "week2": {
+                "post_it": 30,
+                "activity": 35
+              }
+            }
+          }
+        }
+      },
+      "weeklyScore": 69,
+      "marhalaRank": "1",
+      "overallRank": "1",
+      "totalJadeed": "7 سطر",
+      "wusool_page": "",
+      "totalOutOf": 100,
+      "fromDate": "2026-09-27",
+      "tillDate": "2026-10-02",
+      "status": "Yes",
+      "marhala": "Marhala Ula",
+      "wusoolJuz": "30",
+      "wusoolSurah": "الشرح",
+      "wusoolPage": "596",
+      "marhalaTotal": "",
+      "overallTotal": "40",
+      "weekDate": "2026-10-09",
+      "murajazah": 20,
+      "juz_hali": 20,
+      "takhteet": 15,
+      "jadeed": 14,
+      "latestResult": {
+        "id": "7d1a633e-2123-47b4-8267-ecf262857dc3_2026-10-09",
+        "student_id": "7d1a633e-2123-47b4-8267-ecf262857dc3",
+        "its": "",
+        "name": "",
+        "week_date": "2026-10-09",
+        "from_date": "2026-09-27",
+        "till_date": "2026-10-02",
+        "total_score": 69,
+        "murajazah": 20,
+        "juz_hali": 20,
+        "takhteet": 15,
+        "jadeed": 14,
+        "wusool_juz": "30",
+        "wusool_surah": "الشرح",
+        "wusool_page": "596",
+        "total_jadeed_pages": "7",
+        "total_jadeed_unit": "سطر",
+        "totalJadeed": "7 سطر",
+        "rank": 1,
+        "overall_rank": 1,
+        "attendance_count": 4,
+        "attendance_note": "احسنت",
+        "updatedAt": 1791781777544
+      }
+    },
+    "verificationType": "same_number",
+    "isPermanent": true,
+    "verifiedAt": 1791805928029,
+    "expiresAt": null
+  },
+  "259068350472288": {
+    "phone": "259068350472288",
+    "student": {
+      "student_id": "7d1a633e-2123-47b4-8267-ecf262857dc3",
+      "id": "7d1a633e-2123-47b4-8267-ecf262857dc3",
+      "name": "Aliasgar Mulla Hatim bhai baravdawala",
+      "arabic_name": "علي اصغر ملا حاتم بهائي براودوالا",
+      "its": "60202336",
+      "phone": "+918824499840",
+      "whatsapp_number": "+918824499840",
+      "email": "farida.chokla@gmail.com",
+      "teacher": "Batul Ben Gheewala",
+      "teacher_id": "8e2b063e-e5bc-4586-960c-b59e1638ab90",
+      "badal_teacher_id": null,
+      "group": "10",
+      "juz": "30",
+      "surat": "الشرح",
+      "is_active": true,
+      "section": "atfal",
+      "photo_url": "https://firebasestorage.googleapis.com/v0/b/mawaid-b929a.firebasestorage.app/o/teacher_photos%2Fstudent-photos%2Fiwgrjy43ssq-1791524572461.jpg?alt=media",
+      "gem_league": {
+        "updated_at": "2026-10-10T11:46:53.994Z",
+        "photo_url": "https://medypnbcsjytbxiwenob.supabase.co/storage/v1/object/public/teacher_photos/student-photos/u8z5p4e4nq-1785236365067.jpg",
+        "year": "1448H",
+        "teacher_name": "Batul Ben Gheewala",
+        "student_name": "Aliasgar Mulla Hatim bhai baravdawala",
+        "teacher_id": "8e2b063e-e5bc-4586-960c-b59e1638ab90",
+        "student_id": "7d1a633e-2123-47b4-8267-ecf262857dc3",
+        "total_yearly_gems": 662,
+        "months": {
+          "rabi1": {
+            "weeks": {
+              "week4": {
+                "activity": 30,
+                "post_it": 28
+              },
+              "week1": {
+                "post_it": 36,
+                "activity": 35
+              },
+              "week3": {
+                "activity": 30,
+                "post_it": 30
+              },
+              "week2": {
+                "post_it": 6,
+                "activity": 7
+              }
+            },
+            "monthly_total": 202
+          },
+          "safar": {
+            "monthly_total": 190,
+            "weeks": {
+              "week2": {
+                "activity": 0,
+                "post_it": 0
+              },
+              "week3": {
+                "activity": 50,
+                "post_it": 50
+              },
+              "week1": {
+                "post_it": 0,
+                "activity": 0
+              },
+              "week4": {
+                "post_it": 45,
+                "activity": 45
+              }
+            }
+          },
+          "rabi2": {
+            "monthly_total": 270,
+            "weeks": {
+              "week4": {
+                "post_it": 35,
+                "activity": 35
+              },
+              "week1": {
+                "activity": 35,
+                "post_it": 35
+              },
+              "week3": {
+                "activity": 30,
+                "post_it": 35
+              },
+              "week2": {
+                "post_it": 30,
+                "activity": 35
+              }
+            }
+          }
+        }
+      },
+      "weeklyScore": 69,
+      "marhalaRank": "1",
+      "overallRank": "1",
+      "totalJadeed": "7 سطر",
+      "wusool_page": "",
+      "totalOutOf": 100,
+      "fromDate": "2026-09-27",
+      "tillDate": "2026-10-02",
+      "status": "Yes",
+      "marhala": "Marhala Ula",
+      "wusoolJuz": "30",
+      "wusoolSurah": "الشرح",
+      "wusoolPage": "596",
+      "marhalaTotal": "",
+      "overallTotal": "40",
+      "weekDate": "2026-10-09",
+      "murajazah": 20,
+      "juz_hali": 20,
+      "takhteet": 15,
+      "jadeed": 14,
+      "latestResult": {
+        "id": "7d1a633e-2123-47b4-8267-ecf262857dc3_2026-10-09",
+        "student_id": "7d1a633e-2123-47b4-8267-ecf262857dc3",
+        "its": "",
+        "name": "",
+        "week_date": "2026-10-09",
+        "from_date": "2026-09-27",
+        "till_date": "2026-10-02",
+        "total_score": 69,
+        "murajazah": 20,
+        "juz_hali": 20,
+        "takhteet": 15,
+        "jadeed": 14,
+        "wusool_juz": "30",
+        "wusool_surah": "الشرح",
+        "wusool_page": "596",
+        "total_jadeed_pages": "7",
+        "total_jadeed_unit": "سطر",
+        "totalJadeed": "7 سطر",
+        "rank": 1,
+        "overall_rank": 1,
+        "attendance_count": 4,
+        "attendance_note": "احسنت",
+        "updatedAt": 1791781777544
+      }
+    },
+    "verificationType": "same_number",
+    "isPermanent": true,
+    "verifiedAt": 1791805930892,
+    "expiresAt": null
   }
 }

@@ -124,8 +124,12 @@ export const BOT_CONFIG = {
 
 // State Variables
 export let sock = null;
+export function setBaileysSocket(newSock) {
+  sock = newSock;
+}
 export function setSock(s) { sock = s; }
 export let baileysStatus = 'INITIALIZING'; // 'INITIALIZING' | 'QR_READY' | 'CONNECTED' | 'DISCONNECTED'
+export function setBaileysStatus(s) { baileysStatus = s; }
 export let latestQrDataUrl = '';
 export let latestQrRaw = '';
 export let latestPairingCode = '';
@@ -741,6 +745,146 @@ export function recordParentInteraction(phone) {
 }
 
 // ---------------------------------------------------------------------------
+// Guided Chat Session Store — "Start chat" / "Close chat" per-user Bot Switch
+// ---------------------------------------------------------------------------
+// The helpline number is shared with administrators, so the bot must NEVER
+// hijack a normal (manual) conversation. It stays completely silent until the
+// user explicitly sends "Start chat"; it then sends the role-aware welcome +
+// menu and keeps serving the guided menu until the user sends "Close chat"
+// (or the chat idles out). Applies identically to teachers (staff),
+// parents/students and brand-new numbers.
+const WA_CHAT_SESSIONS_PATH = path.resolve('linked_whatsapp_chat_sessions.json');
+
+/** Idle timeout after which an open guided chat silently returns to normal chat. */
+export const CHAT_SESSION_IDLE_TIMEOUT_MS = Number(process.env.WA_CHAT_IDLE_TIMEOUT_MS) || 30 * 60 * 1000;
+
+export const chatSessionsMap = new Map(); // phone -> { phone, role, startedAt, lastActivity }
+
+export function loadChatSessions() {
+  try {
+    if (!fs.existsSync(WA_CHAT_SESSIONS_PATH)) return;
+    const data = JSON.parse(fs.readFileSync(WA_CHAT_SESSIONS_PATH, 'utf8') || '{}');
+    for (const [phone, rec] of Object.entries(data)) {
+      if (rec && typeof rec === 'object') chatSessionsMap.set(String(phone), rec);
+    }
+    if (chatSessionsMap.size) {
+      console.log(`[CHAT-GATE] 🔓 Restored ${chatSessionsMap.size} open guided chat session(s).`);
+    }
+  } catch (_) { }
+}
+loadChatSessions();
+
+export function persistChatSessions() {
+  try {
+    const out = {};
+    for (const [phone, rec] of chatSessionsMap.entries()) out[phone] = rec;
+    fs.writeFileSync(WA_CHAT_SESSIONS_PATH, JSON.stringify(out, null, 2));
+  } catch (_) { }
+}
+
+/**
+ * Lower-cases and strips punctuation so that "Start chat", "start-chat!" and
+ * "/startchat" all resolve to the same canonical trigger.
+ */
+export function normalizeChatCommand(text) {
+  return String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+export const START_CHAT_COMMANDS = [
+  'start chat', 'startchat', 'start the chat', 'chat start', 'start bot', 'bot start'
+];
+
+export const CLOSE_CHAT_COMMANDS = [
+  'close chat', 'closechat', 'close the chat', 'chat close', 'end chat', 'stop chat', 'stop bot', 'bot stop', 'close bot'
+];
+
+/** True only for the explicit "Start chat" trigger (never for a bare 'start'). */
+export function isStartChatCommand(text) {
+  return START_CHAT_COMMANDS.includes(normalizeChatCommand(text));
+}
+
+/** True only for the explicit "Close chat" trigger. */
+export function isCloseChatCommand(text) {
+  return CLOSE_CHAT_COMMANDS.includes(normalizeChatCommand(text));
+}
+
+/**
+ * Returns the currently OPEN guided chat session for a phone, or null when the
+ * bot is idle (closed / idled out), so normal chat applies.
+ */
+export function getChatSession(phone) {
+  const key = cleanPhone(phone);
+  if (!key) return null;
+  const rec = chatSessionsMap.get(key);
+  if (!rec) return null;
+  const last = Number(rec.lastActivity || rec.startedAt || 0);
+  if (!last || (Date.now() - last) > CHAT_SESSION_IDLE_TIMEOUT_MS) {
+    chatSessionsMap.delete(key);
+    persistChatSessions();
+    console.log(`[CHAT-GATE] ⏱️ Guided chat session for +${key} expired (idle). Back to normal chat.`);
+    return null;
+  }
+  return rec;
+}
+
+/** Opens (or re-opens) the guided chat session for a phone and returns its record. */
+export function openChatSession(phone, role = 'guest') {
+  const key = cleanPhone(phone);
+  if (!key) return null;
+  const now = Date.now();
+  const existing = chatSessionsMap.get(key);
+  const rec = {
+    phone: key,
+    role,
+    startedAt: existing?.startedAt || now,
+    lastActivity: now
+  };
+  chatSessionsMap.set(key, rec);
+  persistChatSessions();
+  return rec;
+}
+
+/** Refreshes the idleness timer of an already open session (no disk write). */
+export function touchChatSession(phone) {
+  const key = cleanPhone(phone);
+  if (!key) return;
+  const rec = chatSessionsMap.get(key);
+  if (rec) rec.lastActivity = Date.now();
+}
+
+/** Closes the guided chat session. Returns true when a session was actually open. */
+export function closeChatSession(phone) {
+  const key = cleanPhone(phone);
+  if (!key) return false;
+  const existed = chatSessionsMap.delete(key);
+  if (existed) persistChatSessions();
+  return existed;
+}
+
+/** Number of users currently inside a guided chat. */
+export function getOpenChatSessionCount() {
+  return chatSessionsMap.size;
+}
+
+// Housekeeping: drop idle sessions so the store never grows unbounded.
+if (!global.__waChatSessionSweeper) {
+  global.__waChatSessionSweeper = true;
+  const sweeper = setInterval(() => {
+    const now = Date.now();
+    let removed = 0;
+    for (const [key, rec] of chatSessionsMap.entries()) {
+      const last = Number(rec?.lastActivity || rec?.startedAt || 0);
+      if (!last || (now - last) > CHAT_SESSION_IDLE_TIMEOUT_MS) {
+        chatSessionsMap.delete(key);
+        removed++;
+      }
+    }
+    if (removed) persistChatSessions();
+  }, Math.max(60 * 1000, Math.min(CHAT_SESSION_IDLE_TIMEOUT_MS, 5 * 60 * 1000)));
+  if (typeof sweeper.unref === 'function') sweeper.unref();
+}
+
+// ---------------------------------------------------------------------------
 // Atfal Teacher (Staff) Profiles, Linked WhatsApp Storage & Schedules
 // ---------------------------------------------------------------------------
 const WA_TEACHERS_PATH = path.resolve('linked_whatsapp_teachers.json');
@@ -752,6 +896,80 @@ export const teacherProfilesById = new Map();
 
 export const sentDailySelfAttendanceReminders = new Set();
 export const sentDailyElearningReminders = new Set();
+
+// Persistent Teacher Scheduled Reminders (Survives bot restarts, reconnects & daemon reloads)
+const SENT_TEACHER_REMINDERS_PATH = path.resolve('sent_teacher_reminders.json');
+
+export function loadSentTeacherReminders() {
+  try {
+    if (fs.existsSync(SENT_TEACHER_REMINDERS_PATH)) {
+      const data = JSON.parse(fs.readFileSync(SENT_TEACHER_REMINDERS_PATH, 'utf8') || '{}');
+      if (Array.isArray(data.self)) {
+        for (const item of data.self) {
+          if (typeof item === 'string') sentDailySelfAttendanceReminders.add(item);
+        }
+      }
+      if (Array.isArray(data.elearning)) {
+        for (const item of data.elearning) {
+          if (typeof item === 'string') sentDailyElearningReminders.add(item);
+        }
+      }
+      console.log(`[WHATSAPP BOT] 🛡️ Loaded persistent teacher reminders: ${sentDailySelfAttendanceReminders.size} self, ${sentDailyElearningReminders.size} elearning.`);
+    }
+  } catch (err) {
+    console.warn('[WHATSAPP BOT] Could not load sent teacher reminders:', err.message);
+  }
+}
+
+export function saveSentTeacherReminders() {
+  try {
+    const data = {
+      self: Array.from(sentDailySelfAttendanceReminders),
+      elearning: Array.from(sentDailyElearningReminders),
+      updatedAt: Date.now()
+    };
+    fs.writeFileSync(SENT_TEACHER_REMINDERS_PATH, JSON.stringify(data, null, 2), 'utf8');
+  } catch (_) {}
+}
+loadSentTeacherReminders();
+
+// Persistent Attendance Notifications Deduplication (Eliminates duplicate shoots to parents)
+const SENT_ATTENDANCE_NOTIFS_PATH = path.resolve('sent_attendance_notifications.json');
+export const sentAttendanceNotificationKeys = new Map(); // key -> timestamp
+
+export function loadSentAttendanceNotifications() {
+  try {
+    if (fs.existsSync(SENT_ATTENDANCE_NOTIFS_PATH)) {
+      const data = JSON.parse(fs.readFileSync(SENT_ATTENDANCE_NOTIFS_PATH, 'utf8') || '{}');
+      const now = Date.now();
+      const oneDayMs = 24 * 60 * 60 * 1000;
+      for (const [k, ts] of Object.entries(data)) {
+        if (now - ts < oneDayMs) {
+          sentAttendanceNotificationKeys.set(k, ts);
+        }
+      }
+      console.log(`[WHATSAPP BOT] 🛡️ Loaded ${sentAttendanceNotificationKeys.size} recent attendance notification keys.`);
+    }
+  } catch (err) {
+    console.warn('[WHATSAPP BOT] Could not load sent attendance notifications:', err.message);
+  }
+}
+
+export function saveSentAttendanceNotifications() {
+  try {
+    const now = Date.now();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    const obj = {};
+    for (const [k, ts] of sentAttendanceNotificationKeys.entries()) {
+      if (now - ts < oneDayMs) {
+        obj[k] = ts;
+      }
+    }
+    fs.writeFileSync(SENT_ATTENDANCE_NOTIFS_PATH, JSON.stringify(obj, null, 2), 'utf8');
+  } catch (_) {}
+}
+loadSentAttendanceNotifications();
+
 
 /**
  * Robust RFC 4180 CSV parser supporting multiline quoted strings.
@@ -1511,6 +1729,8 @@ export async function sendTeacherElearningAttendanceReminder(teacher, targetJid,
  * 1. 4:25 PM IST -> Teacher Self-Attendance Reminder
  * 2. 10:00 PM IST -> eLearning Entry Reminder & Class Marked Attendance Summary
  */
+let isCheckingTeacherSchedules = false;
+
 export async function checkAndSendTeacherDailySchedules(options = {}) {
   const forceSchedule = options.forceSchedule || null; // 'self_attendance' | 'elearning_summary'
   const ist = getISTDateParts();
@@ -1522,84 +1742,181 @@ export async function checkAndSendTeacherDailySchedules(options = {}) {
       success: true,
       sent: 0,
       reason: 'Sunday - Teacher scheduled reminders are paused on Sundays. Regular bot responses remain fully active.',
-      currentTimeIST: `${ist.weekday} ${ist.dateDisplay} ${ist.hour}:${ist.minute}:${ist.second}`    };
+      currentTimeIST: `${ist.weekday} ${ist.dateDisplay} ${ist.hour}:${ist.minute}:${ist.second}`
+    };
   }
 
-  // Collect verified teachers to receive notifications
-  const teachersToNotify = new Map();
-
-  for (const [phoneOrLid, rec] of linkedWATeachersCache.entries()) {
-    if (!rec || !rec.teacherId) continue;
-    const profile = teacherProfilesById.get(rec.teacherId) ||
-      teacherProfilesByName.get(normalizeTeacherName(rec.teacherName)) || {
-        id: rec.teacherId,
-        name: rec.teacherName,
-        phone: rec.phone,
-        role: rec.role,
-        email: rec.teacherEmail
-      };
-    teachersToNotify.set(rec.teacherId, { teacher: profile, targetPhone: rec.phone || phoneOrLid });
+  // Concurrency lock: Prevent overlapping executions if previous interval is still sending
+  if (isCheckingTeacherSchedules && !forceSchedule) {
+    return { success: true, skipped: true, reason: 'Teacher schedule check already in progress' };
   }
 
-  // Also include any staff profile teacher with a registered phone
-  for (const t of teacherProfilesList) {
-    if (t.cleanPhone && t.cleanPhone.length >= 10 && !teachersToNotify.has(t.id)) {
-      teachersToNotify.set(t.id, { teacher: t, targetPhone: t.cleanPhone });
+  isCheckingTeacherSchedules = true;
+
+  try {
+    // Collect unique verified teachers to receive notifications:
+    // Strictly deduplicated by canonical 10-digit phone number AND normalized teacher name!
+    const teachersToNotify = [];
+    const seenPhones = new Set();
+    const seenNames = new Set();
+
+    for (const [phoneOrLid, rec] of linkedWATeachersCache.entries()) {
+      if (!rec || !rec.teacherId) continue;
+      const profile = teacherProfilesById.get(rec.teacherId) ||
+        teacherProfilesByName.get(normalizeTeacherName(rec.teacherName)) || {
+          id: rec.teacherId,
+          name: rec.teacherName,
+          phone: rec.phone,
+          role: rec.role,
+          email: rec.teacherEmail
+        };
+
+      // Resolve real mobile phone number (prefer mobile over LID to prevent duplicate LID+phone shoots)
+      let resolvedPhone = cleanPhone(rec.phone || '');
+      if ((!resolvedPhone || resolvedPhone.length < 10) && phoneOrLid) {
+        if (phoneOrLid.length > 13) {
+          const mapped = lidMappingCache.get(phoneOrLid);
+          if (mapped) resolvedPhone = cleanPhone(mapped);
+        } else {
+          resolvedPhone = cleanPhone(phoneOrLid);
+        }
+      }
+      if (!resolvedPhone && profile.cleanPhone) resolvedPhone = profile.cleanPhone;
+      if (!resolvedPhone && profile.cleanWhatsApp) resolvedPhone = profile.cleanWhatsApp;
+
+      const phone10 = resolvedPhone && resolvedPhone.length >= 10 ? resolvedPhone.slice(-10) : '';
+      const normName = normalizeTeacherName(profile.name || rec.teacherName);
+
+      if (phone10 && seenPhones.has(phone10)) continue;
+      if (normName && seenNames.has(normName)) continue;
+
+      if (phone10) seenPhones.add(phone10);
+      if (normName) seenNames.add(normName);
+
+      teachersToNotify.push({
+        teacher: profile,
+        targetPhone: resolvedPhone || phoneOrLid,
+        phone10,
+        normName
+      });
     }
-  }
 
-  if (teachersToNotify.size === 0) return { sent: 0, reason: 'No teachers found' };
+    // Also include any staff profile teacher with a registered phone not yet added
+    for (const t of teacherProfilesList) {
+      const phone = t.cleanPhone || t.cleanWhatsApp || '';
+      if (!phone || phone.length < 10) continue;
+      const phone10 = phone.slice(-10);
+      const normName = normalizeTeacherName(t.name);
 
-  let selfCount = 0;
-  let elearningCount = 0;
+      if (phone10 && seenPhones.has(phone10)) continue;
+      if (normName && seenNames.has(normName)) continue;
 
-  // 1. Check Schedule 1: 4:25 PM IST (16:25)
-  const isTimeForSelfAttendance = forceSchedule === 'self_attendance' || (isMonToSat && ist.hour === 16 && ist.minute === 25);
-  if (isTimeForSelfAttendance) {
-    for (const [tId, { teacher, targetPhone }] of teachersToNotify.entries()) {
-      const reminderKey = `${ist.dateKey}:self:${tId}`;
-      if (!forceSchedule && sentDailySelfAttendanceReminders.has(reminderKey)) continue;
+      if (phone10) seenPhones.add(phone10);
+      if (normName) seenNames.add(normName);
 
-      const jid = formatTargetJid(targetPhone);
-      if (jid && sock && baileysStatus === 'CONNECTED') {
-        try {
-          await sendTeacherSelfAttendanceReminder(teacher, jid, targetPhone);
-          sentDailySelfAttendanceReminders.add(reminderKey);
-          selfCount++;
-          console.log(`[TEACHER-CRON] ⏱ Sent 4:25 PM Self-Attendance reminder to ${teacher.name} (${jid})`);
-        } catch (err) {
-          console.warn(`[TEACHER-CRON-ERR] Failed to send 4:25 PM reminder to ${jid}:`, err.message);
+      teachersToNotify.push({
+        teacher: t,
+        targetPhone: phone,
+        phone10,
+        normName
+      });
+    }
+
+    if (teachersToNotify.length === 0) return { sent: 0, reason: 'No teachers found' };
+
+    let selfCount = 0;
+    let elearningCount = 0;
+
+    // 1. Check Schedule 1: 4:25 PM IST (16:25)
+    const isTimeForSelfAttendance = forceSchedule === 'self_attendance' || (isMonToSat && ist.hour === 16 && ist.minute === 25);
+    if (isTimeForSelfAttendance) {
+      for (const item of teachersToNotify) {
+        const { teacher, targetPhone, phone10, normName } = item;
+        const phoneKey = phone10 ? `${ist.dateKey}:self:phone:${phone10}` : null;
+        const nameKey = normName ? `${ist.dateKey}:self:teacher:${normName}` : null;
+        const idKey = teacher.id ? `${ist.dateKey}:self:${teacher.id}` : null;
+
+        if (!forceSchedule) {
+          if (
+            (phoneKey && sentDailySelfAttendanceReminders.has(phoneKey)) ||
+            (nameKey && sentDailySelfAttendanceReminders.has(nameKey)) ||
+            (idKey && sentDailySelfAttendanceReminders.has(idKey))
+          ) {
+            continue;
+          }
+        }
+
+        // Claim keys immediately before awaiting to prevent race conditions from concurrent cron ticks!
+        if (phoneKey) sentDailySelfAttendanceReminders.add(phoneKey);
+        if (nameKey) sentDailySelfAttendanceReminders.add(nameKey);
+        if (idKey) sentDailySelfAttendanceReminders.add(idKey);
+        saveSentTeacherReminders();
+
+        const jid = formatTargetJid(targetPhone);
+        if (jid && sock && baileysStatus === 'CONNECTED') {
+          try {
+            await sendTeacherSelfAttendanceReminder(teacher, jid, targetPhone);
+            selfCount++;
+            console.log(`[TEACHER-CRON] ⏱ Sent 4:25 PM Self-Attendance reminder to ${teacher.name} (${jid})`);
+          } catch (err) {
+            console.warn(`[TEACHER-CRON-ERR] Failed to send 4:25 PM reminder to ${jid}:`, err.message);
+          }
         }
       }
     }
-  }
 
-  // 2. Check Schedule 2: 10:00 PM IST (22:00)
-  const isTimeForElearning = forceSchedule === 'elearning_summary' || (isMonToSat && ist.hour === 22 && (ist.minute === 0 || ist.minute === 1));
-  if (isTimeForElearning) {
-    for (const [tId, { teacher, targetPhone }] of teachersToNotify.entries()) {
-      const reminderKey = `${ist.dateKey}:elearning:${tId}`;
-      if (!forceSchedule && sentDailyElearningReminders.has(reminderKey)) continue;
+    // 2. Check Schedule 2: 10:00 PM IST (22:00)
+    const isTimeForElearning = forceSchedule === 'elearning_summary' || (isMonToSat && ist.hour === 22 && (ist.minute === 0 || ist.minute === 1));
+    if (isTimeForElearning) {
+      // Pre-sync attendance once for all teachers so each individual call doesn't re-query Firestore over network!
+      try {
+        await syncTodayAttendanceFromFirestore();
+      } catch (_) {}
 
-      const jid = formatTargetJid(targetPhone);
-      if (jid && sock && baileysStatus === 'CONNECTED') {
-        try {
-          await sendTeacherElearningAttendanceReminder(teacher, jid, targetPhone);
-          sentDailyElearningReminders.add(reminderKey);
-          elearningCount++;
-          console.log(`[TEACHER-CRON] 🌙 Sent 10:00 PM eLearning & attendance summary to ${teacher.name} (${jid})`);
-        } catch (err) {
-          console.warn(`[TEACHER-CRON-ERR] Failed to send 10:00 PM summary to ${jid}:`, err.message);
+      for (const item of teachersToNotify) {
+        const { teacher, targetPhone, phone10, normName } = item;
+        const phoneKey = phone10 ? `${ist.dateKey}:elearning:phone:${phone10}` : null;
+        const nameKey = normName ? `${ist.dateKey}:elearning:teacher:${normName}` : null;
+        const idKey = teacher.id ? `${ist.dateKey}:elearning:${teacher.id}` : null;
+
+        if (!forceSchedule) {
+          if (
+            (phoneKey && sentDailyElearningReminders.has(phoneKey)) ||
+            (nameKey && sentDailyElearningReminders.has(nameKey)) ||
+            (idKey && sentDailyElearningReminders.has(idKey))
+          ) {
+            continue;
+          }
+        }
+
+        // Claim keys immediately before awaiting to prevent race conditions from concurrent cron ticks!
+        if (phoneKey) sentDailyElearningReminders.add(phoneKey);
+        if (nameKey) sentDailyElearningReminders.add(nameKey);
+        if (idKey) sentDailyElearningReminders.add(idKey);
+        saveSentTeacherReminders();
+
+        const jid = formatTargetJid(targetPhone);
+        if (jid && sock && baileysStatus === 'CONNECTED') {
+          try {
+            await sendTeacherElearningAttendanceReminder(teacher, jid, targetPhone);
+            elearningCount++;
+            console.log(`[TEACHER-CRON] 🌙 Sent 10:00 PM eLearning & attendance summary to ${teacher.name} (${jid})`);
+          } catch (err) {
+            console.warn(`[TEACHER-CRON-ERR] Failed to send 10:00 PM summary to ${jid}:`, err.message);
+          }
         }
       }
     }
-  }
 
-  return {
-    success: true,
-    selfAttendanceSent: selfCount,
-    elearningSent: elearningCount,
-    currentTimeIST: `${ist.weekday} ${ist.dateDisplay} ${ist.hour}:${ist.minute}:${ist.second}`  };
+    return {
+      success: true,
+      selfAttendanceSent: selfCount,
+      elearningSent: elearningCount,
+      currentTimeIST: `${ist.weekday} ${ist.dateDisplay} ${ist.hour}:${ist.minute}:${ist.second}`
+    };
+  } finally {
+    isCheckingTeacherSchedules = false;
+  }
 }
 
 /**
@@ -3101,21 +3418,8 @@ export async function fetchLiveSheetResult(student) {
  * Robust message sender that handles both standard phone JIDs and private @lid JIDs
  * with automatic phone JID prioritization so mobile WhatsApp clients reliably render the messages.
  */
-export async function sendWhatsAppMessage(targetJid, content, senderPhone = '') {
+export async function sendWhatsAppMessage(targetJid, content, senderPhone = '', options = {}) {
   if (!sock) return null;
-
-  // Deduplicate rapid identical outbound messages to prevent double-shot bugs
-  const textBody = content?.text || content?.caption || '';
-  if (textBody) {
-    const sig = `${targetJid}:${textBody.trim().substring(0, 80)}`;
-    if (isDuplicateOutboundMsg(sig, 3000)) {
-      console.log(`[WHATSAPP-SEND-SKIPPED] 🛡️ Skipped duplicate message dispatch to ${targetJid}`);
-      return { duplicate_skipped: true };
-    }
-  }
-
-  // Always use clean text payload (strip buttons array if any to prevent Baileys button rejection)
-  const sendPayload = (content && content.buttons && content.text) ? { text: content.text } : content;
 
   // Resolve direct phone number to guarantee delivery to mobile chat
   let resolvedPhone = cleanPhone(senderPhone);
@@ -3123,11 +3427,27 @@ export async function sendWhatsAppMessage(targetJid, content, senderPhone = '') 
     const lidDigits = targetJid.replace(/@.*$/, '').replace(/\D/g, '');
     resolvedPhone = lidMappingCache.get(lidDigits) ||
       (linkedWASubscribersCache.get(lidDigits)?.student?.phone ? cleanPhone(linkedWASubscribersCache.get(lidDigits).student.phone) : '') ||
-      (linkedWASubscribersCache.get(lidDigits)?.phone ? cleanPhone(linkedWASubscribersCache.get(lidDigits).phone) : '');
+      (linkedWASubscribersCache.get(lidDigits)?.student?.whatsappNumber ? cleanPhone(linkedWASubscribersCache.get(lidDigits).student.whatsappNumber) : '') ||
+      (linkedWASubscribersCache.get(lidDigits)?.phone && linkedWASubscribersCache.get(lidDigits).phone.length <= 13 ? cleanPhone(linkedWASubscribersCache.get(lidDigits).phone) : '');
   }
   if (!resolvedPhone && targetJid && targetJid.includes('@s.whatsapp.net')) {
     resolvedPhone = cleanPhone(targetJid.replace(/@.*$/, ''));
   }
+
+  // Deduplicate rapid identical outbound messages to prevent double-shot bugs.
+  // User-triggered session messages ("Start chat" / "Close chat") may pass options.bypassDedup
+  const textBody = content?.text || content?.caption || '';
+  if (textBody && !options.bypassDedup) {
+    const canonicalTarget = resolvedPhone && resolvedPhone.length >= 10 ? resolvedPhone.slice(-10) : targetJid;
+    const sig = `${canonicalTarget}:${textBody.trim().substring(0, 80)}`;
+    if (isDuplicateOutboundMsg(sig, 15000)) {
+      console.log(`[WHATSAPP-SEND-SKIPPED] 🛡️ Suppressed duplicate message dispatch to ${canonicalTarget} (sent < 15s ago)`);
+      return { duplicate_skipped: true };
+    }
+  }
+
+  // Always use clean text payload (strip buttons array if any to prevent Baileys button rejection)
+  const sendPayload = (content && content.buttons && content.text) ? { text: content.text } : content;
 
   const targets = [];
   if (resolvedPhone && resolvedPhone.length >= 10 && resolvedPhone.length <= 13) {
@@ -3135,7 +3455,10 @@ export async function sendWhatsAppMessage(targetJid, content, senderPhone = '') 
     targets.push(phoneJid);
   }
   if (targetJid && !targets.includes(targetJid)) {
-    targets.push(targetJid);
+    // Only fallback to LID if no direct phone JID is available!
+    if (!targets.length) {
+      targets.push(targetJid);
+    }
   }
 
   let finalResult = null;
@@ -3411,8 +3734,10 @@ export function formatTeacherVerifiedWelcomeMenu(teacher, allocatedStudents = []
     `*Commands:*\n` +
     `1️⃣ *1* — Students List 📋\n` +
     `2️⃣ *2* — Today's Hazri Summary 📊\n` +
-    `3️⃣ *3* — Results & Scores 🏆\n` +
-    `4️⃣ *4* — Helpline 📞\n\n` +
+    `3️⃣ *3* — Weekly & Monthly Attendance History 📅\n` +
+    `4️⃣ *4* — Results & Scores 🏆\n` +
+    `5️⃣ *5* — Self-Attendance Punch ⏰\n` +
+    `6️⃣ *6* — Helpline 📞\n\n` +
     `💡 Or reply: \`result ${sampleName}\`, \`attendance ${sampleName}\`, \`jadwal ${sampleName}\`\n\n` +
     `🌐 *Portal:* https://mouze-tahfeez-atfal.vercel.app/\n\n` +
     `Shukran.\n\n` +
@@ -3431,8 +3756,10 @@ export function formatTeacherDashboardMenu(teacher, studentCount, sampleStudent 
     `*Commands:*\n` +
     `1️⃣ *1* — Students List 📋\n` +
     `2️⃣ *2* — Today's Hazri Summary 📊\n` +
-    `3️⃣ *3* — Results & Scores 🏆\n` +
-    `4️⃣ *4* — Helpline 📞\n\n` +
+    `3️⃣ *3* — Weekly & Monthly Attendance History 📅\n` +
+    `4️⃣ *4* — Results & Scores 🏆\n` +
+    `5️⃣ *5* — Self-Attendance Punch ⏰\n` +
+    `6️⃣ *6* — Helpline 📞\n\n` +
     `💡 Or reply: \`result ${sampleName}\`, \`attendance ${sampleName}\`, \`jadwal ${sampleName}\`\n\n` +
     `🌐 *Portal:* https://mouze-tahfeez-atfal.vercel.app/\n\n` +
     `Shukran.\n\n` +
@@ -3502,6 +3829,114 @@ export function findTargetStudentInTeacherQuery(rawText, students) {
   }
 
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Guided Chat Identity Resolution & Start / Close Message Builders
+// ---------------------------------------------------------------------------
+
+/**
+ * Identifies who is talking to the bot so the "Start chat" welcome can be
+ * tailored for teachers (staff), parents/students, or a brand-new number.
+ */
+export function resolveGuidedChatIdentity(senderPhone, rawJidId = '') {
+  const phone = cleanPhone(senderPhone);
+  const lid = rawJidId && String(rawJidId) !== phone ? String(rawJidId) : '';
+
+  // 1. Teacher / staff (linked profile, or auto-verifiable via staff profile phone)
+  const teacherRec = getLinkedTeacherRecord(phone) || (lid ? getLinkedTeacherRecord(lid) : null);
+  const teacher = (teacherRec && teacherRec.teacher) || verifyTeacherByPhone(phone) || (lid ? verifyTeacherByPhone(lid) : null);
+  if (teacher) {
+    const allocatedStudents = findTeacherAllocatedStudents(teacher) || [];
+    return { role: 'teacher', teacher, allocatedStudents, student: null };
+  }
+
+  // 2. Linked parent / student subscriber, or roster phone auto-match
+  let student = null;
+  const subRec = getLinkedSubscriberRecord(phone) || (lid ? getLinkedSubscriberRecord(lid) : null);
+  if (subRec && !subRec.expired && subRec.student) student = subRec.student;
+  if (!student) {
+    student = lookupStudentInRoster({ phone: phone }) || (lid ? lookupStudentInRoster({ phone: lid }) : null);
+  }
+  if (student) {
+    return { role: 'parent', teacher: null, allocatedStudents: [], student };
+  }
+
+  // 3. Brand-new / unregistered number
+  return { role: 'guest', teacher: null, allocatedStudents: [], student: null };
+}
+
+/** Shared footer explaining how to end a guided chat. */
+const GUIDED_CHAT_FOOTER =
+  '\n━━━━━━━━━━━━━━━━━━━━━\n' +
+  'ℹ️ Type *Close chat* anytime to switch the assistant OFF and return to normal chat.\n' +
+  `📞 *Helpline:* ${BOT_CONFIG.HELPLINE_NUMBER}\n` +
+  '*Mauze Tahfeez - Galiakot*';
+
+/**
+ * Builds the "Start chat" welcome + menu message for the detected role.
+ */
+export function formatGuidedChatWelcome(identity = {}) {
+  const { role, teacher, allocatedStudents = [], student } = identity;
+
+  const header =
+    '🤖 *Mauze Tahfeez Assistant* — Chat Started\n' +
+    '━━━━━━━━━━━━━━━━━━━━━\n' +
+    'Salam Jameel,\n';
+
+  // A. Teacher / staff
+  if (role === 'teacher' && teacher) {
+    return header +
+      `Respected Ustad *${teacher.name || 'Janab'}*,\n` +
+      '✅ The assistant is now *ACTIVE* for this chat.' +
+      formatTeacherVerifiedWelcomeMenu(teacher, allocatedStudents) +
+      GUIDED_CHAT_FOOTER;
+  }
+
+  // B. Linked parent / student
+  if (role === 'parent' && student) {
+    return header +
+      'Respected Parent,\n' +
+      '✅ The assistant is now *ACTIVE* for this chat.\n\n' +
+      `👤 Student: *${student.name || 'Student'}* (\`${student.its || 'Verified'}\`)\n\n` +
+      '*Options:*\n' +
+      '1️⃣ *1* — Weekly Result Card 📊\n' +
+      '2️⃣ *2* — Today\'s Attendance 📋\n' +
+      '3️⃣ *3* — Leave Application & Status 📝\n' +
+      '4️⃣ *4* — Atfal Gem League Points 💎\n' +
+      '5️⃣ *5* — Helpline 📞\n\n' +
+      `🌐 *Portal:* ${BOT_CONFIG.PORTAL_URL}\n` +
+      GUIDED_CHAT_FOOTER;
+  }
+
+  // C. Brand-new / unregistered number
+  return header +
+    'Welcome to *Mauze Tahfeez Galiakot*.\n' +
+    '✅ The assistant is now *ACTIVE* for this chat.\n\n' +
+    '*Here is how to use this chat:*\n' +
+    "1️⃣ *Parents:* reply with your child's *8-digit ITS number* to connect updates, or\n" +
+    '👉 `/verify [Contact], [Name], [ITS]`\n' +
+    '2️⃣ *Ustad / Staff:* reply `/teacher [Full Name], [Email]` to link your staff profile.\n' +
+    '3️⃣ *New Admission (1447-48H):*\n' +
+    '👉 https://mouze-tahfeez-atfal.vercel.app/admission\n\n' +
+    `🌐 *Portal:* ${BOT_CONFIG.PORTAL_URL}\n` +
+    GUIDED_CHAT_FOOTER;
+}
+
+/**
+ * Builds the "Close chat" confirmation. After this the bot stays silent and
+ * normal (manual) chat applies until the user types "Start chat" again.
+ */
+export function formatGuidedChatClosed(wasOpen = true) {
+  return '🔒 *Chat Closed*\n' +
+    '━━━━━━━━━━━━━━━━━━━━━\n' +
+    (wasOpen
+      ? 'The assistant has been switched *OFF* for this chat.\n'
+      : 'The assistant was already switched *OFF* for this chat.\n') +
+    'You are now in *normal chat* — our team will reply to you here personally.\n\n' +
+    '👉 Type *Start chat* anytime to switch the assistant back ON.\n\n' +
+    `📞 *Helpline:* ${BOT_CONFIG.HELPLINE_NUMBER}\n` +
+    '*Mauze Tahfeez - Galiakot*';
 }
 
 // ---------------------------------------------------------------------------
@@ -3578,19 +4013,73 @@ export async function handleIncomingWhatsAppMessage(msg) {
 
   console.log(`[WHATSAPP-INBOUND] 💬 From +${senderPhone} (LID: ${rawJidId}): "${rawText}"`);
 
-  // Instant visual feedback: show "typing..." on WhatsApp immediately
-  try {
-    sock.sendPresenceUpdate('composing', remoteJid).catch(() => {});
-  } catch (_) {}
+  // NOTE: no "typing..." presence and no anti-spam reply here on purpose.
+  // While the guided chat is closed the bot must not react in ANY way, so both
+  // signals are raised further down, only once the bot is actually allowed to
+  // answer this user (inside the gate below).
+  const cleanCmd = rawText.toLowerCase().trim();
 
-  // Rate Limiting & Anti-Spam Check
+  // =========================================================================
+  // GUIDED CHAT SESSION GATE — "Start chat" / "Close chat"
+  // =========================================================================
+  // 1. "Start chat"  -> switch the bot ON for this user: welcome + menu, then
+  //                     the guided menu conversation continues as normal.
+  // 2. "Close chat"  -> switch the bot OFF for this user: normal (manual) chat
+  //                     applies and the bot ignores further messages.
+  // 3. Anything else while the bot is OFF is silently ignored (normal chat).
+  // Identical for teachers (staff), parents/students and brand-new numbers.
+  if (isStartChatCommand(rawText)) {
+    // Anti-spam still protects the bot mode, but a throttled trigger is dropped
+    // SILENTLY - the bot must never speak to a user whose chat is closed.
+    const startSafety = checkSafetyLimit(senderPhone);
+    if (!startSafety.allowed) {
+      console.log(`[CHAT-GATE] ⏳ Start trigger from +${senderPhone} throttled by anti-spam. Ignored silently (no reply while closed).`);
+      return;
+    }
+    const identity = resolveGuidedChatIdentity(senderPhone, rawJidId);
+    openChatSession(senderPhone, identity.role);
+    if (rawJidId && rawJidId !== senderPhone) openChatSession(rawJidId, identity.role);
+    try { sock.sendPresenceUpdate('composing', remoteJid).catch(() => {}); } catch (_) {}
+    await sendWhatsAppMessage(remoteJid, { text: formatGuidedChatWelcome(identity) }, senderPhone, { bypassDedup: true });
+    console.log(`[CHAT-GATE] ▶️ Guided chat STARTED for +${senderPhone} (role: ${identity.role}). Welcome + menu sent.`);
+    return;
+  }
+
+  if (isCloseChatCommand(rawText)) {
+    // Closing is the safe action, so it is ALWAYS honoured - never throttled.
+    let wasOpen = closeChatSession(senderPhone);
+    if (rawJidId && rawJidId !== senderPhone) {
+      wasOpen = closeChatSession(rawJidId) || wasOpen;
+    }
+    try { sock.sendPresenceUpdate('composing', remoteJid).catch(() => {}); } catch (_) {}
+    await sendWhatsAppMessage(remoteJid, { text: formatGuidedChatClosed(wasOpen) }, senderPhone, { bypassDedup: true });
+    console.log(`[CHAT-GATE] ⏹️ Guided chat CLOSED for +${senderPhone} (was open: ${wasOpen}). Normal chat applies.`);
+    return;
+  }
+
+  // Bot is OFF for this user -> stay silent so normal/manual chat can proceed.
+  // Greetings (hi / salam / hello) are dropped here BEFORE the anti-spam budget
+  // is touched, so chatter in normal chat can never block a later "Start chat".
+  const hasOpenSession = Boolean(getChatSession(senderPhone)) || Boolean(rawJidId && rawJidId !== senderPhone && getChatSession(rawJidId));
+  if (!hasOpenSession) {
+    console.log(`[CHAT-GATE] 🔇 +${senderPhone} sent "${rawText}" while the bot is OFF. Normal chat mode (silent pass-through). Type "Start chat" to activate the bot.`);
+    return;
+  }
+
+  // Rate Limiting & Anti-Spam Check - only ever applies INSIDE an open guided
+  // chat, the one place where the bot is allowed to answer.
   const safety = checkSafetyLimit(senderPhone);
   if (!safety.allowed) {
+    try { sock.sendPresenceUpdate('composing', remoteJid).catch(() => {}); } catch (_) {}
     await sendWhatsAppMessage(remoteJid, { text: safety.reason }, senderPhone);
     return;
   }
 
-  const cleanCmd = rawText.toLowerCase().trim();
+  // Guided chat is open -> instant "typing..." feedback, keep alive, and
+  // continue to the command router.
+  try { sock.sendPresenceUpdate('composing', remoteJid).catch(() => {}); } catch (_) {}
+  touchChatSession(senderPhone);
+  if (rawJidId && rawJidId !== senderPhone) touchChatSession(rawJidId);
 
   // =========================================================================
   // ATFAL TEACHER (STAFF) BOT ROUTING & VERIFICATION ENGINE
@@ -4629,6 +5118,38 @@ export async function dispatchStudentNotification(payload) {
     const attDate = details?.date || details?.attendance_date || new Date().toLocaleDateString('en-GB');
     const statusEmoji = attStatus === 'Absent' ? '❌' : (attStatus === 'Present' ? '✅' : '📝');
 
+    // Bulletproof Deduplication: Prevent duplicate shoots from concurrent triggers
+    // (e.g. Frontend POST /api/notify-student-update AND Firestore realtime listener)
+    const cleanId = String(targetStudentId || targetIts || targetName).trim().toLowerCase();
+    const phone10 = targetPhone && targetPhone.length >= 10 ? targetPhone.slice(-10) : '';
+
+    const dedupeKeys = [
+      cleanId ? `att:${cleanId}:${attDate}:${attStatus}` : null,
+      targetIts ? `att:its:${targetIts}:${attDate}:${attStatus}` : null,
+      phone10 ? `att:phone:${phone10}:${attDate}:${attStatus}` : null
+    ].filter(Boolean);
+
+    const now = Date.now();
+    let alreadyDispatched = false;
+    for (const k of dedupeKeys) {
+      const lastTs = sentAttendanceNotificationKeys.get(k) || 0;
+      if (now - lastTs < 15 * 60 * 1000) {
+        alreadyDispatched = true;
+        break;
+      }
+    }
+
+    if (alreadyDispatched) {
+      console.log(`[ATTENDANCE-DEDUP] 🛡️ Suppressed duplicate attendance notification for ${studentDisplayName} (${attDate} - ${attStatus}). Already dispatched.`);
+      return { success: true, delivered: 0, suppressed: true, deduplicated: true };
+    }
+
+    // Claim keys immediately before any network work!
+    for (const k of dedupeKeys) {
+      sentAttendanceNotificationKeys.set(k, now);
+    }
+    saveSentAttendanceNotifications();
+
     const record = {
       status: attStatus,
       statusEmoji,
@@ -4652,11 +5173,12 @@ export async function dispatchStudentNotification(payload) {
       `📌 Today: *${statusEmoji} ${attStatus}*\n\n` +
       `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
       `💬 *Type 1 (Result Card) • 3 (Leave Status) • 4 (League Points)*`;
-  } else if (type === 'weekly_result_live' || type === 'mark_progress') {
-    const score = details?.total_score ?? '—';
-    const wusool = details?.wusool_juz ? `Juz ${details.wusool_juz}` : '—';
+  } else if (type === 'weekly_result_live' || type === 'mark_progress' || type === 'result_progress' || type === 'result' || type === 'result_live') {
+    const rawScore = details?.total_score !== undefined ? details.total_score : (details?.weeklyScore !== undefined ? details.weeklyScore : (details?.score ?? '—'));
+    const score = rawScore;
+    const wusool = details?.wusool_juz ? `Juz ${details.wusool_juz}` : (details?.juz ? `Juz ${details.juz}` : '—');
     const teacherName = details?.teacher_name ? ` by *${details.teacher_name}*` : '';
-    const dateStr = details?.date || new Date().toLocaleDateString('en-GB');
+    const dateStr = details?.date || details?.week_date || details?.weekDate || new Date().toLocaleDateString('en-GB');
 
     messageText = `\n` +
       `🏆 *Weekly Result Live Update*\n\n` +
@@ -4740,14 +5262,65 @@ export async function dispatchStudentNotification(payload) {
       `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League)*`;
   }
 
+  // Canonical recipient resolution:
+  // Map LIDs to direct phone @s.whatsapp.net when known to prevent double-shotting (LID + Phone) to the same parent!
+  const uniqueRecipients = new Map();
+
+  for (const rawRecipient of targetRecipients) {
+    const rawStr = String(rawRecipient || '').trim();
+    if (!rawStr) continue;
+
+    const rawDigits = rawStr.replace(/\D/g, '');
+    let resolvedPhone = '';
+    let isLid = false;
+
+    if (rawDigits.length > 13) {
+      isLid = true;
+      const subRec = linkedWASubscribersCache.get(rawDigits);
+      const mappedPhone = lidMappingCache.get(rawDigits) ||
+        (subRec?.student?.phone ? cleanPhone(subRec.student.phone) : '') ||
+        (subRec?.student?.whatsappNumber ? cleanPhone(subRec.student.whatsappNumber) : '') ||
+        (subRec?.student?.whatsapp_number ? cleanPhone(subRec.student.whatsapp_number) : '') ||
+        (subRec?.phone && subRec.phone.length <= 13 ? cleanPhone(subRec.phone) : '');
+      if (mappedPhone && mappedPhone.length >= 10 && mappedPhone.length <= 13) {
+        resolvedPhone = cleanPhone(mappedPhone);
+      }
+    } else {
+      resolvedPhone = cleanPhone(rawDigits);
+    }
+
+    let finalJid = '';
+    let canonicalKey = '';
+
+    if (resolvedPhone && resolvedPhone.length >= 10) {
+      finalJid = `${resolvedPhone}@s.whatsapp.net`;
+      canonicalKey = `phone:${resolvedPhone.slice(-10)}`;
+    } else if (isLid) {
+      finalJid = `${rawDigits}@lid`;
+      canonicalKey = `lid:${rawDigits}`;
+    }
+
+    if (finalJid && canonicalKey) {
+      const phoneKey = resolvedPhone && resolvedPhone.length >= 10 ? `phone:${resolvedPhone.slice(-10)}` : null;
+      // If we already have a direct phone JID for this user, NEVER add the LID duplicate!
+      if (isLid && phoneKey && uniqueRecipients.has(phoneKey)) {
+        continue;
+      }
+      uniqueRecipients.set(canonicalKey, {
+        jid: finalJid,
+        phone: resolvedPhone || rawDigits,
+        isLid
+      });
+    }
+  }
+
   let delivered = 0;
   if (sock && baileysStatus === 'CONNECTED') {
-    for (const recipient of targetRecipients) {
-      const jid = formatTargetJid(recipient);
+    for (const [recKey, { jid, phone }] of uniqueRecipients.entries()) {
       if (!jid) continue;
 
       // Check if this recipient is a verified teacher/staff or a parent
-      const cleanRecPhone = cleanPhone(recipient);
+      const cleanRecPhone = cleanPhone(phone);
       const isTeacher = Boolean(getLinkedTeacherRecord(cleanRecPhone) || verifyTeacherByPhone(cleanRecPhone));
 
       let finalMsg = messageText;
@@ -4801,7 +5374,7 @@ export async function dispatchStudentNotification(payload) {
       }
 
       try {
-        await sock.sendMessage(jid, { text: finalMsg });
+        await sendWhatsAppMessage(jid, { text: finalMsg }, phone);
         delivered++;
         console.log(`[WHATSAPP-PUSH] 🚀 Sent live ${type} update to ${jid} (${isTeacher ? 'TEACHER' : 'PARENT'}) for ${studentDisplayName}`);
       } catch (err) {
@@ -4813,8 +5386,8 @@ export async function dispatchStudentNotification(payload) {
   return {
     success: true,
     delivered,
-    totalTargets: targetRecipients.size,
-    recipients: Array.from(targetRecipients)
+    totalTargets: uniqueRecipients.size,
+    recipients: Array.from(uniqueRecipients.values()).map(r => r.jid)
   };
 }
 
@@ -4993,7 +5566,7 @@ export function initFirestoreRealtimeListeners() {
           // Seed initial snapshot attendance docs so past attendance is NEVER spammed on startup/reconnect!
           snapshot.forEach((doc) => {
             const data = doc.data();
-            const eventKey = `${colName}:${doc.id}:${data.status}:${data.attendance_date}:${data.updated_at || data.marked_at}`;
+            const eventKey = `${colName}:${doc.id}:${data.status}:${data.attendance_date}`;
             processedFirestoreEvents.add(eventKey);
           });
           console.log(`[FIRESTORE-LISTENER] 📋 Initial snapshot seeded ${snapshot.size} records for ${colName} (Spam-proof).`);
@@ -5004,7 +5577,7 @@ export function initFirestoreRealtimeListeners() {
           if (change.type === 'added' || change.type === 'modified') {
             const doc = change.doc;
             const data = doc.data();
-            const eventKey = `${colName}:${doc.id}:${data.status}:${data.attendance_date}:${data.updated_at || data.marked_at}`;
+            const eventKey = `${colName}:${doc.id}:${data.status}:${data.attendance_date}`;
             if (processedFirestoreEvents.has(eventKey)) return;
             processedFirestoreEvents.add(eventKey);
 
@@ -6038,325 +6611,16 @@ export function startWhatsAppBotEngine() {
     }
 
     // 11. Push Real-Time Student Update to Parents WhatsApp (POST /api/notify-student-update)
+    // Directly delegates to unified dispatchStudentNotification for instant deduplication & canonical recipient resolution
     if (pathname === '/api/notify-student-update' && req.method === 'POST') {
       let body = '';
       req.on('data', (chunk) => { body += chunk; });
       req.on('end', async () => {
         try {
           const payload = JSON.parse(body || '{}');
-          const { type, student, details, studentId, phone, its, name } = payload;
-          let targetPhone = cleanPhone(phone || student?.phone || student?.whatsapp_number || details?.phone || '');
-          let targetIts = String(its || student?.its || student?.its_id || details?.its || details?.its_id || '').trim();
-          let targetName = String(name || student?.name || student?.student_name || details?.student_name || details?.studentName || '').trim();
-          let targetStudentId = String(studentId || student?.student_id || student?.id || details?.studentId || details?.student_id || '').trim();
-
-          // Auto-enrich student details from roster if any identifier is provided
-          const matchedRosterStudent = embeddedRoster.find(s => {
-            const sPhone = cleanPhone(s.phone || s.whatsappNumber || s.whatsapp_number);
-            const sIts = String(s.its || '').trim();
-            const sId = String(s.student_id || s.id || '').trim();
-            const sName = String(s.name || '').trim().toLowerCase();
-            return (
-              (targetStudentId && (sId === targetStudentId || s.id === targetStudentId)) ||
-              (targetIts && sIts === targetIts) ||
-              (targetPhone && sPhone && (sPhone === targetPhone || sPhone.slice(-10) === targetPhone.slice(-10))) ||
-              (!targetIts && !targetPhone && !targetStudentId && targetName && sName === targetName.toLowerCase())
-            );
-          });
-
-          if (matchedRosterStudent) {
-            if (!targetName) targetName = matchedRosterStudent.name;
-            if (!targetIts && matchedRosterStudent.its) targetIts = String(matchedRosterStudent.its);
-            if (!targetStudentId && (matchedRosterStudent.student_id || matchedRosterStudent.id)) {
-              targetStudentId = String(matchedRosterStudent.student_id || matchedRosterStudent.id);
-            }
-            if (!targetPhone) {
-              const rp = cleanPhone(matchedRosterStudent.phone || matchedRosterStudent.whatsappNumber || matchedRosterStudent.whatsapp_number);
-              if (rp) targetPhone = rp;
-            }
-          }
-
-          const isEventBroadcast = type === 'event_leave' && !targetPhone && !targetIts && !targetStudentId;
-
-          // Collect all recipient WhatsApp numbers strictly for this child
-          const targetRecipients = new Set();
-          if (targetPhone) targetRecipients.add(targetPhone);
-
-          if (isEventBroadcast) {
-            // For general school-wide event leaves, broadcast to all active linked parents
-            for (const [p] of linkedWASubscribersCache.entries()) {
-              targetRecipients.add(p);
-            }
-          } else {
-            // Strictly match linked subscribers for this specific child ONLY
-            for (const [p, rec] of linkedWASubscribersCache.entries()) {
-              const s = rec.student;
-              if (!s) continue;
-              const sPhone = cleanPhone(s.phone || s.whatsappNumber || s.whatsapp_number || '');
-              const sIts = String(s.its || '').trim();
-              const sName = String(s.name || '').trim().toLowerCase();
-              const sId = String(s.student_id || s.id || '').trim();
-
-              const itsMatches = Boolean(targetIts && sIts && sIts === targetIts);
-              const idMatches = Boolean(targetStudentId && sId && sId === targetStudentId);
-              const phoneMatches = Boolean(targetPhone && sPhone && (
-                sPhone === targetPhone ||
-                (sPhone.length >= 10 && targetPhone.length >= 10 && sPhone.slice(-10) === targetPhone.slice(-10))
-              ));
-              const nameMatches = Boolean(
-                !targetIts && !targetPhone && !targetStudentId &&
-                targetName && sName && (sName === targetName.toLowerCase())
-              );
-
-              if (itsMatches || idMatches || phoneMatches || nameMatches) {
-                targetRecipients.add(p);
-              }
-            }
-
-            // Also check embedded roster to push to the student profile's registered WhatsApp
-            for (const s of embeddedRoster) {
-              const sPhone = cleanPhone(s.phone || s.whatsappNumber || s.whatsapp_number || '');
-              const sIts = String(s.its || '').trim();
-              const sName = String(s.name || '').trim().toLowerCase();
-              const sId = String(s.student_id || s.id || '').trim();
-
-              const itsMatches = Boolean(targetIts && sIts === targetIts);
-              const idMatches = Boolean(targetStudentId && sId && sId === targetStudentId);
-              const phoneMatches = Boolean(targetPhone && sPhone && (
-                sPhone === targetPhone ||
-                (sPhone.length >= 10 && targetPhone.length >= 10 && sPhone.slice(-10) === targetPhone.slice(-10))
-              ));
-              const nameMatches = Boolean(
-                !targetIts && !targetPhone && !targetStudentId &&
-                targetName && sName && (sName === targetName.toLowerCase())
-              );
-
-              if (itsMatches || idMatches || phoneMatches || nameMatches) {
-                if (sPhone) targetRecipients.add(sPhone);
-              }
-            }
-
-            // For leave events, also notify the child's assigned teacher
-            if (type && type.startsWith('leave')) {
-              const studObj = matchedRosterStudent || { name: targetName, its: targetIts, id: targetStudentId };
-              const teacherPhone = findTeacherPhoneForStudent(studObj);
-              if (teacherPhone) targetRecipients.add(teacherPhone);
-            }
-          }
-
-          const studentDisplayName = targetName || student?.name || 'Student';
-          let messageText = '';
-
-          if (type === 'attendance') {
-            const rawStatus = details?.status || details?.attendanceStatus || 'Present';
-            const attStatus = /absent/i.test(rawStatus)
-              ? 'Absent'
-              : (/leave|uzur/i.test(rawStatus) ? 'Excused (Leave)' : 'Present');
-            const attDate = details?.date || new Date().toLocaleDateString('en-GB');
-            const statusEmoji = attStatus === 'Absent' ? '❌' : (attStatus === 'Present' ? '✅' : '📝');
-
-            const record = {
-              status: attStatus,
-              statusEmoji,
-              date: attDate,
-              name: studentDisplayName,
-              phone: targetPhone,
-              its: targetIts,
-              studentId: targetStudentId,
-              updatedAt: Date.now()
-            };
-
-            if (targetPhone) saveAttendanceRecord(`phone:${targetPhone}`, record);
-            if (targetIts) saveAttendanceRecord(`its:${targetIts}`, record);
-            if (targetName) saveAttendanceRecord(`name:${targetName.toLowerCase()}`, record);
-            if (targetStudentId) saveAttendanceRecord(`id:${targetStudentId}`, record);
-
-            messageText = `\n` +
-              `Respected Parent,\n\n` +
-              `Attendance marked for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n` +
-              `📅 Date: *${attDate}*\n` +
-              `📌 Hazri: *${statusEmoji} ${attStatus}*\n\n` +
-              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 1 (Result) • 3 (Leave) • 4 (League Points)*`;
-          } else if (type === 'result_progress' || type === 'result' || type === 'result_live') {
-            const rawScore = details?.total_score !== undefined ? details.total_score : (details?.weeklyScore !== undefined ? details.weeklyScore : details?.score);
-            const numScore = parseFloat(rawScore) || 0;
-            const wJuz = details?.wusool_juz || details?.wusoolJuz || details?.juz || '';
-            const wSurah = details?.wusool_surah || details?.wusoolSurah || details?.surat || '';
-            const wPage = details?.wusool_page || details?.wusoolPage || '';
-            const resData = {
-              student_id: targetStudentId || targetIts,
-              its: targetIts,
-              name: studentDisplayName,
-              week_date: details?.week_date || details?.weekDate || new Date().toISOString().slice(0, 10),
-              from_date: details?.from_date || details?.fromDate || '',
-              till_date: details?.till_date || details?.tillDate || details?.to_date || '',
-              total_score: numScore,
-              wusool_juz: wJuz,
-              wusool_surah: wSurah,
-              wusool_page: wPage,
-              total_jadeed_pages: details?.total_jadeed_pages || details?.totalJadeed || '',
-              total_jadeed_unit: details?.total_jadeed_unit || 'صفه',
-              rank: parseInt(details?.rank || details?.marhalaRank, 10) || 1,
-              overall_rank: parseInt(details?.overall_rank || details?.overallRank || details?.rank, 10) || 1,
-              updated_at: Date.now()
-            };
-            saveWeeklyResultRecord(resData);
-
-            const sMatch = embeddedRoster.find(s => 
-              (targetStudentId && (s.student_id === targetStudentId || s.id === targetStudentId)) ||
-              (targetIts && s.its === targetIts) ||
-              (targetName && s.name.toLowerCase() === targetName.toLowerCase())
-            );
-            if (sMatch) {
-              enrichStudentWithLatestResult(sMatch);
-            }
-
-            const shouldShoot = Boolean(payload.shootToParent || details?.shootToParent || details?.isLive || type === 'result_live');
-            if (shouldShoot && sMatch) {
-              for (const p of targetRecipients) {
-                sendStudentResultImageWhatsApp(`${p}@s.whatsapp.net`, sMatch, p).catch(e => console.warn('[LIVE-RESULT-SHOOT-ERR]:', e.message));
-              }
-            }
-
-            messageText = `\n\n` +
-              `🏆 *Result Update: ${studentDisplayName}*\n` +
-              `Score: *${numScore} / 100*` + (wJuz ? ` | Juz ${wJuz} (${wSurah})` : '') + `\n\n` +
-              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
-          } else if (type === 'leave_applied') {
-            const fromD = details?.fromDate || details?.from_date || '';
-            const tillD = details?.toDate || details?.to_date || '';
-            const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || 'Requested Dates');
-            const reasonStr = details?.reason || details?.note || 'Personal Leave';
-
-            const lvRecord = {
-              status: 'Pending Admin Approval',
-              statusEmoji: '⏳',
-              fromDate: fromD,
-              toDate: tillD,
-              periodStr,
-              reason: reasonStr,
-              comment: '',
-              name: studentDisplayName,
-              phone: targetPhone,
-              its: targetIts,
-              studentId: targetStudentId,
-              updatedAt: Date.now()
-            };
-            if (targetPhone) saveLeaveRecord(`phone:${targetPhone}`, lvRecord);
-            if (targetIts) saveLeaveRecord(`its:${targetIts}`, lvRecord);
-            if (targetName) saveLeaveRecord(`name:${targetName.toLowerCase()}`, lvRecord);
-            if (targetStudentId) saveLeaveRecord(`id:${targetStudentId}`, lvRecord);
-
-            messageText = `\n\n` +
-              `📝 *Leave Application: ${studentDisplayName}*\n` +
-              `📅 Period: *${periodStr}*\n` +
-              `📝 Reason: *${reasonStr}*\n` +
-              `⏳ Status: *Pending Approval*\n\n` +
-              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`;
-          } else if (type === 'leave' || type === 'leave_action') {
-            const lvStatus = details?.status || 'Approved';
-            const statusEmoji = /approved/i.test(lvStatus) ? '✅' : (/rejected/i.test(lvStatus) ? '❌' : '⏳');
-            const fromD = details?.fromDate || details?.from_date || '';
-            const tillD = details?.toDate || details?.to_date || '';
-            const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || '');
-            const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || '';
-
-            const lvRecord = {
-              status: lvStatus,
-              statusEmoji,
-              fromDate: fromD,
-              toDate: tillD,
-              periodStr,
-              reason: details?.reason || '',
-              comment,
-              name: studentDisplayName,
-              phone: targetPhone,
-              its: targetIts,
-              studentId: targetStudentId,
-              updatedAt: Date.now()
-            };
-            if (targetPhone) saveLeaveRecord(`phone:${targetPhone}`, lvRecord);
-            if (targetIts) saveLeaveRecord(`its:${targetIts}`, lvRecord);
-            if (targetName) saveLeaveRecord(`name:${targetName.toLowerCase()}`, lvRecord);
-            if (targetStudentId) saveLeaveRecord(`id:${targetStudentId}`, lvRecord);
-
-            messageText = `\n\n` +
-              `📝 *Leave Update: ${studentDisplayName}*\n` +
-              (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
-              `📌 Status: *${statusEmoji} ${lvStatus}*\n` +
-              (comment ? `💬 Remark: _${comment}_\n\n` : '\n') +
-              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`;
-          } else if (type === 'leave_chat_message') {
-            const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || details?.body || '';
-
-            messageText = `\n\n` +
-              `💬 *Leave Chat: ${studentDisplayName}*\n` +
-              `_${comment}_\n\n` +
-              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave Status)*`;
-          } else if (type === 'event_leave') {
-            const evName = details?.eventName || details?.title || 'Event Leave';
-            const fromD = details?.fromDate || details?.from_date || '';
-            const tillD = details?.toDate || details?.to_date || '';
-            const periodStr = fromD && tillD ? `${fromD} to ${tillD}` : (fromD || '');
-            const reasonStr = details?.reason || details?.body || '';
-
-            messageText = `\n\n` +
-              `*${evName}*\n` +
-              (periodStr ? `📅 Period: *${periodStr}*\n` : '') +
-              (reasonStr ? `📝 Note: _${reasonStr}_\n` : '') +
-              `Holiday marked for *${studentDisplayName}*.\n\n` +
-              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave Status)*`;
-          } else if (type === 'fee_reminder') {
-            const hijriNow = getFatemiHijriMonth();
-            const monthName = details?.monthName || hijriNow.nameEn;
-            const payUrl = 'https://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT';
-
-            messageText = `\n` +
-              `Respected Parent,\n\n` +
-              `Hub Raqam reminder for *${monthName}* for *${studentDisplayName}*${targetIts ? ` (\`${targetIts}\`)` : ''}:\n\n` +
-              `💳 *Pay Online:*\n${payUrl}\n\n` +
-              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 1 (Result) • 2 (Hazri) • 4 (League Points)*`;
-          } else if (type === 'jadwal') {
-            messageText = `\n\n` +
-              `Hifz timetable and target updated for *${studentDisplayName}*.\n\n` +
-              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
-          } else {
-            messageText = `\n\n` +
-              `*${studentDisplayName}:* ${details?.body || details?.title || 'New update recorded.'}\n\n` +
-              `Regards,\n*Mauze Tahfeez - Galiakot*\n\n` +
-              `💬 *Type 1 (Result) • 2 (Hazri) • 3 (Leave) • 4 (League Points)*`;
-          }
-
-          let delivered = 0;
-          if (sock && baileysStatus === 'CONNECTED') {
-            for (const recipient of targetRecipients) {
-              const jid = formatTargetJid(recipient);
-              if (!jid) continue;
-              try {
-                await sock.sendMessage(jid, { text: messageText });
-                delivered++;
-                console.log(`[WHATSAPP-PUSH] 🚀 Sent live ${type} update to ${jid} for ${studentDisplayName}`);
-              } catch (err) {
-                console.warn(`[WHATSAPP-PUSH-FAIL] Error sending to ${jid}:`, err.message);
-              }
-            }
-          }
-
+          const dispatchResult = await dispatchStudentNotification(payload);
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({
-            success: true,
-            delivered,
-            totalTargets: targetRecipients.size,
-            recipients: Array.from(targetRecipients)
-          }));
+          res.end(JSON.stringify(dispatchResult || { success: true }));
         } catch (e) {
           res.writeHead(500, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, error: e.message }));
@@ -6606,6 +6870,11 @@ export function startWhatsAppBotEngine() {
   }
 }
 
-// Automatically start engine
-startWhatsAppBotEngine();
+// Automatically start engine (set WA_BOT_SKIP_AUTOSTART=true to import this
+// module for testing/verification without opening the WhatsApp socket).
+if (process.env.WA_BOT_SKIP_AUTOSTART !== 'true') {
+  startWhatsAppBotEngine();
+} else {
+  console.log('[WHATSAPP BOT] ⏸️ Autostart skipped (WA_BOT_SKIP_AUTOSTART=true).');
+}
 

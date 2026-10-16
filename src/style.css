@@ -138,8 +138,33 @@
 
 @font-face {
   font-family: 'Al-Kanz';
-  src: url('/fonts/al-kanz.ttf') format('truetype');
+  src: local('Al-Kanz'),
+    local('AL-KANZ'),
+    local('Al-Kanz for Windows'),
+    url('/fonts/al-kanz.ttf') format('truetype');
   font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Al-Kanz';
+  src: local('Al-Kanz'),
+    local('AL-KANZ'),
+    local('Al-Kanz for Windows'),
+    url('/fonts/al-kanz.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Al-Kanz';
+  src: local('Al-Kanz'),
+    local('AL-KANZ'),
+    local('Al-Kanz for Windows'),
+    url('/fonts/al-kanz.ttf') format('truetype');
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
@@ -517,7 +542,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
 }
 
 .arabic-kanz {
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-family: 'Al-Kanz';
   direction: rtl;
   color: var(--dark-gold);
   font-weight: 400;
@@ -527,7 +552,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
 }
 
 .arabic-text {
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-family: 'Al-Kanz';
   font-weight: 400;
 }
 
@@ -1822,7 +1847,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
 }
 
 .jumla-label {
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-family: 'Al-Kanz';
   font-weight: 400;
   font-size: 2.2rem;
   color: #8b0000;
@@ -1843,14 +1868,14 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   margin-bottom: 8px;
   background: white;
   box-shadow: 0 8px 20px rgba(138, 101, 21, 0.1);
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-family: 'Al-Kanz';
 }
 
 .max-score {
   font-size: 1rem;
   font-weight: 700;
   color: var(--text-muted);
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-family: 'Al-Kanz';
 }
 
 .score-details-box {
@@ -1876,7 +1901,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
 }
 
 .arabic-label {
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-family: 'Al-Kanz';
   font-size: 1.5rem;
   color: var(--dark-gold);
 }
@@ -1885,7 +1910,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   font-weight: 800;
   color: var(--text-main);
   font-size: 1.2rem;
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-family: 'Al-Kanz';
 }
 
 .result-footer-grid {
@@ -9204,29 +9229,27 @@ body {
   font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
 }
 
-n
-
 /* --- Full Width Label Helper --- */
 .full-width {
   grid-column: 1 / -1;
 }
 
-/* --- Kanz al Marjaan Font Helper (no RTL direction) --- */
+/* --- Al-Kanz Font Helper (no RTL direction) --- */
 .kanz-font {
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-family: 'Al-Kanz';
   letter-spacing: normal;
   font-kerning: normal;
   -webkit-font-kerning: normal;
 }
 
 .arabic-text {
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-family: 'Al-Kanz';
 }
 
 
 .premium-select option.arabic-text,
 .juz-surat-selector .premium-select .arabic-kanz-option {
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif !important;
+  font-family: 'Al-Kanz' !important;
   font-size: 1.1rem;
 }
 
@@ -10864,10 +10887,10 @@ img:not([loading]) {
 
 
 
-/* Override for elements that specifically need Kanz al Marjaan font (like attendance headings) */
+/* Override for elements that specifically need Al-Kanz font (like attendance headings) */
 h4.attendance-rating-text,
 .attendance-rating-text.arabic-kanz {
-  font-family: 'Kanz al Marjaan', 'Al-Kanz', serif !important;
+  font-family: 'Al-Kanz' !important;
 }
 
 /* Arabic font enforcement */
@@ -10877,7 +10900,34 @@ h4.attendance-rating-text,
 .kanz-font,
 [class*=" arabic-"],
 [class*="kanz-"] {
-  font-family: "Al-Kanz", "Kanz al Marjaan", serif;
+  font-family: 'Al-Kanz';
+}
+
+/* ===================================================================
+   ★ TAHFEEZ REPORT CARD - PURE AL-KANZ FONT ENFORCEMENT
+   Ensures all Arabic and English labels (Jadeed, Murajah, Wusool Juz, etc.)
+   strictly render in Al-Kanz font only with zero fallbacks to other fonts.
+   =================================================================== */
+.progress-overview .arabic-kanz,
+.progress-overview .kanz-font,
+.progress-overview .arabic-label,
+.progress-overview .jumla-label,
+.progress-overview .score-circle,
+.progress-overview .score-val,
+.progress-overview .max-score,
+.progress-overview .meta-val,
+.progress-overview .attendance-rating-text,
+.progress-overview .attendance-sub-label,
+.progress-overview .target-box h5.arabic-kanz,
+.progress-overview .target-box p span.arabic-kanz,
+.progress-overview .note-label.arabic-kanz,
+.progress-overview .note-val,
+.progress-overview .score-details-box .score-row span.arabic-label,
+.progress-overview [class*="kanz"],
+.progress-overview .target-box h5,
+.progress-overview .attendance-card-modern h4.attendance-rating-text,
+.progress-overview .jadeed-pages-card h4.attendance-rating-text {
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif !important;
 }
 
 /* ── App Update Popup – Countdown & Force Overrides ── */

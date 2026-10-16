@@ -285,17 +285,32 @@ export default function StudentProfileView({
         .map(String);
 
       // Save to localStorage immediately if not an oversized base64 string
+      // (all key variants so every avatar lookup finds it).
       try {
         if (photoUrlToCommit && (!photoUrlToCommit.startsWith("data:") || photoUrlToCommit.length < 50000)) {
-          localStorage.setItem(`mauze_student_photo_${studentKey}`, photoUrlToCommit);
+          const seenKeys = new Set();
           candidateIds.forEach((cid) => {
-            localStorage.setItem(`mauze_photo_${cid}`, photoUrlToCommit);
+            const k1 = `mauze_student_photo_${cid}`;
+            const k2 = `mauze_photo_${cid}`;
+            const k3 = `student_photo_${cid}`;
+            if (!seenKeys.has(k1)) { seenKeys.add(k1); localStorage.setItem(k1, photoUrlToCommit); }
+            if (!seenKeys.has(k2)) { seenKeys.add(k2); localStorage.setItem(k2, photoUrlToCommit); }
+            if (!seenKeys.has(k3)) { seenKeys.add(k3); localStorage.setItem(k3, photoUrlToCommit); }
           });
+          localStorage.setItem(`mauze_student_photo_${studentKey}`, photoUrlToCommit);
           localStorage.setItem("activeChildPhoto", photoUrlToCommit);
         }
       } catch (_) {}
 
-      // Update in Supabase across all potential identifier columns
+      // Update in Supabase across all potential identifier columns.
+      // Write every photo field variant so admin, teacher, parent and league
+      // views (which read different keys) all resolve the same picture.
+      const photoSyncPayload = {
+        photo_url: photoUrlToCommit,
+        avatar_url: photoUrlToCommit,
+        photo: photoUrlToCommit,
+        updated_at: new Date().toISOString(),
+      };
       const conditions = [];
       candidateIds.forEach((cid) => {
         conditions.push(`student_id.eq.${cid}`);
@@ -307,11 +322,7 @@ export default function StudentProfileView({
         try {
           await supabase
             .from(targetTable)
-            .update({
-              photo_url: photoUrlToCommit,
-              avatar_url: photoUrlToCommit,
-              updated_at: new Date().toISOString(),
-            })
+            .update(photoSyncPayload)
             .or(conditions.join(","));
         } catch (sbErr) {
           console.warn("Supabase photo update note:", sbErr);
@@ -325,7 +336,7 @@ export default function StudentProfileView({
         for (const cid of candidateIds) {
           try {
             const ref = doc(db, targetTable, String(cid));
-            await setDoc(ref, { photo_url: photoUrlToCommit, avatar_url: photoUrlToCommit }, { merge: true });
+            await setDoc(ref, { ...photoSyncPayload }, { merge: true });
           } catch (_) {}
         }
       } catch (_) {}
@@ -336,6 +347,7 @@ export default function StudentProfileView({
         studentProfile.photo_url = photoUrlToCommit;
         studentProfile.photoUrl = photoUrlToCommit;
         studentProfile.avatar_url = photoUrlToCommit;
+        studentProfile.photo = photoUrlToCommit;
       }
 
       if (onProfileUpdated) {
@@ -344,6 +356,7 @@ export default function StudentProfileView({
           photo_url: photoUrlToCommit,
           photoUrl: photoUrlToCommit,
           avatar_url: photoUrlToCommit,
+          photo: photoUrlToCommit,
         });
       }
 
@@ -424,6 +437,13 @@ export default function StudentProfileView({
 
           if (!uploadError && uploadData?.publicUrl) {
             uploadedUrl = uploadData.publicUrl;
+          } else if (!uploadError && uploadData?.path) {
+            try {
+              const { data: pubData } = await supabase.storage
+                .from("child profile pictures")
+                .getPublicUrl(uploadData.path);
+              if (pubData?.publicUrl) uploadedUrl = pubData.publicUrl;
+            } catch (_) {}
           }
         } catch (stErr) {
           console.warn("Storage upload note, using compressed profile photo:", stErr);
@@ -513,6 +533,7 @@ export default function StudentProfileView({
         photo_url: photoToPersist,
         photoUrl: photoToPersist,
         avatar_url: photoToPersist,
+        photo: photoToPersist,
         updated_at: new Date().toISOString(),
       };
 
@@ -573,13 +594,15 @@ export default function StudentProfileView({
         }
       } catch (_) {}
 
-      // Cache updated photo in localStorage if safe in size
+      // Cache updated photo in localStorage (all key variants) if safe in size
       if (photoToPersist && typeof localStorage !== "undefined") {
         try {
           if (!photoToPersist.startsWith("data:") || photoToPersist.length < 50000) {
             localStorage.setItem(`mauze_student_photo_${studentKey}`, photoToPersist);
             candidateIds.forEach((cid) => {
+              localStorage.setItem(`mauze_student_photo_${cid}`, photoToPersist);
               localStorage.setItem(`mauze_photo_${cid}`, photoToPersist);
+              localStorage.setItem(`student_photo_${cid}`, photoToPersist);
             });
             localStorage.setItem("activeChildPhoto", photoToPersist);
           }

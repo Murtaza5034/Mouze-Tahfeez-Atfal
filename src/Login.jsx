@@ -44,9 +44,47 @@ const ROLE_OPTIONS = [
   },
 ];
 
+const KNOWN_ADMIN_EMAILS = new Set([
+  "taher.rawat@mahdalzahra.com",
+  "taher.rawat@mahadalzahra.com",
+  "taherrawat786@gmail.com",
+  "taherrawat786@gamil.com",
+  "mh.developer53@gmail.com",
+]);
+
+function isTaherRawatAdminEmail(em) {
+  const clean = (em || "").trim().toLowerCase();
+  return (
+    clean === "taher.rawat@mahdalzahra.com" ||
+    clean === "taher.rawat@mahadalzahra.com" ||
+    clean === "taherrawat786@gmail.com" ||
+    clean === "taherrawat786@gamil.com" ||
+    clean.includes("taher.rawat") ||
+    clean.includes("taherrawat")
+  );
+}
+
+const KNOWN_TEACHER_EMAILS = new Set([
+  "zahabiyarampura6@gmail.com",
+  "ychikhly156@gmail.com",
+  "mustafamanpur1@gmail.com",
+  "321hatim@gmail.com",
+  "husain.kheroda@mahadalzahra.com",
+  "moiz.nihal@mahadalzahra.com",
+  "mansoor.taskeen@mahadalzahra.com",
+  "ruqaiyahbadnagar553@gmail.com",
+  "murtaza.mohammed.hamid@mahadalzahra.com",
+  "saifuddin5287@gmail.com",
+  "batool5152@yahoo.com",
+  "tmjiger@gmail.com",
+]);
+
 export default function Login({ onLoginSuccess }) {
   const [selectedRole, setSelectedRole] = useState(() => {
     const saved = localStorage.getItem("mauze-saved-role") || "parents";
+    const savedEmail = (localStorage.getItem("mauze-saved-email") || "").trim().toLowerCase();
+    if (KNOWN_ADMIN_EMAILS.has(savedEmail) || isTaherRawatAdminEmail(savedEmail)) return "admin";
+    if (KNOWN_TEACHER_EMAILS.has(savedEmail)) return "teacher";
     const isValid = ROLE_OPTIONS.some(opt => opt.id === saved);
     return isValid ? saved : "parents";
   });
@@ -56,6 +94,16 @@ export default function Login({ onLoginSuccess }) {
   const [password, setPassword] = useState(() => {
     return localStorage.getItem("mauze-saved-password") || "";
   });
+
+  // Automatically switch tab to Admin or Teacher if user enters a known admin/teacher email
+  useEffect(() => {
+    const cleanEmail = email.trim().toLowerCase();
+    if ((KNOWN_ADMIN_EMAILS.has(cleanEmail) || isTaherRawatAdminEmail(cleanEmail)) && selectedRole !== "admin") {
+      setSelectedRole("admin");
+    } else if (KNOWN_TEACHER_EMAILS.has(cleanEmail) && !KNOWN_ADMIN_EMAILS.has(cleanEmail) && !isTaherRawatAdminEmail(cleanEmail) && selectedRole !== "teacher" && selectedRole !== "admin") {
+      setSelectedRole("teacher");
+    }
+  }, [email, selectedRole]);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -140,26 +188,39 @@ export default function Login({ onLoginSuccess }) {
 
   const handleLogin = async (event) => {
     event.preventDefault();
+    if (typeof window !== "undefined") {
+      window.__mauze_login_in_progress = true;
+    }
     setLoading(true);
     setError(null);
     setMismatchInfo(null);
     setButtonFeedback(null);
 
+    const cleanEmail = email.trim().toLowerCase();
+    const isTaherAdmin = isTaherRawatAdminEmail(cleanEmail);
+    const isKnownAdmin = KNOWN_ADMIN_EMAILS.has(cleanEmail) || isTaherAdmin;
+    const isKnownTeacher = KNOWN_TEACHER_EMAILS.has(cleanEmail);
+    const effectiveSelectedRole = isKnownAdmin
+      ? "admin"
+      : isKnownTeacher
+        ? (selectedRole === "admin" ? "admin" : "teacher")
+        : selectedRole;
+
     let lastError = null;
     const maxRetries = 2;
-    const timeoutMs = 10000;
+    const timeoutMs = 15000;
     const backoffs = [1200, 2500];
 
     // Wrap the auth call in a timeout so a slow/hung mobile request can't block
     // the UI forever; we re-attempt with adaptive backoff on weak connections.
-    const attemptAuth = () => new Promise((resolve) => {
+    const attemptAuth = (targetEmail = email) => new Promise((resolve) => {
       let settled = false;
       const timer = setTimeout(() => {
         if (settled) return;
         settled = true;
         resolve({ data: null, error: { name: 'AbortError', message: 'Request timed out' } });
       }, timeoutMs);
-      supabase.auth.signInWithPassword({ email, password }).then((result) => {
+      supabase.auth.signInWithPassword({ email: targetEmail, password }).then((result) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
@@ -172,13 +233,30 @@ export default function Login({ onLoginSuccess }) {
       });
     });
 
-    const isDevAdmin = email.trim().toLowerCase() === "mh.developer53@gmail.com";
-    if (isDevAdmin) {
+    const isDevAdmin = cleanEmail === "mh.developer53@gmail.com";
+    if (isDevAdmin || isTaherAdmin) {
       let { data, error: authError } = await attemptAuth();
-      if (authError && (authError.message?.toLowerCase().includes("invalid") || authError.message?.toLowerCase().includes("credentials"))) {
+      if (authError && isTaherAdmin) {
+        // Try all verified aliases for Janab Mulla Taher bhai Rawat
+        const aliases = [
+          "taher.rawat@mahadalzahra.com",
+          "taher.rawat@mahdalzahra.com",
+          "taherrawat786@gmail.com",
+          "taherrawat786@gamil.com",
+        ].filter((a) => a !== cleanEmail);
+        for (const alias of aliases) {
+          const aliasRes = await attemptAuth(alias);
+          if (!aliasRes.error && aliasRes.data?.user) {
+            data = aliasRes.data;
+            authError = null;
+            break;
+          }
+        }
+      }
+      if (authError && isDevAdmin && (authError.message?.toLowerCase().includes("invalid") || authError.message?.toLowerCase().includes("credentials"))) {
         try {
           const { error: signUpError } = await supabase.auth.signUp({
-            email: email.trim().toLowerCase(),
+            email: cleanEmail,
             password: password,
             options: {
               data: {
@@ -202,6 +280,9 @@ export default function Login({ onLoginSuccess }) {
       if (!authError && data?.user) {
         onLoginSuccess(data.user, "admin", rememberMe).then((result) => {
           setLoading(false);
+          if (typeof window !== "undefined") {
+            window.__mauze_login_in_progress = false;
+          }
           if (!result?.ok) {
             setError(result?.message || "This account cannot access the selected portal.");
             if (result?.expectedRole) {
@@ -213,6 +294,12 @@ export default function Login({ onLoginSuccess }) {
           } else {
             setButtonFeedback("success");
           }
+        }).catch((err) => {
+          setLoading(false);
+          if (typeof window !== "undefined") {
+            window.__mauze_login_in_progress = false;
+          }
+          setError(err?.message || "Login processing failed.");
         });
         return;
       }
@@ -223,8 +310,11 @@ export default function Login({ onLoginSuccess }) {
         const { data, error: authError } = await attemptAuth();
 
         if (!authError) {
-          onLoginSuccess(data.user, selectedRole, rememberMe).then((result) => {
+          onLoginSuccess(data.user, effectiveSelectedRole, rememberMe).then((result) => {
             setLoading(false);
+            if (typeof window !== "undefined") {
+              window.__mauze_login_in_progress = false;
+            }
             if (!result?.ok) {
               setError(result?.message || "This account cannot access the selected portal.");
               if (result?.expectedRole) {
@@ -236,6 +326,12 @@ export default function Login({ onLoginSuccess }) {
             } else {
               setButtonFeedback("success");
             }
+          }).catch((err) => {
+            setLoading(false);
+            if (typeof window !== "undefined") {
+              window.__mauze_login_in_progress = false;
+            }
+            setError(err?.message || "Login processing failed.");
           });
           return;
         }
@@ -250,10 +346,13 @@ export default function Login({ onLoginSuccess }) {
       }
     }
 
+    if (typeof window !== "undefined") {
+      window.__mauze_login_in_progress = false;
+    }
     setButtonFeedback("error");
     setError(isNetworkError(lastError)
       ? "Unable to connect. Please check your internet and try again."
-      : lastError.message);
+      : lastError?.message || "Login failed.");
     setButtonFeedback(null);
     setLoading(false);
   };

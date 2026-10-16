@@ -22,6 +22,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { firebaseApp } from "./config.js";
+import { auth, waitForAuthReady } from "./auth.js";
 
 // ---------------------------------------------------------------------------
 // Firestore data engine exposing a supabase-compatible query surface.
@@ -505,6 +506,13 @@ function nativeConstraints(filters) {
 async function loadCandidates(state, ref) {
   const filters = state.filters || [];
 
+  // Wait for Firebase Auth initialization if auth is currently settling
+  if (!auth.currentUser) {
+    try {
+      await waitForAuthReady();
+    } catch (_) {}
+  }
+
   // Intercept empty 'in' filters to avoid Firestore crashes and return [] immediately
   const hasEmptyInFilter = filters.some(f => f.op === "in" && Array.isArray(f.val) && f.val.length === 0);
   if (hasEmptyInFilter) {
@@ -531,8 +539,17 @@ async function loadCandidates(state, ref) {
       const snap = await getDoc(docRef);
       return snap.exists() ? [convertRow(snap)] : [];
     } catch (_) {
-      const snap = await getDocFromServer(docRef);
-      return snap.exists() ? [convertRow(snap)] : [];
+      try {
+        const snap = await getDocFromServer(docRef);
+        return snap.exists() ? [convertRow(snap)] : [];
+      } catch (docErr) {
+        // Fallback to cache or empty
+        try {
+          const snap = await getDocFromCache(docRef);
+          return snap.exists() ? [convertRow(snap)] : [];
+        } catch (_) {}
+        return [];
+      }
     }
   }
 
@@ -551,6 +568,34 @@ async function loadCandidates(state, ref) {
     const snap = await getDocs(q);
     return snap.docs.map(convertRow);
   } catch (e) {
+    // 1. Try local cache fallback before failing
+    try {
+      const snapCache = await getDocsFromCache(q);
+      if (snapCache && snapCache.docs.length > 0) {
+        return snapCache.docs.map(convertRow);
+      }
+    } catch (_) {}
+
+    const errCode = String(e?.code || "").toLowerCase();
+    const errMsg = String(e?.message || "");
+
+    // 2. Auth / permission-denied recovery: wait for auth and retry
+    if (errCode.includes("permission-denied") || errMsg.includes("permission") || errMsg.includes("permissions")) {
+      try {
+        await waitForAuthReady();
+        const snapRetry = await getDocs(q);
+        return snapRetry.docs.map(convertRow);
+      } catch (_) {}
+      try {
+        const snapCache = await getDocsFromCache(q);
+        if (snapCache && snapCache.docs.length > 0) {
+          return snapCache.docs.map(convertRow);
+        }
+      } catch (_) {}
+      console.warn(`[Firestore Permission/Auth Note] Safe fallback for "${state.collection}":`, errMsg || errCode);
+      return [];
+    }
+
     if (isIndexError(e)) {
       const first = filters.find(isSimpleFilter);
       let indexQ = ref;
@@ -575,10 +620,39 @@ async function loadCandidates(state, ref) {
         }
       } catch (_) {}
 
-      const snap = await getDocs(indexQ);
-      return snap.docs.map(convertRow);
+      try {
+        const snap = await getDocs(indexQ);
+        return snap.docs.map(convertRow);
+      } catch (idxErr) {
+        console.warn(`Firestore index fallback error on "${state.collection}":`, idxErr?.message);
+        return [];
+      }
     }
-    throw e;
+
+    if (
+      errCode.includes("resource-exhausted") ||
+      errCode.includes("quota") ||
+      errMsg.includes("Quota exceeded") ||
+      errMsg.includes("RESOURCE_EXHAUSTED") ||
+      errCode.includes("unavailable") ||
+      errCode.includes("network") ||
+      errMsg.includes("network") ||
+      errMsg.includes("offline")
+    ) {
+      console.warn(`[Firestore Offline/Quota Fallback] Safe return for "${state.collection}":`, errMsg || errCode);
+      return [];
+    }
+
+    // Rather than crashing caller, check cache one more time before returning empty
+    try {
+      const snapCache = await getDocsFromCache(q);
+      if (snapCache && snapCache.docs.length > 0) {
+        return snapCache.docs.map(convertRow);
+      }
+    } catch (_) {}
+
+    console.warn(`[Firestore Safe Return for "${state.collection}"]:`, errMsg || errCode);
+    return [];
   }
 }
 

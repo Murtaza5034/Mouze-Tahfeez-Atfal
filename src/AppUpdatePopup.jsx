@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "./supabaseClient";
+import { isNativeUpdateTakingOver } from "./nativeAppUpdate";
 import { Smartphone, X, CheckCircle2, ExternalLink, Sparkles, Shield, Clock } from "lucide-react";
 
 const LS_KEY = "mauze-dismissed-app-update";
@@ -41,6 +42,14 @@ export default function AppUpdatePopup() {
   const checkForUpdate = useCallback(async () => {
     try {
       setLoading(true);
+
+      // Google Play's official in-app update flow takes precedence: when it is
+      // showing an update, do not show this popup on top of it.
+      if (await isNativeUpdateTakingOver()) {
+        setDismissed(true);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("app_releases")
         .select("version_name, version_code, release_notes, created_at, status, console_status")
